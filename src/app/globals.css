@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+/*
+  =============================================================================
+  Novel Studio Design System
+  -----------------------------------------------------------------------------
+  Notion / Obsidian / Linear 처럼 심플하고 오래 봐도 질리지 않는 UI를 목표로 한다.
+
+  원칙
+  - 흰색 + 매우 연한 회색 기반
+  - 포인트 컬러는 파란색 하나
+  - 둥근 모서리, 카드 UI, 충분한 여백
+  - iPad 터치에 충분한 크기 (최소 터치 영역 약 44px)
+  =============================================================================
+*/
+
+:root {
+  /* -------------------------------------------------------------------------
+     1. Color System
+     - canvas  : 앱 전체 배경 (순백)
+     - surface : 카드/패널 배경 (거의 흰색)
+     - muted   : 섹션 구분용 매우 연한 회색
+     - border  : 경계선 (눈에 띄지 않게)
+     - ink     : 본문 텍스트
+     - subtle  : 보조 텍스트
+     - accent  : 유일한 포인트 컬러 (파랑)
+     ------------------------------------------------------------------------- */
+  --ns-color-canvas: #ffffff;
+  --ns-color-surface: #ffffff;
+  --ns-color-muted: #f7f7f5;
+  --ns-color-border: #e8e8e5;
+  --ns-color-border-strong: #d4d4d0;
+
+  --ns-color-ink: #1f1f1f;
+  --ns-color-ink-secondary: #5f5f5a;
+  --ns-color-ink-tertiary: #8a8a84;
+  --ns-color-ink-inverse: #ffffff;
+
+  --ns-color-accent: #2563eb;
+  --ns-color-accent-hover: #1d4ed8;
+  --ns-color-accent-soft: #eff6ff;
+  --ns-color-accent-border: #bfdbfe;
+
+  --ns-color-danger: #dc2626;
+  --ns-color-danger-hover: #b91c1c;
+  --ns-color-danger-soft: #fef2f2;
+
+  --ns-color-overlay: rgb(15 15 15 / 0.4);
+
+  /* -------------------------------------------------------------------------
+     2. Typography
+     - 본문: 읽기 편한 크기와 행간
+     - 제목: 과장하지 않는 계층
+     - iPad에서도 읽히도록 최소 14px 이상 유지
+     ------------------------------------------------------------------------- */
+  --ns-font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --ns-font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --ns-text-xs: 0.75rem; /* 12px - 캡션, 메타 */
+  --ns-text-sm: 0.875rem; /* 14px - 보조 본문 */
+  --ns-text-base: 1rem; /* 16px - 기본 본문 */
+  --ns-text-lg: 1.125rem; /* 18px - 강조 본문 */
+  --ns-text-xl: 1.25rem; /* 20px - 소제목 */
+  --ns-text-2xl: 1.5rem; /* 24px - 페이지 제목 */
+  --ns-text-3xl: 1.875rem; /* 30px - 히어로/작품명 */
+
+  --ns-leading-tight: 1.25;
+  --ns-leading-snug: 1.375;
+  --ns-leading-normal: 1.5;
+  --ns-leading-relaxed: 1.65;
+
+  --ns-tracking-tight: -0.02em;
+  --ns-tracking-normal: 0;
+  --ns-font-weight-normal: 400;
+  --ns-font-weight-medium: 500;
+  --ns-font-weight-semibold: 600;
+
+  /* -------------------------------------------------------------------------
+     3. Spacing 규칙 (4px 기준 스케일)
+     - 1 = 4px, 2 = 8px, 3 = 12px, 4 = 16px ...
+     - 컴포넌트 내부: 3~4 (12~16px)
+     - 카드 패딩: 5~6 (20~24px)
+     - 섹션 간격: 8~12 (32~48px)
+     - 페이지 여백: 6~10 (24~40px), iPad는 더 넉넉히
+     ------------------------------------------------------------------------- */
+  --ns-space-0: 0;
+  --ns-space-1: 0.25rem; /* 4px */
+  --ns-space-2: 0.5rem; /* 8px */
+  --ns-space-3: 0.75rem; /* 12px */
+  --ns-space-4: 1rem; /* 16px */
+  --ns-space-5: 1.25rem; /* 20px */
+  --ns-space-6: 1.5rem; /* 24px */
+  --ns-space-8: 2rem; /* 32px */
+  --ns-space-10: 2.5rem; /* 40px */
+  --ns-space-12: 3rem; /* 48px */
+  --ns-space-16: 4rem; /* 64px */
+
+  /* 터치/클릭 최소 높이 (iPad 친화) */
+  --ns-touch-min: 2.75rem; /* 44px */
+
+  /* 모서리 — 카드 UI에 맞는 부드러운 라운드 */
+  --ns-radius-sm: 0.5rem; /* 8px */
+  --ns-radius-md: 0.75rem; /* 12px */
+  --ns-radius-lg: 1rem; /* 16px */
+  --ns-radius-xl: 1.25rem; /* 20px */
+  --ns-radius-full: 9999px;
+
+  /* 그림자 — 거의 없는 수준 (과한 elevation 지양) */
+  --ns-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+  --ns-shadow-md: 0 4px 16px rgb(0 0 0 / 0.06);
+  --ns-shadow-lg: 0 12px 40px rgb(0 0 0 / 0.1);
+
+  /* 포커스 링 */
+  --ns-ring-accent: 0 0 0 3px rgb(37 99 235 / 0.25);
+
+  /* 하위 호환 (기존 Next 템플릿 변수) */
+  --background: var(--ns-color-canvas);
+  --foreground: var(--ns-color-ink);
+}
+
+/*
+  Tailwind v4 테마 토큰
+  - 클래스에서 bg-ns-muted, text-ns-ink, p-ns-4, rounded-ns-md 등으로 사용
+*/
+@theme inline {
+  --color-background: var(--ns-color-canvas);
+  --color-foreground: var(--ns-color-ink);
+
+  --color-ns-canvas: var(--ns-color-canvas);
+  --color-ns-surface: var(--ns-color-surface);
+  --color-ns-muted: var(--ns-color-muted);
+  --color-ns-border: var(--ns-color-border);
+  --color-ns-border-strong: var(--ns-color-border-strong);
+  --color-ns-ink: var(--ns-color-ink);
+  --color-ns-ink-secondary: var(--ns-color-ink-secondary);
+  --color-ns-ink-tertiary: var(--ns-color-ink-tertiary);
+  --color-ns-ink-inverse: var(--ns-color-ink-inverse);
+  --color-ns-accent: var(--ns-color-accent);
+  --color-ns-accent-hover: var(--ns-color-accent-hover);
+  --color-ns-accent-soft: var(--ns-color-accent-soft);
+  --color-ns-accent-border: var(--ns-color-accent-border);
+  --color-ns-danger: var(--ns-color-danger);
+  --color-ns-danger-hover: var(--ns-color-danger-hover);
+  --color-ns-danger-soft: var(--ns-color-danger-soft);
+  --color-ns-overlay: var(--ns-color-overlay);
+
+  --font-sans: var(--ns-font-sans);
+  --font-mono: var(--ns-font-mono);
+
+  --text-ns-xs: var(--ns-text-xs);
+  --text-ns-sm: var(--ns-text-sm);
+  --text-ns-base: var(--ns-text-base);
+  --text-ns-lg: var(--ns-text-lg);
+  --text-ns-xl: var(--ns-text-xl);
+  --text-ns-2xl: var(--ns-text-2xl);
+  --text-ns-3xl: var(--ns-text-3xl);
+
+  --leading-ns-tight: var(--ns-leading-tight);
+  --leading-ns-snug: var(--ns-leading-snug);
+  --leading-ns-normal: var(--ns-leading-normal);
+  --leading-ns-relaxed: var(--ns-leading-relaxed);
+
+  --spacing-ns-0: var(--ns-space-0);
+  --spacing-ns-1: var(--ns-space-1);
+  --spacing-ns-2: var(--ns-space-2);
+  --spacing-ns-3: var(--ns-space-3);
+  --spacing-ns-4: var(--ns-space-4);
+  --spacing-ns-5: var(--ns-space-5);
+  --spacing-ns-6: var(--ns-space-6);
+  --spacing-ns-8: var(--ns-space-8);
+  --spacing-ns-10: var(--ns-space-10);
+  --spacing-ns-12: var(--ns-space-12);
+  --spacing-ns-16: var(--ns-space-16);
+  --spacing-ns-touch: var(--ns-touch-min);
+
+  --radius-ns-sm: var(--ns-radius-sm);
+  --radius-ns-md: var(--ns-radius-md);
+  --radius-ns-lg: var(--ns-radius-lg);
+  --radius-ns-xl: var(--ns-radius-xl);
+  --radius-ns-full: var(--ns-radius-full);
+
+  --shadow-ns-sm: var(--ns-shadow-sm);
+  --shadow-ns-md: var(--ns-shadow-md);
+  --shadow-ns-lg: var(--ns-shadow-lg);
+}
+
+/*
+  기본 문서 스타일
+  - 다크 모드 자동 전환은 사용하지 않는다.
+    (디자인 컨셉이 밝은 작업실 UI이므로 일관성을 우선한다.)
+*/
+body {
+  background: var(--ns-color-canvas);
+  color: var(--ns-color-ink);
+  font-family: var(--ns-font-sans);
+  font-size: var(--ns-text-base);
+  line-height: var(--ns-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+  타이포그래피 유틸리티
+  - 페이지/컴포넌트에서 제목·본문 계층을 통일하기 위한 클래스
+*/
+.ns-display {
+  font-size: var(--ns-text-3xl);
+  line-height: var(--ns-leading-tight);
+  font-weight: var(--ns-font-weight-semibold);
+  letter-spacing: var(--ns-tracking-tight);
+  color: var(--ns-color-ink);
+}
+
+.ns-title {
+  font-size: var(--ns-text-2xl);
+  line-height: var(--ns-leading-tight);
+  font-weight: var(--ns-font-weight-semibold);
+  letter-spacing: var(--ns-tracking-tight);
+  color: var(--ns-color-ink);
+}
+
+.ns-heading {
+  font-size: var(--ns-text-xl);
+  line-height: var(--ns-leading-snug);
+  font-weight: var(--ns-font-weight-semibold);
+  color: var(--ns-color-ink);
+}
+
+.ns-body {
+  font-size: var(--ns-text-base);
+  line-height: var(--ns-leading-relaxed);
+  font-weight: var(--ns-font-weight-normal);
+  color: var(--ns-color-ink);
+}
+
+.ns-body-sm {
+  font-size: var(--ns-text-sm);
+  line-height: var(--ns-leading-normal);
+  font-weight: var(--ns-font-weight-normal);
+  color: var(--ns-color-ink-secondary);
+}
+
+.ns-caption {
+  font-size: var(--ns-text-xs);
+  line-height: var(--ns-leading-normal);
+  font-weight: var(--ns-font-weight-medium);
+  color: var(--ns-color-ink-tertiary);
+}
+
+/* 포커스 가능한 요소의 기본 아웃라인 정리 */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ns-ring-accent);
+}
