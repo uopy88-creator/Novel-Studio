@@ -10,8 +10,10 @@ export type { SupabasePublicConfig } from "./supabase/client";
 
 export {
   DB_TABLES,
+  type DbCharacterRow,
   type DbDialogueRow,
   type DbDocumentRow,
+  type DbInspirationRow,
   type DbManuscriptRow,
   type DbProjectRow,
 } from "./supabase/types";

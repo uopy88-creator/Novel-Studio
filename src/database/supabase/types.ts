@@ -65,6 +65,44 @@ export interface DbDialogueRow {
   updated_at: string;
 }
 
+/** characters */
+export interface DbCharacterRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  role: string;
+  age: string;
+  gender: string;
+  occupation: string;
+  personality: string;
+  goal: string;
+  secret: string;
+  memo: string;
+  image: string;
+  color: string;
+  is_favorite: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** inspirations */
+export interface DbInspirationRow {
+  id: string;
+  project_id: string;
+  document_id: string;
+  user_id: string;
+  selected_text: string;
+  work_title: string;
+  author: string;
+  memo: string;
+  start_offset: number;
+  end_offset: number;
+  created_at: string;
+  updated_at: string;
+}
+
 /** 테이블 이름 — SQL / 리포지토리에서 동일하게 사용 */
 export const DB_TABLES = {
   projects: "projects",
@@ -72,5 +110,6 @@ export const DB_TABLES = {
   manuscripts: "manuscripts",
   dialogues: "dialogues",
   characters: "characters",
+  inspirations: "inspirations",
   memos: "memos",
 } as const;

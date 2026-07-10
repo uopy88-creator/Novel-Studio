@@ -5,6 +5,11 @@
  * LoginForm
  * -----------------------------------------------------------------------------
  * 이메일 · 비밀번호만. SNS / 닉네임 / 프로필 없음.
+ *
+ * iOS Safari 자동완성 대응
+ * - controlled input (value + state)
+ * - onChange + onInput 모두 state 갱신
+ * - autocomplete: email / current-password
  * =============================================================================
  */
 
@@ -12,6 +17,8 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/auth/AuthProvider";
+import { authService } from "@/services/auth-service";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import {
   Card,
@@ -22,6 +29,8 @@ import {
 } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
+const ENV_MISSING_MESSAGE = "Supabase 환경변수가 설정되지 않았습니다.";
+
 export function LoginForm() {
   const { signIn, isSupabaseReady } = useAuth();
   const router = useRouter();
@@ -30,14 +39,53 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
+  /** Safari 자동완성은 onChange 대신 onInput 만 오는 경우가 있다 */
+  function onEmailInput(event: FormEvent<HTMLInputElement>) {
+    setEmail(event.currentTarget.value);
+  }
+
+  function onPasswordInput(event: FormEvent<HTMLInputElement>) {
+    setPassword(event.currentTarget.value);
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError(ENV_MISSING_MESSAGE);
+      return;
+    }
+
+    // 제출 직전 DOM 값으로 state를 한 번 더 맞춤 (자동완성 누락 대비)
+    const form = event.currentTarget;
+    const emailInput = form.elements.namedItem("email");
+    const passwordInput = form.elements.namedItem("password");
+    const emailValue =
+      emailInput instanceof HTMLInputElement ? emailInput.value : email;
+    const passwordValue =
+      passwordInput instanceof HTMLInputElement ? passwordInput.value : password;
+
+    setEmail(emailValue);
+    setPassword(passwordValue);
+
+    const providerName = authService.getProviderName();
+    const providerExists = authService.hasProvider();
+
+    console.log("[Novel Studio Auth] before signIn", {
+      emailLength: emailValue.trim().length,
+      passwordLength: passwordValue.trim().length,
+      providerExists,
+      providerName,
+    });
+
     setSubmitting(true);
     try {
-      await signIn({ email, password });
+      // 로그인 버튼 시점에 authService → provider → Supabase client
+      await signIn({ email: emailValue, password: passwordValue });
       router.replace("/");
     } catch (err) {
+      console.error("[Novel Studio Auth] LoginForm caught", err);
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
     } finally {
       setSubmitting(false);
@@ -59,26 +107,33 @@ export function LoginForm() {
             className="mb-ns-4 rounded-ns-md border border-ns-border bg-ns-muted px-ns-4 py-ns-3 text-ns-sm text-ns-ink-secondary"
             role="status"
           >
-            Supabase 환경변수가 없습니다. README의 「Supabase Auth 설정」을 따라
-            `.env.local`을 만든 뒤 개발 서버를 다시 시작해 주세요.
+            {ENV_MISSING_MESSAGE}
           </p>
         ) : null}
-        <form className="flex flex-col gap-ns-4" onSubmit={onSubmit}>
+        <form className="flex flex-col gap-ns-4" onSubmit={onSubmit} noValidate>
           <Input
             label="이메일"
+            name="email"
             type="email"
+            inputMode="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={onEmailInput}
+            onInput={onEmailInput}
             placeholder="you@example.com"
             required
           />
           <Input
             label="비밀번호"
+            name="password"
             type="password"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={onPasswordInput}
+            onInput={onPasswordInput}
             placeholder="6자 이상"
             required
             minLength={6}

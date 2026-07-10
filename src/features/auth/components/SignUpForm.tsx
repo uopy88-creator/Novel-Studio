@@ -6,6 +6,8 @@
  * -----------------------------------------------------------------------------
  * 이메일 · 비밀번호 · 비밀번호 확인만.
  * 성공 시 Supabase 세션이 저장되어 자동 로그인한다.
+ *
+ * 제출 시 FormData로 DOM 값을 읽는다 (iOS Safari 자동완성 대응).
  * =============================================================================
  */
 
@@ -13,6 +15,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/auth/AuthProvider";
+import { readSignUpFromForm } from "@/auth/lib/read-credentials-from-form";
 import { Button } from "@/components/ui/Button";
 import {
   Card,
@@ -32,20 +35,26 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
-    if (password !== passwordConfirm) {
+    const values = readSignUpFromForm(event.currentTarget);
+    setEmail(values.email);
+    setPassword(values.password);
+    setPasswordConfirm(values.passwordConfirm);
+
+    if (values.password.trim() !== values.passwordConfirm.trim()) {
       setError("비밀번호 확인이 일치하지 않습니다.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await signUp({ email, password });
+      await signUp({ email: values.email, password: values.password });
       router.replace("/");
     } catch (err) {
+      console.error("[Novel Studio Auth] SignUpForm caught", err);
       setError(err instanceof Error ? err.message : "회원가입에 실패했습니다.");
     } finally {
       setSubmitting(false);
@@ -67,15 +76,21 @@ export function SignUpForm() {
             className="mb-ns-4 rounded-ns-md border border-ns-border bg-ns-muted px-ns-4 py-ns-3 text-ns-sm text-ns-ink-secondary"
             role="status"
           >
-            Supabase 환경변수가 없습니다. README의 「Supabase Auth 설정」을 따라
-            `.env.local`을 만든 뒤 개발 서버를 다시 시작해 주세요.
+            Supabase 환경변수가 없습니다. Vercel Environment Variables(또는 로컬
+            `.env.local`)에 `NEXT_PUBLIC_SUPABASE_URL` /
+            `NEXT_PUBLIC_SUPABASE_ANON_KEY` 를 넣고 다시 배포해 주세요.
           </p>
         ) : null}
         <form className="flex flex-col gap-ns-4" onSubmit={onSubmit}>
           <Input
             label="이메일"
+            name="email"
             type="email"
+            inputMode="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
@@ -83,6 +98,7 @@ export function SignUpForm() {
           />
           <Input
             label="비밀번호"
+            name="password"
             type="password"
             autoComplete="new-password"
             value={password}
@@ -93,6 +109,7 @@ export function SignUpForm() {
           />
           <Input
             label="비밀번호 확인"
+            name="passwordConfirm"
             type="password"
             autoComplete="new-password"
             value={passwordConfirm}

@@ -144,7 +144,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center p-ns-4 sm:items-center sm:p-ns-6"
+      className="fixed inset-0 z-50 flex items-end justify-center p-ns-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:p-ns-6"
       role="presentation"
     >
       {/* 반투명 오버레이 — 클릭 시 닫기 */}
@@ -178,14 +178,14 @@ export function Modal({
           <div className="min-w-0 flex-1">
             <h2
               id={titleId}
-              className="text-ns-xl font-semibold leading-ns-snug text-ns-ink"
+              className="break-words text-ns-xl font-semibold leading-ns-snug text-ns-ink"
             >
               {title}
             </h2>
             {description ? (
               <p
                 id={descriptionId}
-                className="mt-ns-1 text-ns-sm leading-ns-normal text-ns-ink-secondary"
+                className="mt-ns-1 break-words text-ns-sm leading-ns-normal text-ns-ink-secondary"
               >
                 {description}
               </p>

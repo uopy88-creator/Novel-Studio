@@ -4,21 +4,26 @@
  * =============================================================================
  * ManuscriptWorkspace
  * -----------------------------------------------------------------------------
- * Novel Studio의 핵심 화면.
- *
- * 흐름
- * Project → Document(Chapter) 선택 → Manuscript 편집
- *
- * - 자동 저장 (LocalStorage)
- * - 원고 내 검색 + 위치 이동
- * - 오른쪽 실시간 통계 패널
+ * Project → Document 선택 → Manuscript 편집
+ * (+ 캐릭터 @멘션, Inspiration 영감 노트)
  * =============================================================================
  */
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Character } from "@/features/characters/types/character";
+import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
-import { ManuscriptEditor } from "@/features/manuscript/components/ManuscriptEditor";
+import { readCharactersByProject } from "@/features/characters/lib/character-storage";
+import { updateCharacter } from "@/features/characters/lib/character-storage";
+import { CharacterMentionField } from "@/features/characters/components/CharacterMentionField";
+import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
+import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
+import { InspirationSelectionMenu } from "@/features/inspiration/components/InspirationSelectionMenu";
+import { InspirationGutter } from "@/features/inspiration/components/InspirationGutter";
+import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
+import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
+import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
@@ -36,7 +41,6 @@ import { cn } from "@/lib/utils/cn";
 
 export interface ManuscriptWorkspaceProps {
   projectId: ProjectId;
-  /** Document 목록에서 넘어올 때 자동 선택 */
   initialDocumentId?: string;
 }
 
@@ -55,7 +59,46 @@ export function ManuscriptWorkspace({
     lastSavedAt,
   } = useManuscript(projectId, initialDocumentId as ChapterId | undefined);
 
+  const {
+    create: createInspiration,
+    update: updateInspiration,
+    remove: removeInspiration,
+    listByDocument,
+  } = useInspirations(projectId);
+
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [profile, setProfile] = useState<Character | null>(null);
+  const [docInspirations, setDocInspirations] = useState<Inspiration[]>([]);
+  const [pendingSelection, setPendingSelection] =
+    useState<TextSelectionRange | null>(null);
+  const [viewingInspiration, setViewingInspiration] =
+    useState<Inspiration | null>(null);
+  const [deletingInspiration, setDeletingInspiration] =
+    useState<Inspiration | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const list = await readCharactersByProject(projectId);
+      if (!cancelled) setCharacters(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const refreshDocInspirations = useCallback(async () => {
+    if (!selectedChapterId) {
+      setDocInspirations([]);
+      return;
+    }
+    setDocInspirations(await listByDocument(selectedChapterId));
+  }, [listByDocument, selectedChapterId]);
+
+  useEffect(() => {
+    void refreshDocInspirations();
+  }, [refreshDocInspirations]);
 
   const selectedDocument = useMemo(
     () => documents.find((document) => document.id === selectedChapterId) ?? null,
@@ -73,7 +116,6 @@ export function ManuscriptWorkspace({
     };
   }, [content]);
 
-  /** 검색 결과 → textarea 선택 영역으로 이동 */
   const jumpToMatch = useCallback(
     (start: number, end: number) => {
       const el = editorRef.current;
@@ -97,7 +139,8 @@ export function ManuscriptWorkspace({
           <p className="ns-caption mb-ns-2">집필</p>
           <h2 className="ns-heading">Manuscript</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            Document를 선택한 뒤 원고를 작성하세요. 입력 내용은 자동 저장됩니다.
+            문장을 선택하면 💡 영감을 남길 수 있습니다. `@이름`으로 인물도
+            멘션할 수 있습니다.
           </p>
         </div>
         {selectedDocument ? (
@@ -117,7 +160,6 @@ export function ManuscriptWorkspace({
         <EmptyDocumentsHint />
       ) : (
         <div className="flex flex-col gap-ns-6">
-          {/* Document 선택 */}
           <section aria-label="Document 선택">
             <p className="mb-ns-3 text-ns-sm font-medium text-ns-ink">
               Document
@@ -151,7 +193,6 @@ export function ManuscriptWorkspace({
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-ns-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
-              {/* 에디터 열 */}
               <div className="flex min-w-0 flex-col gap-ns-4">
                 <div className="flex flex-col gap-ns-1">
                   <p className="text-ns-xs font-medium text-ns-accent">
@@ -169,16 +210,32 @@ export function ManuscriptWorkspace({
 
                 <SearchBar content={content} onJump={jumpToMatch} />
 
-                <ManuscriptEditor
-                  ref={editorRef}
-                  value={content}
-                  onChange={setContent}
-                  documentTitle={selectedDocument.title}
-                  className="min-h-[32rem]"
-                />
+                <div className="relative">
+                  <InspirationGutter
+                    content={content}
+                    inspirations={docInspirations}
+                    onOpen={(item) => setViewingInspiration(item)}
+                    className="z-10 pt-ns-5"
+                  />
+                  <CharacterMentionField
+                    value={content}
+                    onChange={setContent}
+                    characters={characters}
+                    documentTitle={selectedDocument.title}
+                    editorRef={editorRef}
+                    editorClassName="pl-10"
+                    onOpenCharacter={(character) => setProfile(character)}
+                  />
+                  <InspirationSelectionMenu
+                    textareaRef={editorRef}
+                    enabled={Boolean(selectedDocument)}
+                    onAddInspiration={(selection) =>
+                      setPendingSelection(selection)
+                    }
+                  />
+                </div>
               </div>
 
-              {/* 통계 패널 — PC에서 오른쪽, 좁은 화면에서는 아래 */}
               <StatisticsPanel
                 totalChars={stats.totalChars}
                 charsWithoutSpaces={stats.charsWithoutSpaces}
@@ -190,6 +247,78 @@ export function ManuscriptWorkspace({
           )}
         </div>
       )}
+
+      <CharacterFormModal
+        open={Boolean(profile)}
+        mode="edit"
+        character={profile}
+        onClose={() => setProfile(null)}
+        onSubmit={(input) => {
+          if (!profile) return;
+          void (async () => {
+            const updated = await updateCharacter(profile.id, input);
+            if (updated) {
+              setCharacters(await readCharactersByProject(projectId));
+            }
+            setProfile(null);
+          })();
+        }}
+      />
+
+      <InspirationModal
+        open={Boolean(pendingSelection)}
+        mode="create"
+        selectedText={pendingSelection?.text}
+        onClose={() => setPendingSelection(null)}
+        onSubmit={(input) => {
+          if (!pendingSelection || !selectedChapterId) return;
+          void (async () => {
+            await createInspiration({
+              documentId: selectedChapterId,
+              selectedText: pendingSelection.text,
+              startOffset: pendingSelection.start,
+              endOffset: pendingSelection.end,
+              workTitle: input.workTitle,
+              author: input.author,
+              memo: input.memo,
+            });
+            setPendingSelection(null);
+            await refreshDocInspirations();
+          })();
+        }}
+      />
+
+      <InspirationModal
+        open={Boolean(viewingInspiration)}
+        mode="edit"
+        inspiration={viewingInspiration}
+        onClose={() => setViewingInspiration(null)}
+        onSubmit={(input) => {
+          if (!viewingInspiration) return;
+          void (async () => {
+            await updateInspiration(viewingInspiration.id, input);
+            setViewingInspiration(null);
+            await refreshDocInspirations();
+          })();
+        }}
+        onDelete={() => {
+          if (!viewingInspiration) return;
+          setDeletingInspiration(viewingInspiration);
+          setViewingInspiration(null);
+        }}
+      />
+
+      <InspirationDeleteDialog
+        open={Boolean(deletingInspiration)}
+        inspiration={deletingInspiration}
+        onClose={() => setDeletingInspiration(null)}
+        onConfirm={(item) => {
+          void (async () => {
+            await removeInspiration(item.id);
+            await refreshDocInspirations();
+          })();
+        }}
+      />
     </ContentContainer>
   );
 }

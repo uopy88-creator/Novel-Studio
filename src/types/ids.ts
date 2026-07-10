@@ -36,6 +36,9 @@ export type ForeshadowingId = EntityId;
 /** 메모 ID */
 export type MemoId = EntityId;
 
+/** 영감 노트 ID */
+export type InspirationId = EntityId;
+
 /** 집필 세션 ID */
 export type WritingSessionId = EntityId;
 

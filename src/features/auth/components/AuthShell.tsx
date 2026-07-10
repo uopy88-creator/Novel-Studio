@@ -5,7 +5,7 @@
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-ns-canvas px-ns-6 py-ns-10">
+    <div className="flex min-h-dvh min-h-screen w-full min-w-0 items-center justify-center bg-ns-canvas px-ns-4 py-ns-8 sm:px-ns-6 sm:py-ns-10">
       {children}
     </div>
   );

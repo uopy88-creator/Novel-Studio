@@ -188,15 +188,28 @@
   기본 문서 스타일
   - 다크 모드 자동 전환은 사용하지 않는다.
     (디자인 컨셉이 밝은 작업실 UI이므로 일관성을 우선한다.)
+  - 모바일/iPad: 가로 스크롤·긴 URL/이메일 잘림 완화
 */
+html {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--ns-color-canvas);
   color: var(--ns-color-ink);
   font-family: var(--ns-font-sans);
   font-size: var(--ns-text-base);
   line-height: var(--ns-leading-normal);
+  overflow-x: clip;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* iPhone 홈 인디케이터·노치 여백 */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /*

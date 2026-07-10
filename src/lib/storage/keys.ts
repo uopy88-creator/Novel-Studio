@@ -25,8 +25,11 @@ export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
 /** 메모 (Dashboard 읽기 전용 — CRUD는 아직 없음) */
 export const MEMOS_STORAGE_KEY = "novel-studio:memos";
 
-/** 캐릭터 (Dashboard 읽기 전용 — CRUD는 아직 없음) */
+/** 캐릭터 프로필 */
 export const CHARACTERS_STORAGE_KEY = "novel-studio:characters";
+
+/** 영감 노트 (Inspiration) */
+export const INSPIRATIONS_STORAGE_KEY = "novel-studio:inspirations";
 
 /** 사이드바 접힘 상태 */
 export const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";

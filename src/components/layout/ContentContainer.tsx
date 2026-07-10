@@ -39,7 +39,7 @@ export function ContentContainer({
   return (
     <div
       className={cn(
-        "mx-auto w-full px-ns-6 py-ns-8 sm:px-ns-8 sm:py-ns-10",
+        "mx-auto w-full min-w-0 px-ns-4 py-ns-6 sm:px-ns-6 sm:py-ns-8 md:px-ns-8 md:py-ns-10",
         widthClasses[width],
         className,
       )}

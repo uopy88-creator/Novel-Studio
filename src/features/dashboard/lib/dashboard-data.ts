@@ -3,32 +3,39 @@
  * Dashboard용 데이터 읽기
  * -----------------------------------------------------------------------------
  * Dashboard는 수정하지 않는다. 읽기만 한다.
- * Documents / Manuscripts 는 Cloud 우선 저장소를 사용한다.
- * Memo / Character는 아직 LocalStorage만.
  * =============================================================================
  */
 
 import type { Chapter } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
 import type { Character } from "@/features/characters/types/character";
+import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { Memo } from "@/features/memo/types/memo";
 import type { ProjectId } from "@/types/ids";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
+import {
+  pickFeaturedCharacters,
+  readCharactersByProject as readCharactersFromStorage,
+} from "@/features/characters/lib/character-storage";
+import {
+  pickRecentInspirations,
+  readInspirationsByProject,
+} from "@/features/inspiration/lib/inspiration-storage";
 import {
   countCharsWithoutSpaces,
   countCharsWithSpaces,
   estimateBookPages,
   estimateManuscriptSheets,
 } from "@/lib/stats";
-import {
-  CHARACTERS_STORAGE_KEY,
-  MEMOS_STORAGE_KEY,
-} from "@/lib/storage/keys";
+import { MEMOS_STORAGE_KEY } from "@/lib/storage/keys";
 import { readJsonArray } from "@/lib/storage/browser";
 
-export { CHARACTERS_STORAGE_KEY, MEMOS_STORAGE_KEY };
-export { MANUSCRIPTS_STORAGE_KEY } from "@/lib/storage/keys";
+export { MEMOS_STORAGE_KEY };
+export {
+  CHARACTERS_STORAGE_KEY,
+  MANUSCRIPTS_STORAGE_KEY,
+} from "@/lib/storage/keys";
 
 export async function readManuscriptsByProject(
   projectId: ProjectId,
@@ -43,10 +50,10 @@ export function readMemosByProject(projectId: ProjectId): Memo[] {
   );
 }
 
-export function readCharactersByProject(projectId: ProjectId): Character[] {
-  return readJsonArray<Character>(CHARACTERS_STORAGE_KEY).filter(
-    (item) => item.projectId === projectId,
-  );
+export async function readCharactersByProject(
+  projectId: ProjectId,
+): Promise<Character[]> {
+  return readCharactersFromStorage(projectId);
 }
 
 export interface RecentDocumentItem {
@@ -65,6 +72,8 @@ export interface DashboardSnapshot {
   memoCount: number;
   characterCount: number;
   recentDocuments: RecentDocumentItem[];
+  featuredCharacters: Character[];
+  recentInspirations: Inspiration[];
 }
 
 export async function buildDashboardSnapshot(
@@ -73,7 +82,8 @@ export async function buildDashboardSnapshot(
   const documents = await readChaptersByProject(projectId);
   const manuscripts = await readManuscriptsByProject(projectId);
   const memos = readMemosByProject(projectId);
-  const characters = readCharactersByProject(projectId);
+  const characters = await readCharactersByProject(projectId);
+  const inspirations = await readInspirationsByProject(projectId);
 
   let totalChars = 0;
   let charsWithoutSpaces = 0;
@@ -99,6 +109,8 @@ export async function buildDashboardSnapshot(
     memoCount: memos.length,
     characterCount: characters.length,
     recentDocuments: buildRecentDocuments(documents),
+    featuredCharacters: pickFeaturedCharacters(characters, 4),
+    recentInspirations: pickRecentInspirations(inspirations, 3),
   };
 }
 

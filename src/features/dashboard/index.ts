@@ -1,7 +1,5 @@
-/**
- * dashboard feature 공개 진입점.
- * 보기 전용 — CRUD를 export하지 않는다.
- */
+export { RecentInspirationCard } from "@/features/inspiration/components/RecentInspirationCard";
+export { FeaturedCharacterCard } from "@/features/characters/components/FeaturedCharacterCard";
 export { DashboardPage } from "./components/DashboardPage";
 export { DashboardCard } from "./components/DashboardCard";
 export { StatisticsGrid } from "./components/StatisticsGrid";

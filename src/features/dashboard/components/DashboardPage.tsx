@@ -4,19 +4,19 @@
  * =============================================================================
  * DashboardPage
  * -----------------------------------------------------------------------------
- * 작품 작업실의 홈. 통계·최근 Document를 한눈에 보여 준다.
- *
- * - AppLayout 안에서 렌더된다 (라우트 layout)
- * - 보기 전용 (생성/수정/삭제 UI 없음)
- * - Document(Chapter) 기능은 건드리지 않는다
+ * 작품 작업실의 홈. 통계·최근 Document·대표 캐릭터를 한눈에 보여 준다.
  * =============================================================================
  */
 
+import Link from "next/link";
 import type { ProjectId } from "@/types/ids";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { StatisticsGrid } from "@/features/dashboard/components/StatisticsGrid";
 import { RecentDocumentCard } from "@/features/dashboard/components/RecentDocumentCard";
+import { FeaturedCharacterCard } from "@/features/characters/components/FeaturedCharacterCard";
+import { RecentInspirationCard } from "@/features/inspiration/components/RecentInspirationCard";
 import { ContentContainer } from "@/components/layout";
+import { studioPath } from "@/components/layout/nav-items";
 
 export interface DashboardPageProps {
   projectId: ProjectId;
@@ -50,6 +50,74 @@ export function DashboardPage({ projectId }: DashboardPageProps) {
               memoCount={snapshot.memoCount}
               characterCount={snapshot.characterCount}
             />
+          </section>
+
+          <section aria-label="대표 캐릭터">
+      <div className="mb-ns-4 flex min-w-0 flex-wrap items-end justify-between gap-ns-4">
+              <h3 className="text-ns-base font-semibold text-ns-ink">
+                대표 캐릭터
+              </h3>
+              <Link
+                href={studioPath(projectId, "characters")}
+                className="shrink-0 text-ns-sm font-medium text-ns-accent hover:text-ns-accent-hover"
+              >
+                전체 보기
+              </Link>
+            </div>
+
+            {snapshot.featuredCharacters.length === 0 ? (
+              <div className="rounded-ns-xl border border-dashed border-ns-border bg-ns-muted/40 px-ns-6 py-ns-10 text-center">
+                <p className="text-ns-sm text-ns-ink-secondary">
+                  아직 인물이 없습니다. Characters 메뉴에서 프로필을 만들어
+                  보세요.
+                </p>
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-ns-3 sm:grid-cols-2 lg:grid-cols-4">
+                {snapshot.featuredCharacters.map((character) => (
+                  <li key={character.id}>
+                    <FeaturedCharacterCard
+                      character={character}
+                      projectId={projectId}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-label="최근 Inspiration">
+            <div className="mb-ns-4 flex min-w-0 flex-wrap items-end justify-between gap-ns-4">
+              <h3 className="text-ns-base font-semibold text-ns-ink">
+                최근 Inspiration
+              </h3>
+              <Link
+                href={studioPath(projectId, "inspiration")}
+                className="shrink-0 text-ns-sm font-medium text-ns-accent hover:text-ns-accent-hover"
+              >
+                전체 보기
+              </Link>
+            </div>
+
+            {snapshot.recentInspirations.length === 0 ? (
+              <div className="rounded-ns-xl border border-dashed border-ns-border bg-ns-muted/40 px-ns-6 py-ns-10 text-center">
+                <p className="text-ns-sm text-ns-ink-secondary">
+                  아직 영감 노트가 없습니다. Manuscript에서 문장을 선택해 💡을
+                  남겨 보세요.
+                </p>
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-ns-3 md:grid-cols-3">
+                {snapshot.recentInspirations.map((inspiration) => (
+                  <li key={inspiration.id}>
+                    <RecentInspirationCard
+                      inspiration={inspiration}
+                      projectId={projectId}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section aria-label="최근 수정한 Document">

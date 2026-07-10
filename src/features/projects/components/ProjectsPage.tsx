@@ -40,16 +40,16 @@ export function ProjectsPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-ns-6 py-ns-10 sm:px-ns-10 sm:py-ns-16">
+    <div className="mx-auto flex min-h-dvh min-h-screen w-full min-w-0 max-w-3xl flex-col px-ns-4 py-ns-8 sm:px-ns-10 sm:py-ns-16">
       {/* 헤더 — Notion/Linear처럼 여백 많고 심플 */}
       <header className="mb-ns-10 flex flex-col gap-ns-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="ns-caption mb-ns-2">Novel Studio</p>
           <h1 className="ns-title">작품</h1>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
             작업할 작품을 선택하거나 새로 만드세요.
             {user?.email ? (
-              <span className="mt-ns-1 block text-ns-ink-tertiary">
+              <span className="mt-ns-1 block break-all text-ns-ink-tertiary">
                 {user.email}
               </span>
             ) : null}

@@ -7,6 +7,7 @@
  * =============================================================================
  */
 
+import type { AuthError } from "@supabase/supabase-js";
 import type { AuthProvider } from "@/auth/providers/types";
 import { mapSupabaseAuthError } from "@/auth/lib/map-supabase-auth-error";
 import { mapSupabaseSession } from "@/auth/lib/map-supabase-session";
@@ -18,7 +19,7 @@ import {
 function requireClient() {
   if (!isSupabaseConfigured()) {
     throw new Error(
-      "Supabase가 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣고 개발 서버를 다시 시작해 주세요.",
+      "Supabase가 설정되지 않았습니다. Vercel Environment Variables 또는 .env.local에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣고 다시 배포/재시작해 주세요.",
     );
   }
 
@@ -37,13 +38,47 @@ function requireEmail(email: string): string {
   if (!trimmed || !trimmed.includes("@")) {
     throw new Error("올바른 이메일을 입력해 주세요.");
   }
-  return trimmed;
+  return trimmed.toLowerCase();
 }
 
-function requirePassword(password: string): void {
-  if (!password || password.length < 6) {
+/**
+ * 자동완성·모바일 키보드가 붙이는 앞뒤 공백을 제거한다.
+ * (비밀번호 중간 공백은 유지)
+ */
+function normalizePassword(password: string): string {
+  return password.trim();
+}
+
+function requirePassword(password: string): string {
+  const normalized = normalizePassword(password);
+  if (!normalized || normalized.length < 6) {
     throw new Error("비밀번호는 6자 이상이어야 합니다.");
   }
+  return normalized;
+}
+
+/** 로그인 실패 원인 파악용 — 원본 Supabase 에러를 콘솔에 남긴다 */
+function logAuthFailure(
+  action: "signIn" | "signUp" | "signOut" | "getSession",
+  error: AuthError | Error | unknown,
+) {
+  const authError = error as AuthError;
+  console.error(`[Novel Studio Auth] ${action} failed`, {
+    provider: "supabase",
+    message: authError?.message ?? String(error),
+    status: authError?.status,
+    code: authError?.code,
+    name: authError?.name,
+    supabaseConfigured: isSupabaseConfigured(),
+    supabaseUrlHost: (() => {
+      try {
+        const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+        return raw ? new URL(raw).host : "(missing)";
+      } catch {
+        return "(invalid url)";
+      }
+    })(),
+  });
 }
 
 export const supabaseAuthProvider: AuthProvider = {
@@ -57,6 +92,7 @@ export const supabaseAuthProvider: AuthProvider = {
 
     const { data, error } = await client.auth.getSession();
     if (error) {
+      logAuthFailure("getSession", error);
       throw mapSupabaseAuthError(error);
     }
     return mapSupabaseSession(data.session);
@@ -70,19 +106,24 @@ export const supabaseAuthProvider: AuthProvider = {
   async signInWithEmail({ email, password }) {
     const client = requireClient();
     const normalizedEmail = requireEmail(email);
-    requirePassword(password);
+    const normalizedPassword = requirePassword(password);
 
     const { data, error } = await client.auth.signInWithPassword({
       email: normalizedEmail,
-      password,
+      password: normalizedPassword,
     });
 
     if (error) {
+      logAuthFailure("signIn", error);
       throw mapSupabaseAuthError(error);
     }
 
     const session = mapSupabaseSession(data.session);
     if (!session) {
+      console.error("[Novel Studio Auth] signIn returned empty session", {
+        provider: "supabase",
+        hasUser: Boolean(data.user),
+      });
       throw new Error("로그인에 실패했습니다. 다시 시도해 주세요.");
     }
     return session;
@@ -91,14 +132,15 @@ export const supabaseAuthProvider: AuthProvider = {
   async signUpWithEmail({ email, password }) {
     const client = requireClient();
     const normalizedEmail = requireEmail(email);
-    requirePassword(password);
+    const normalizedPassword = requirePassword(password);
 
     const { data, error } = await client.auth.signUp({
       email: normalizedEmail,
-      password,
+      password: normalizedPassword,
     });
 
     if (error) {
+      logAuthFailure("signUp", error);
       throw mapSupabaseAuthError(error);
     }
 
@@ -121,6 +163,7 @@ export const supabaseAuthProvider: AuthProvider = {
 
     const { error } = await client.auth.signOut();
     if (error) {
+      logAuthFailure("signOut", error);
       throw mapSupabaseAuthError(error);
     }
   },

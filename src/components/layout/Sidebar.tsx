@@ -59,6 +59,7 @@ export function Sidebar({
           // 공통
           "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-ns-border bg-ns-muted",
           "transition-[width,transform] duration-200 ease-out",
+          "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
           // 모바일: 슬라이드 인/아웃
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           // md+: 항상 보이고, 너비만 접기

@@ -23,6 +23,8 @@ const EMPTY_SNAPSHOT: DashboardSnapshot = {
   memoCount: 0,
   characterCount: 0,
   recentDocuments: [],
+  featuredCharacters: [],
+  recentInspirations: [],
 };
 
 export function useDashboard(projectId: ProjectId) {

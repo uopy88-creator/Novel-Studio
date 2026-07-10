@@ -1,6 +1,19 @@
-import { ComingSoon } from "@/components/layout";
+/**
+ * Characters — 인물 프로필.
+ * 사이드바 Characters 메뉴와 연결된다.
+ */
 
-/** Characters — 기능 미구현, 준비 중만 표시 */
-export default function CharactersPage() {
-  return <ComingSoon featureName="Characters" />;
+import { CharactersPage } from "@/features/characters";
+
+interface CharactersRoutePageProps {
+  params: Promise<{
+    projectId: string;
+  }>;
+}
+
+export default async function CharactersRoutePage({
+  params,
+}: CharactersRoutePageProps) {
+  const { projectId } = await params;
+  return <CharactersPage projectId={projectId} />;
 }

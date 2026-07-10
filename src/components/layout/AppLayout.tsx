@@ -74,7 +74,7 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-ns-canvas text-ns-ink">
+    <div className="flex min-h-dvh min-h-screen bg-ns-canvas text-ns-ink">
       <Sidebar
         projectId={projectId}
         collapsed={collapsed}

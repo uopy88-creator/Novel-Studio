@@ -19,7 +19,7 @@ import {
 import { hashPassword, verifyPassword } from "@/auth/lib/password";
 
 function requirePassword(password: string): void {
-  if (!password || password.length < 6) {
+  if (!password?.trim() || password.trim().length < 6) {
     throw new Error("비밀번호는 6자 이상이어야 합니다.");
   }
 }
@@ -46,13 +46,29 @@ export const localAuthProvider: AuthProvider = {
     requireEmail(email);
     requirePassword(password);
 
-    const record = findAuthUserByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+
+    const record = findAuthUserByEmail(normalizedEmail);
     if (!record) {
+      console.error("[Novel Studio Auth] signIn failed", {
+        provider: "local",
+        reason: "user_not_found",
+        hint: "이 기기 LocalStorage에 계정이 없습니다. Vercel에서는 Supabase Auth를 쓰는지 확인하세요.",
+      });
       throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
     }
 
-    const ok = await verifyPassword(record.email, password, record.passwordHash);
+    const ok = await verifyPassword(
+      record.email,
+      normalizedPassword,
+      record.passwordHash,
+    );
     if (!ok) {
+      console.error("[Novel Studio Auth] signIn failed", {
+        provider: "local",
+        reason: "bad_password",
+      });
       throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
     }
 

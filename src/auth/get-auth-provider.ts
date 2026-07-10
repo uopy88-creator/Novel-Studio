@@ -13,7 +13,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 /**
  * Supabase 환경변수가 있으면 Supabase Auth, 없으면 로컬 폴백.
- * 작품 데이터 저장과는 무관 — 항상 LocalStorage.
+ * 호출 시점에만 고른다 — import 시 client를 만들지 않는다.
  */
 export function getAuthProvider(): AuthProvider {
   if (isSupabaseConfigured()) {

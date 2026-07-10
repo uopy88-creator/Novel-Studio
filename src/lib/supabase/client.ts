@@ -8,12 +8,15 @@
  * - NEXT_PUBLIC_SUPABASE_URL
  * - NEXT_PUBLIC_SUPABASE_ANON_KEY
  *
- * Auth 세션은 persistSession 으로 브라우저에 유지된다.
+ * Auth 세션은 persistSession 으로 브라우저 localStorage에 유지된다.
+ * (쿠키 기반 SSR 세션이 아님 — middleware 없음)
  * Database CRUD는 features/*-storage → database/supabase/*-repo 경로를 사용한다.
  * =============================================================================
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+const AUTH_STORAGE_KEY = "novel-studio:supabase-auth";
 
 let browserClient: SupabaseClient | null = null;
 
@@ -25,6 +28,61 @@ export function isSupabaseConfigured(): boolean {
   if (!url || !anonKey) return false;
   if (url.includes("your-project") || anonKey === "your-anon-key") return false;
   return true;
+}
+
+/**
+ * Safari 비공개 모드 등에서 localStorage 접근이 막힐 때를 위한 안전한 래퍼.
+ * 세션 유지는 못 할 수 있어도, 로그인 API 호출 자체는 가능하게 한다.
+ */
+function createAuthStorage(): Storage {
+  if (typeof window === "undefined") {
+    return {
+      get length() {
+        return 0;
+      },
+      clear() {},
+      getItem() {
+        return null;
+      },
+      key() {
+        return null;
+      },
+      removeItem() {},
+      setItem() {},
+    };
+  }
+
+  try {
+    const probe = "__ns_storage_probe__";
+    window.localStorage.setItem(probe, "1");
+    window.localStorage.removeItem(probe);
+    return window.localStorage;
+  } catch {
+    console.warn(
+      "[Novel Studio Auth] localStorage unavailable — session will not persist (Safari private mode?)",
+    );
+    const memory = new Map<string, string>();
+    return {
+      get length() {
+        return memory.size;
+      },
+      clear() {
+        memory.clear();
+      },
+      getItem(key: string) {
+        return memory.has(key) ? memory.get(key)! : null;
+      },
+      key(index: number) {
+        return Array.from(memory.keys())[index] ?? null;
+      },
+      removeItem(key: string) {
+        memory.delete(key);
+      },
+      setItem(key: string, value: string) {
+        memory.set(key, value);
+      },
+    };
+  }
 }
 
 /**
@@ -60,8 +118,9 @@ export function createSupabaseClient(): SupabaseClient | null {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storage: window.localStorage,
-      storageKey: "novel-studio:supabase-auth",
+      flowType: "pkce",
+      storage: createAuthStorage(),
+      storageKey: AUTH_STORAGE_KEY,
     },
   });
 
@@ -81,7 +140,7 @@ export function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseClient();
   if (!client) {
     throw new Error(
-      "Supabase가 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣고 개발 서버를 다시 시작해 주세요.",
+      "Supabase가 설정되지 않았습니다. Vercel Environment Variables 또는 .env.local에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣고 다시 배포/재시작해 주세요.",
     );
   }
   return client;
