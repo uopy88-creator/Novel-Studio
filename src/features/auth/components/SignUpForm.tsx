@@ -76,9 +76,7 @@ export function SignUpForm() {
             className="mb-ns-4 rounded-ns-md border border-ns-border bg-ns-muted px-ns-4 py-ns-3 text-ns-sm text-ns-ink-secondary"
             role="status"
           >
-            Supabase 환경변수가 없습니다. Vercel Environment Variables(또는 로컬
-            `.env.local`)에 `NEXT_PUBLIC_SUPABASE_URL` /
-            `NEXT_PUBLIC_SUPABASE_ANON_KEY` 를 넣고 다시 배포해 주세요.
+            Supabase 환경변수가 설정되지 않았습니다.
           </p>
         ) : null}
         <form className="flex flex-col gap-ns-4" onSubmit={onSubmit}>

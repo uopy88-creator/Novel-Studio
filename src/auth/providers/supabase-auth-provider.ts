@@ -15,6 +15,7 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { getSupabaseUrl } from "@/lib/supabase/public-env";
 
 function requireClient() {
   if (!isSupabaseConfigured()) {
@@ -72,7 +73,7 @@ function logAuthFailure(
     supabaseConfigured: isSupabaseConfigured(),
     supabaseUrlHost: (() => {
       try {
-        const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+        const raw = getSupabaseUrl();
         return raw ? new URL(raw).host : "(missing)";
       } catch {
         return "(invalid url)";

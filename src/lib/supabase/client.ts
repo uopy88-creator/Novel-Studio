@@ -4,17 +4,19 @@
  * -----------------------------------------------------------------------------
  * Next.js App Router · 브라우저용 클라이언트.
  *
- * 환경변수
- * - NEXT_PUBLIC_SUPABASE_URL
- * - NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * 환경변수는 `public-env.ts` 에서만 읽는다.
+ * (NEXT_PUBLIC_* 가 클라이언트 번들에 올바르게 인라인되도록)
  *
  * Auth 세션은 persistSession 으로 브라우저 localStorage에 유지된다.
- * (쿠키 기반 SSR 세션이 아님 — middleware 없음)
- * Database CRUD는 features/*-storage → database/supabase/*-repo 경로를 사용한다.
  * =============================================================================
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  hasSupabasePublicEnv,
+} from "@/lib/supabase/public-env";
 
 const AUTH_STORAGE_KEY = "novel-studio:supabase-auth";
 
@@ -22,12 +24,7 @@ let browserClient: SupabaseClient | null = null;
 
 /** 환경변수가 채워져 있는지 (플레이스홀더 제외) */
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-
-  if (!url || !anonKey) return false;
-  if (url.includes("your-project") || anonKey === "your-anon-key") return false;
-  return true;
+  return hasSupabasePublicEnv();
 }
 
 /**
@@ -96,8 +93,8 @@ export function createSupabaseClient(): SupabaseClient | null {
     return null;
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!.trim();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim();
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
 
   if (typeof window === "undefined") {
     return createClient(url, anonKey, {
@@ -140,7 +137,7 @@ export function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseClient();
   if (!client) {
     throw new Error(
-      "Supabase가 설정되지 않았습니다. Vercel Environment Variables 또는 .env.local에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣고 다시 배포/재시작해 주세요.",
+      "Supabase 환경변수가 설정되지 않았습니다. Vercel에 NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 를 넣고 Redeploy 하세요.",
     );
   }
   return client;

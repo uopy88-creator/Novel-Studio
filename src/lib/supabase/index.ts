@@ -7,3 +7,9 @@ export {
   isSupabaseConfigured,
   requireSupabaseClient,
 } from "./client";
+
+export {
+  getSupabaseUrl,
+  getSupabaseAnonKey,
+  hasSupabasePublicEnv,
+} from "./public-env";
