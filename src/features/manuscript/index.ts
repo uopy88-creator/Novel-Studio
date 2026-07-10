@@ -4,12 +4,11 @@
  * - Manuscript: 원고 편집
  */
 export { DocumentsPage } from "./components/DocumentsPage";
-export { DocumentsPage as ChaptersPage } from "./components/DocumentsPage";
 export { DocumentCard } from "./components/DocumentCard";
 export { DocumentList } from "./components/DocumentList";
 export { DocumentModal } from "./components/DocumentModal";
 export { DocumentDeleteDialog } from "./components/DocumentDeleteDialog";
-export { useChapters } from "./hooks/useChapters";
+export { useChapters, useDocuments } from "./hooks/useChapters";
 
 export { ManuscriptWorkspace } from "./components/ManuscriptWorkspace";
 export { ManuscriptEditor } from "./components/ManuscriptEditor";

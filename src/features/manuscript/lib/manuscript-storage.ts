@@ -1,138 +1,178 @@
 /**
  * =============================================================================
- * Manuscript LocalStorage
+ * Manuscript Storage (Cloud 우선 + LocalStorage 백업)
  * -----------------------------------------------------------------------------
- * Document(Chapter) 1 : Manuscript 1
- * Dashboard와 같은 키(novel-studio:manuscripts)를 사용해 통계가 연동된다.
+ * 온라인 시 Supabase `manuscripts` 테이블. LocalStorage는 백업.
  * =============================================================================
  */
 
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
 import type { ChapterId, ManuscriptId, ProjectId } from "@/types/ids";
 import { syncChapterAfterManuscriptWrite } from "@/features/manuscript/lib/chapter-storage";
+import { canUseCloudDb } from "@/database/supabase/cloud-mode";
 import {
-  countCharsWithoutSpaces,
-} from "@/features/dashboard/lib/stats";
+  cloudGetManuscriptByDocumentId,
+  cloudListManuscripts,
+  cloudUpsertManuscript,
+} from "@/database/supabase/manuscripts-repo";
+import { countCharsWithoutSpaces } from "@/lib/stats";
+import { MANUSCRIPTS_STORAGE_KEY } from "@/lib/storage/keys";
+import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
-/** Dashboard `MANUSCRIPTS_STORAGE_KEY` 와 동일해야 한다 */
-export const MANUSCRIPTS_STORAGE_KEY = "novel-studio:manuscripts";
+export { MANUSCRIPTS_STORAGE_KEY };
 
-function canUseStorage(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.localStorage !== "undefined"
-  );
+function readLocalManuscripts(): Manuscript[] {
+  return readJsonArray<Manuscript>(MANUSCRIPTS_STORAGE_KEY);
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-export function readAllManuscripts(): Manuscript[] {
-  if (!canUseStorage()) return [];
-
-  try {
-    const raw = window.localStorage.getItem(MANUSCRIPTS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as Manuscript[];
-  } catch {
-    return [];
-  }
-}
-
-export function writeAllManuscripts(manuscripts: Manuscript[]): void {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(
-    MANUSCRIPTS_STORAGE_KEY,
-    JSON.stringify(manuscripts),
-  );
-}
-
-export function getManuscriptByChapterId(
-  projectId: ProjectId,
-  chapterId: ChapterId,
-): Manuscript | null {
-  return (
-    readAllManuscripts().find(
-      (item) => item.projectId === projectId && item.chapterId === chapterId,
-    ) ?? null
-  );
+function writeLocalManuscripts(manuscripts: Manuscript[]): void {
+  writeJsonArray(MANUSCRIPTS_STORAGE_KEY, manuscripts);
 }
 
 function createManuscriptId(): ManuscriptId {
   return crypto.randomUUID();
 }
 
-/**
- * 본문 저장 (없으면 생성, 있으면 갱신).
- * plainText / wordCount를 함께 갱신하고 Document 메타도 맞춘다.
- */
-export function saveManuscriptContent(params: {
+export async function readAllManuscripts(): Promise<Manuscript[]> {
+  if (await canUseCloudDb()) {
+    try {
+      const manuscripts = await cloudListManuscripts();
+      writeLocalManuscripts(manuscripts);
+      return manuscripts;
+    } catch {
+      return readLocalManuscripts();
+    }
+  }
+  return readLocalManuscripts();
+}
+
+export async function writeAllManuscripts(
+  manuscripts: Manuscript[],
+): Promise<void> {
+  writeLocalManuscripts(manuscripts);
+}
+
+export async function getManuscriptByChapterId(
+  projectId: ProjectId,
+  chapterId: ChapterId,
+): Promise<Manuscript | null> {
+  if (await canUseCloudDb()) {
+    try {
+      const manuscript = await cloudGetManuscriptByDocumentId(
+        projectId,
+        chapterId,
+      );
+      if (manuscript) {
+        const all = readLocalManuscripts();
+        const index = all.findIndex(
+          (item) =>
+            item.projectId === projectId && item.chapterId === chapterId,
+        );
+        if (index >= 0) {
+          const next = [...all];
+          next[index] = manuscript;
+          writeLocalManuscripts(next);
+        } else {
+          writeLocalManuscripts([...all, manuscript]);
+        }
+      }
+      return manuscript;
+    } catch {
+      // fall through
+    }
+  }
+
+  return (
+    readLocalManuscripts().find(
+      (item) => item.projectId === projectId && item.chapterId === chapterId,
+    ) ?? null
+  );
+}
+
+export async function saveManuscriptContent(params: {
   projectId: ProjectId;
   chapterId: ChapterId;
   content: string;
-}): Manuscript {
+}): Promise<Manuscript> {
   const { projectId, chapterId, content } = params;
-  const all = readAllManuscripts();
-  const index = all.findIndex(
-    (item) => item.projectId === projectId && item.chapterId === chapterId,
-  );
+  const existing = await getManuscriptByChapterId(projectId, chapterId);
   const timestamp = nowIso();
   const plainText = content;
-  const charsWithoutSpaces = countCharsWithoutSpaces(plainText);
-  // wordCount 필드: 공백 제외 글자수 (한국어 집필 지표와 맞춤)
-  const wordCount = charsWithoutSpaces;
+  const wordCount = countCharsWithoutSpaces(plainText);
 
-  let saved: Manuscript;
+  const saved: Manuscript = existing
+    ? {
+        ...existing,
+        content,
+        plainText,
+        wordCount,
+        updatedAt: timestamp,
+        lastOpenedAt: timestamp,
+      }
+    : {
+        id: createManuscriptId(),
+        projectId,
+        chapterId,
+        content,
+        plainText,
+        wordCount,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastOpenedAt: timestamp,
+      };
 
-  if (index >= 0) {
-    saved = {
-      ...all[index],
-      content,
-      plainText,
-      wordCount,
-      updatedAt: timestamp,
-      lastOpenedAt: timestamp,
-    };
-    const next = [...all];
-    next[index] = saved;
-    writeAllManuscripts(next);
+  // 로컬 백업 먼저
+  const local = readLocalManuscripts();
+  const localIndex = local.findIndex(
+    (item) => item.projectId === projectId && item.chapterId === chapterId,
+  );
+  if (localIndex >= 0) {
+    const next = [...local];
+    next[localIndex] = saved;
+    writeLocalManuscripts(next);
   } else {
-    saved = {
-      id: createManuscriptId(),
-      projectId,
-      chapterId,
-      content,
-      plainText,
-      wordCount,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      lastOpenedAt: timestamp,
-    };
-    writeAllManuscripts([...all, saved]);
+    writeLocalManuscripts([...local, saved]);
   }
 
-  syncChapterAfterManuscriptWrite(chapterId, wordCount);
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertManuscript(saved);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
+  await syncChapterAfterManuscriptWrite(chapterId, wordCount);
   return saved;
 }
 
-/** 열람만 했을 때 lastOpenedAt 갱신 (내용 변경 없음) */
-export function touchManuscriptOpened(
+export async function touchManuscriptOpened(
   projectId: ProjectId,
   chapterId: ChapterId,
-): void {
-  const all = readAllManuscripts();
-  const index = all.findIndex(
-    (item) => item.projectId === projectId && item.chapterId === chapterId,
-  );
-  if (index < 0) return;
+): Promise<void> {
+  const existing = await getManuscriptByChapterId(projectId, chapterId);
+  if (!existing) return;
 
-  const next = [...all];
-  next[index] = {
-    ...all[index],
+  const updated: Manuscript = {
+    ...existing,
     lastOpenedAt: nowIso(),
   };
-  writeAllManuscripts(next);
+
+  const local = readLocalManuscripts();
+  const index = local.findIndex(
+    (item) => item.projectId === projectId && item.chapterId === chapterId,
+  );
+  if (index >= 0) {
+    const next = [...local];
+    next[index] = updated;
+    writeLocalManuscripts(next);
+  }
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertManuscript(updated);
+    } catch {
+      // ignore
+    }
+  }
 }

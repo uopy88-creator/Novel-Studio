@@ -12,7 +12,7 @@
  */
 
 import { Card } from "@/components/ui/Card";
-import { formatCount } from "@/features/dashboard/lib/stats";
+import { formatCount } from "@/lib/stats";
 import { cn } from "@/lib/utils/cn";
 
 export interface StatisticsPanelProps {

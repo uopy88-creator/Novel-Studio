@@ -4,7 +4,7 @@
  * =============================================================================
  * useDialogues
  * -----------------------------------------------------------------------------
- * Dialogue Vault CRUD + 즐겨찾기 + 검색 필터.
+ * Dialogue Vault — Cloud(DB) 우선, LocalStorage 백업.
  * =============================================================================
  */
 
@@ -22,18 +22,16 @@ import {
 } from "@/features/dialogue-vault/lib/dialogue-storage";
 
 export interface UseDialoguesResult {
-  /** 검색 적용 전 전체 (즐겨찾기 상단 정렬됨) */
   dialogues: Dialogue[];
-  /** 검색어가 반영된 목록 */
   filtered: Dialogue[];
   isReady: boolean;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  create: (input: DialogueInput) => Dialogue;
-  update: (id: DialogueId, input: DialogueInput) => Dialogue | null;
-  remove: (id: DialogueId) => boolean;
-  toggleFavorite: (id: DialogueId) => void;
-  refresh: () => void;
+  create: (input: DialogueInput) => Promise<Dialogue>;
+  update: (id: DialogueId, input: DialogueInput) => Promise<Dialogue | null>;
+  remove: (id: DialogueId) => Promise<boolean>;
+  toggleFavorite: (id: DialogueId) => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 export function useDialogues(projectId: ProjectId): UseDialoguesResult {
@@ -41,13 +39,19 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   const [isReady, setIsReady] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const refresh = useCallback(() => {
-    setDialogues(readDialoguesByProject(projectId));
+  const refresh = useCallback(async () => {
+    setDialogues(await readDialoguesByProject(projectId));
   }, [projectId]);
 
   useEffect(() => {
-    refresh();
-    setIsReady(true);
+    let cancelled = false;
+    void (async () => {
+      await refresh();
+      if (!cancelled) setIsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   const filtered = useMemo(
@@ -56,36 +60,36 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   );
 
   const create = useCallback(
-    (input: DialogueInput) => {
-      const dialogue = createDialogue(projectId, input);
-      setDialogues(readDialoguesByProject(projectId));
+    async (input: DialogueInput) => {
+      const dialogue = await createDialogue(projectId, input);
+      setDialogues(await readDialoguesByProject(projectId));
       return dialogue;
     },
     [projectId],
   );
 
   const update = useCallback(
-    (id: DialogueId, input: DialogueInput) => {
-      const dialogue = updateDialogue(id, input);
-      setDialogues(readDialoguesByProject(projectId));
+    async (id: DialogueId, input: DialogueInput) => {
+      const dialogue = await updateDialogue(id, input);
+      setDialogues(await readDialoguesByProject(projectId));
       return dialogue;
     },
     [projectId],
   );
 
   const remove = useCallback(
-    (id: DialogueId) => {
-      const ok = deleteDialogue(id);
-      setDialogues(readDialoguesByProject(projectId));
+    async (id: DialogueId) => {
+      const ok = await deleteDialogue(id);
+      setDialogues(await readDialoguesByProject(projectId));
       return ok;
     },
     [projectId],
   );
 
   const toggleFavorite = useCallback(
-    (id: DialogueId) => {
-      toggleDialogueFavorite(id);
-      setDialogues(readDialoguesByProject(projectId));
+    async (id: DialogueId) => {
+      await toggleDialogueFavorite(id);
+      setDialogues(await readDialoguesByProject(projectId));
     },
     [projectId],
   );

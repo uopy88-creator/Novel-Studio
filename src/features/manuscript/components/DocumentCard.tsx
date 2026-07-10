@@ -13,7 +13,7 @@
 import Link from "next/link";
 import type { Chapter } from "@/features/manuscript/types/chapter";
 import { DOCUMENT_KIND_LABELS } from "@/features/manuscript/types/chapter";
-import { formatShortDate } from "@/features/manuscript/lib/format-date";
+import { formatShortDate } from "@/lib/format-date";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";

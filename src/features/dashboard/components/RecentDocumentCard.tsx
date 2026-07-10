@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import type { RecentDocumentItem } from "@/features/dashboard/lib/dashboard-data";
-import { formatShortDate } from "@/features/manuscript/lib/format-date";
+import { formatShortDate } from "@/lib/format-date";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
 

@@ -4,8 +4,7 @@
  * =============================================================================
  * useDashboard
  * -----------------------------------------------------------------------------
- * Dashboard 스냅샷을 LocalStorage에서 읽어 온다.
- * 수정 API는 제공하지 않는다 (보기 전용).
+ * Dashboard 스냅샷 — Cloud 우선 읽기 (보기 전용).
  * =============================================================================
  */
 
@@ -30,13 +29,19 @@ export function useDashboard(projectId: ProjectId) {
   const [snapshot, setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT);
   const [isReady, setIsReady] = useState(false);
 
-  const refresh = useCallback(() => {
-    setSnapshot(buildDashboardSnapshot(projectId));
+  const refresh = useCallback(async () => {
+    setSnapshot(await buildDashboardSnapshot(projectId));
   }, [projectId]);
 
   useEffect(() => {
-    refresh();
-    setIsReady(true);
+    let cancelled = false;
+    void (async () => {
+      await refresh();
+      if (!cancelled) setIsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   return { snapshot, isReady, refresh };

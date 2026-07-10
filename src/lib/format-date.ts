@@ -1,7 +1,8 @@
 /**
- * 날짜 표시용 짧은 포맷 (목록 카드).
- * @example "2026. 7. 10."
+ * 날짜/시각 표시 포맷 (목록·자동저장 표시용).
  */
+
+/** @example "2026. 7. 10." */
 export function formatShortDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -13,10 +14,7 @@ export function formatShortDate(iso: string): string {
   }).format(date);
 }
 
-/**
- * 자동 저장 시각용 (오늘이면 시각만).
- * @example "오후 2:12"
- */
+/** @example "오후 2:12" */
 export function formatShortTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";

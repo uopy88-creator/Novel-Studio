@@ -1,9 +1,8 @@
 /**
  * =============================================================================
- * Chapter / Document LocalStorage
+ * Chapter / Document Storage (Cloud 우선 + LocalStorage 백업)
  * -----------------------------------------------------------------------------
- * Document(목차) 목록 저장소.
- * 키: novel-studio:chapters (기존 호환)
+ * 온라인 시 Supabase `documents` 테이블. LocalStorage는 백업.
  * =============================================================================
  */
 
@@ -16,31 +15,26 @@ import {
   DOCUMENT_KIND_OPTIONS,
 } from "@/features/manuscript/types/chapter";
 import type { ChapterId, ProjectId } from "@/types/ids";
+import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  cloudDeleteDocument,
+  cloudListDocuments,
+  cloudListDocumentsByProject,
+  cloudUpsertDocument,
+  cloudUpsertDocuments,
+} from "@/database/supabase/documents-repo";
+import { CHAPTERS_STORAGE_KEY } from "@/lib/storage/keys";
+import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
-export const CHAPTERS_STORAGE_KEY = "novel-studio:chapters";
+export { CHAPTERS_STORAGE_KEY };
 
-/**
- * 생성/수정 폼 입력값.
- */
 export interface ChapterInput {
-  /** 문서 제목 (비어 있으면 기본값 "새 문서") */
   title: string;
-  /** 문서 종류 */
   kind: DocumentKind;
-  /** 간단한 설명 → summary (선택) */
   description?: string;
 }
 
-function canUseStorage(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.localStorage !== "undefined"
-  );
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
+export type DocumentInput = ChapterInput;
 
 function isDocumentKind(value: unknown): value is DocumentKind {
   return (
@@ -49,10 +43,6 @@ function isDocumentKind(value: unknown): value is DocumentKind {
   );
 }
 
-/**
- * LocalStorage 원시 객체를 Chapter로 정규화.
- * kind가 없는 구데이터는 novel(소설)로 채운다.
- */
 function normalizeChapter(raw: unknown): Chapter | null {
   if (!raw || typeof raw !== "object") return null;
   const item = raw as Partial<Chapter>;
@@ -77,57 +67,77 @@ function normalizeChapter(raw: unknown): Chapter | null {
   };
 }
 
-/** 전체 Document 읽기 */
-export function readAllChapters(): Chapter[] {
-  if (!canUseStorage()) return [];
-
-  try {
-    const raw = window.localStorage.getItem(CHAPTERS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeChapter)
-      .filter((item): item is Chapter => item !== null);
-  } catch {
-    return [];
-  }
+function readLocalAllChapters(): Chapter[] {
+  return readJsonArray<unknown>(CHAPTERS_STORAGE_KEY)
+    .map(normalizeChapter)
+    .filter((item): item is Chapter => item !== null);
 }
 
-/** 전체 저장 (sortOrder 기준 정렬) */
-export function writeAllChapters(chapters: Chapter[]): void {
-  if (!canUseStorage()) return;
-
+function writeLocalAllChapters(chapters: Chapter[]): void {
   const sorted = [...chapters].sort((a, b) => {
     if (a.projectId !== b.projectId) {
       return a.projectId.localeCompare(b.projectId);
     }
     return a.sortOrder - b.sortOrder;
   });
-  window.localStorage.setItem(CHAPTERS_STORAGE_KEY, JSON.stringify(sorted));
-}
-
-/** 특정 작품의 Document만 (순서 순) */
-export function readChaptersByProject(projectId: ProjectId): Chapter[] {
-  return readAllChapters()
-    .filter((chapter) => chapter.projectId === projectId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  writeJsonArray(CHAPTERS_STORAGE_KEY, sorted);
 }
 
 export function createChapterId(): ChapterId {
   return crypto.randomUUID();
 }
 
-/**
- * Document 생성 — 목록 맨 끝.
- * 제목이 비어 있으면 "새 문서".
- */
-export function createChapter(
+export async function readAllChapters(): Promise<Chapter[]> {
+  if (await canUseCloudDb()) {
+    try {
+      const chapters = await cloudListDocuments();
+      writeLocalAllChapters(chapters);
+      return chapters;
+    } catch {
+      return readLocalAllChapters();
+    }
+  }
+  return readLocalAllChapters();
+}
+
+export async function writeAllChapters(chapters: Chapter[]): Promise<void> {
+  writeLocalAllChapters(chapters);
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDocuments(chapters);
+    } catch {
+      // 로컬 백업은 이미 저장됨
+    }
+  }
+}
+
+export async function readChaptersByProject(
+  projectId: ProjectId,
+): Promise<Chapter[]> {
+  if (await canUseCloudDb()) {
+    try {
+      const chapters = await cloudListDocumentsByProject(projectId);
+      // 해당 작품분만 로컬에 병합 백업
+      const others = readLocalAllChapters().filter(
+        (chapter) => chapter.projectId !== projectId,
+      );
+      writeLocalAllChapters([...others, ...chapters]);
+      return chapters;
+    } catch {
+      // fall through
+    }
+  }
+
+  return readLocalAllChapters()
+    .filter((chapter) => chapter.projectId === projectId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function createChapter(
   projectId: ProjectId,
   input: ChapterInput,
-): Chapter {
-  const all = readAllChapters();
-  const siblings = all.filter((chapter) => chapter.projectId === projectId);
+): Promise<Chapter> {
+  const siblings = await readChaptersByProject(projectId);
   const maxSort = siblings.reduce(
     (max, chapter) => Math.max(max, chapter.sortOrder),
     -1,
@@ -148,21 +158,31 @@ export function createChapter(
     updatedAt: timestamp,
   };
 
-  writeAllChapters([...all, chapter]);
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDocument(chapter);
+      const all = readLocalAllChapters();
+      writeLocalAllChapters([...all.filter((c) => c.id !== chapter.id), chapter]);
+      return chapter;
+    } catch {
+      // fall through
+    }
+  }
+
+  const all = readLocalAllChapters();
+  writeLocalAllChapters([...all, chapter]);
   return chapter;
 }
 
-/** Document 수정 (제목·종류·설명) */
-export function updateChapter(
+export async function updateChapter(
   id: ChapterId,
   input: ChapterInput,
-): Chapter | null {
-  const all = readAllChapters();
+): Promise<Chapter | null> {
+  const all = await readAllChapters();
   const index = all.findIndex((chapter) => chapter.id === id);
   if (index < 0) return null;
 
   const title = input.title.trim() || DEFAULT_DOCUMENT_TITLE;
-
   const updated: Chapter = {
     ...all[index],
     title,
@@ -171,30 +191,54 @@ export function updateChapter(
     updatedAt: nowIso(),
   };
 
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDocument(updated);
+      const next = [...all];
+      next[index] = updated;
+      writeLocalAllChapters(next);
+      return updated;
+    } catch {
+      // fall through
+    }
+  }
+
   const next = [...all];
   next[index] = updated;
-  writeAllChapters(next);
+  writeLocalAllChapters(next);
   return updated;
 }
 
-/** Document 삭제 + 같은 작품 sortOrder 재부여 */
-export function deleteChapter(id: ChapterId): boolean {
-  const all = readAllChapters();
+export async function deleteChapter(id: ChapterId): Promise<boolean> {
+  const all = await readAllChapters();
   const target = all.find((chapter) => chapter.id === id);
   if (!target) return false;
 
+  if (await canUseCloudDb()) {
+    try {
+      await cloudDeleteDocument(id);
+      const remaining = all.filter((chapter) => chapter.id !== id);
+      const renumbered = renumberProjectChapters(remaining, target.projectId);
+      await cloudUpsertDocuments(
+        renumbered.filter((chapter) => chapter.projectId === target.projectId),
+      );
+      writeLocalAllChapters(renumbered);
+      return true;
+    } catch {
+      // fall through
+    }
+  }
+
   const remaining = all.filter((chapter) => chapter.id !== id);
-  const renumbered = renumberProjectChapters(remaining, target.projectId);
-  writeAllChapters(renumbered);
+  writeLocalAllChapters(renumberProjectChapters(remaining, target.projectId));
   return true;
 }
 
-/** 위/아래 이동 */
-export function moveChapter(
+export async function moveChapter(
   id: ChapterId,
   direction: "up" | "down",
-): Chapter[] | null {
-  const all = readAllChapters();
+): Promise<Chapter[] | null> {
+  const all = await readAllChapters();
   const target = all.find((chapter) => chapter.id === id);
   if (!target) return null;
 
@@ -224,7 +268,20 @@ export function moveChapter(
     return chapter;
   });
 
-  writeAllChapters(next);
+  const changed = next.filter(
+    (chapter) => chapter.id === a.id || chapter.id === b.id,
+  );
+
+  writeLocalAllChapters(next);
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDocuments(changed);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
   return readChaptersByProject(target.projectId);
 }
 
@@ -248,28 +305,29 @@ function renumberProjectChapters(
   });
 }
 
-export function getChapterNumber(
-  chapters: Chapter[],
-  chapterId: ChapterId,
-): number {
-  const sorted = [...chapters].sort((a, b) => a.sortOrder - b.sortOrder);
-  const index = sorted.findIndex((chapter) => chapter.id === chapterId);
-  return index >= 0 ? index + 1 : 0;
-}
-
-export function syncChapterAfterManuscriptWrite(
+export async function syncChapterAfterManuscriptWrite(
   chapterId: ChapterId,
   wordCount: number,
-): void {
-  const all = readAllChapters();
+): Promise<void> {
+  const all = await readAllChapters();
   const index = all.findIndex((chapter) => chapter.id === chapterId);
   if (index < 0) return;
 
-  const next = [...all];
-  next[index] = {
+  const updated: Chapter = {
     ...all[index],
     wordCount,
     updatedAt: nowIso(),
   };
-  writeAllChapters(next);
+
+  const next = [...all];
+  next[index] = updated;
+  writeLocalAllChapters(next);
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDocument(updated);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
 }

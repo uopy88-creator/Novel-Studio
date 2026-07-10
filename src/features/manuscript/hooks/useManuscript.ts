@@ -4,14 +4,7 @@
  * =============================================================================
  * useManuscript
  * -----------------------------------------------------------------------------
- * Document(Chapter) 하나를 선택해 원고를 편집하고 LocalStorage에 자동 저장한다.
- *
- * 저장 상태
- * - idle: 아직 변경 없음 / 초기
- * - dirty: 입력됨, 저장 대기
- * - saving: 저장 중
- * - saved: 저장 완료
- * - error: 저장 실패
+ * Document 원고 편집 — Cloud(DB) 우선 자동 저장, LocalStorage 백업.
  * =============================================================================
  */
 
@@ -64,50 +57,57 @@ export function useManuscript(
   selectedRef.current = selectedChapterId;
 
   const loadDocument = useCallback(
-    (chapterId: ChapterId) => {
-      const existing = getManuscriptByChapterId(projectId, chapterId);
+    async (chapterId: ChapterId) => {
+      const existing = await getManuscriptByChapterId(projectId, chapterId);
       dirtyRef.current = false;
       setSelectedChapterId(chapterId);
       setContentState(existing?.content ?? "");
       setSaveStatus("idle");
       setLastSavedAt(existing?.updatedAt ?? null);
-      touchManuscriptOpened(projectId, chapterId);
+      void touchManuscriptOpened(projectId, chapterId);
     },
     [projectId],
   );
 
   useEffect(() => {
-    const list = readChaptersByProject(projectId);
-    setDocuments(list);
-    setIsReady(true);
+    let cancelled = false;
+    void (async () => {
+      const list = await readChaptersByProject(projectId);
+      if (cancelled) return;
+      setDocuments(list);
+      setIsReady(true);
 
-    // URL ?documentId= 로 들어온 경우 한 번만 자동 선택
-    if (
-      !didApplyInitial.current &&
-      initialDocumentId &&
-      list.some((document) => document.id === initialDocumentId)
-    ) {
-      didApplyInitial.current = true;
-      loadDocument(initialDocumentId);
-    }
+      if (
+        !didApplyInitial.current &&
+        initialDocumentId &&
+        list.some((document) => document.id === initialDocumentId)
+      ) {
+        didApplyInitial.current = true;
+        await loadDocument(initialDocumentId);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, initialDocumentId, loadDocument]);
 
   const persist = useCallback(
     (chapterId: ChapterId, value: string) => {
-      try {
-        setSaveStatus("saving");
-        const saved = saveManuscriptContent({
-          projectId,
-          chapterId,
-          content: value,
-        });
-        dirtyRef.current = false;
-        setLastSavedAt(saved.updatedAt);
-        setSaveStatus("saved");
-        setDocuments(readChaptersByProject(projectId));
-      } catch {
-        setSaveStatus("error");
-      }
+      setSaveStatus("saving");
+      void (async () => {
+        try {
+          const saved = await saveManuscriptContent({
+            projectId,
+            chapterId,
+            content: value,
+          });
+          dirtyRef.current = false;
+          setLastSavedAt(saved.updatedAt);
+          setSaveStatus("saved");
+        } catch {
+          setSaveStatus("error");
+        }
+      })();
     },
     [projectId],
   );
@@ -127,7 +127,7 @@ export function useManuscript(
         if (timerRef.current) clearTimeout(timerRef.current);
         persist(selectedRef.current, contentRef.current);
       }
-      loadDocument(chapterId);
+      void loadDocument(chapterId);
     },
     [loadDocument, persist],
   );
@@ -151,15 +151,11 @@ export function useManuscript(
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (selectedRef.current && dirtyRef.current) {
-        try {
-          saveManuscriptContent({
-            projectId,
-            chapterId: selectedRef.current,
-            content: contentRef.current,
-          });
-        } catch {
-          // ignore on unmount
-        }
+        void saveManuscriptContent({
+          projectId,
+          chapterId: selectedRef.current,
+          content: contentRef.current,
+        });
       }
     };
   }, [projectId]);

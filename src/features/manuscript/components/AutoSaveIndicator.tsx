@@ -7,7 +7,7 @@
  */
 
 import type { SaveStatus } from "@/features/manuscript/hooks/useManuscript";
-import { formatShortTime } from "@/features/manuscript/lib/format-date";
+import { formatShortTime } from "@/lib/format-date";
 import { cn } from "@/lib/utils/cn";
 
 export interface AutoSaveIndicatorProps {

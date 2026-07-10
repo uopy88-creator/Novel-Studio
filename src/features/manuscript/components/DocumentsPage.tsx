@@ -84,11 +84,13 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
         document={modal.type === "edit" ? modal.document : null}
         onClose={closeModal}
         onSubmit={(input) => {
-          if (modal.type === "edit") {
-            update(modal.document.id, input);
-          } else {
-            create(input);
-          }
+          void (async () => {
+            if (modal.type === "edit") {
+              await update(modal.document.id, input);
+            } else {
+              await create(input);
+            }
+          })();
         }}
       />
 
@@ -96,7 +98,9 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
         open={Boolean(deleting)}
         document={deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={(document) => remove(document.id)}
+        onConfirm={(document) => {
+          void remove(document.id);
+        }}
       />
     </ContentContainer>
   );

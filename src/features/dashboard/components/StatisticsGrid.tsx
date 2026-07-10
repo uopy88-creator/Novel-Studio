@@ -14,7 +14,7 @@
  */
 
 import { DashboardCard } from "@/features/dashboard/components/DashboardCard";
-import { formatCount } from "@/features/dashboard/lib/stats";
+import { formatCount } from "@/lib/stats";
 import { cn } from "@/lib/utils/cn";
 
 export interface StatisticsGridProps {

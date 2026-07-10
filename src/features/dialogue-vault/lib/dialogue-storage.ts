@@ -1,38 +1,30 @@
 /**
  * =============================================================================
- * Dialogue LocalStorage
+ * Dialogue Storage (Cloud 우선 + LocalStorage 백업)
  * -----------------------------------------------------------------------------
- * 키: novel-studio:dialogues
- * 원고와 독립 — Manuscript / Document 를 수정하지 않는다.
+ * 온라인 시 Supabase `dialogues` 테이블. LocalStorage는 백업.
  * =============================================================================
  */
 
 import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
 import type { DialogueId, ProjectId } from "@/types/ids";
+import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  cloudDeleteDialogue,
+  cloudListDialogues,
+  cloudListDialoguesByProject,
+  cloudUpsertDialogue,
+} from "@/database/supabase/dialogues-repo";
+import { DIALOGUES_STORAGE_KEY } from "@/lib/storage/keys";
+import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
-export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
+export { DIALOGUES_STORAGE_KEY };
 
-/** 생성/수정 폼 입력 */
 export interface DialogueInput {
   content: string;
-  /** 쉼표 또는 공백으로 구분된 태그 문자열도 허용하기 전, 이미 파싱된 배열 */
   tags: string[];
 }
 
-function canUseStorage(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.localStorage !== "undefined"
-  );
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-/**
- * 구버전(text 필드) / 신버전(content) 모두 읽는다.
- */
 function normalizeDialogue(raw: unknown): Dialogue | null {
   if (!raw || typeof raw !== "object") return null;
   const item = raw as Partial<Dialogue> & { text?: string };
@@ -63,52 +55,68 @@ function normalizeDialogue(raw: unknown): Dialogue | null {
   };
 }
 
-export function readAllDialogues(): Dialogue[] {
-  if (!canUseStorage()) return [];
-
-  try {
-    const raw = window.localStorage.getItem(DIALOGUES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeDialogue)
-      .filter((item): item is Dialogue => item !== null);
-  } catch {
-    return [];
-  }
+function readLocalDialogues(): Dialogue[] {
+  return readJsonArray<unknown>(DIALOGUES_STORAGE_KEY)
+    .map(normalizeDialogue)
+    .filter((item): item is Dialogue => item !== null);
 }
 
-export function writeAllDialogues(dialogues: Dialogue[]): void {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(
-    DIALOGUES_STORAGE_KEY,
-    JSON.stringify(dialogues),
-  );
-}
-
-/**
- * 작품별 목록.
- * 즐겨찾기 먼저, 그다음 updatedAt 최신순.
- */
-export function readDialoguesByProject(projectId: ProjectId): Dialogue[] {
-  return readAllDialogues()
-    .filter((dialogue) => dialogue.projectId === projectId)
-    .sort((a, b) => {
-      if (a.isFavorite !== b.isFavorite) {
-        return a.isFavorite ? -1 : 1;
-      }
-      return (
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
-    });
+function writeLocalDialogues(dialogues: Dialogue[]): void {
+  writeJsonArray(DIALOGUES_STORAGE_KEY, dialogues);
 }
 
 function createDialogueId(): DialogueId {
   return crypto.randomUUID();
 }
 
-/** 태그 문자열 → 배열 (쉼표/공백 구분, 중복 제거) */
+export async function readAllDialogues(): Promise<Dialogue[]> {
+  if (await canUseCloudDb()) {
+    try {
+      const dialogues = await cloudListDialogues();
+      writeLocalDialogues(dialogues);
+      return dialogues;
+    } catch {
+      return readLocalDialogues();
+    }
+  }
+  return readLocalDialogues();
+}
+
+export async function writeAllDialogues(dialogues: Dialogue[]): Promise<void> {
+  writeLocalDialogues(dialogues);
+}
+
+export async function readDialoguesByProject(
+  projectId: ProjectId,
+): Promise<Dialogue[]> {
+  let list: Dialogue[];
+
+  if (await canUseCloudDb()) {
+    try {
+      list = await cloudListDialoguesByProject(projectId);
+      const others = readLocalDialogues().filter(
+        (dialogue) => dialogue.projectId !== projectId,
+      );
+      writeLocalDialogues([...others, ...list]);
+    } catch {
+      list = readLocalDialogues().filter(
+        (dialogue) => dialogue.projectId === projectId,
+      );
+    }
+  } else {
+    list = readLocalDialogues().filter(
+      (dialogue) => dialogue.projectId === projectId,
+    );
+  }
+
+  return list.sort((a, b) => {
+    if (a.isFavorite !== b.isFavorite) {
+      return a.isFavorite ? -1 : 1;
+    }
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+}
+
 export function parseTagsInput(raw: string): string[] {
   const parts = raw
     .split(/[,，\s]+/)
@@ -117,11 +125,10 @@ export function parseTagsInput(raw: string): string[] {
   return [...new Set(parts)];
 }
 
-export function createDialogue(
+export async function createDialogue(
   projectId: ProjectId,
   input: DialogueInput,
-): Dialogue {
-  const all = readAllDialogues();
+): Promise<Dialogue> {
   const timestamp = nowIso();
 
   const dialogue: Dialogue = {
@@ -134,15 +141,25 @@ export function createDialogue(
     updatedAt: timestamp,
   };
 
-  writeAllDialogues([...all, dialogue]);
+  const local = readLocalDialogues();
+  writeLocalDialogues([...local, dialogue]);
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDialogue(dialogue);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
   return dialogue;
 }
 
-export function updateDialogue(
+export async function updateDialogue(
   id: DialogueId,
   input: DialogueInput,
-): Dialogue | null {
-  const all = readAllDialogues();
+): Promise<Dialogue | null> {
+  const all = await readAllDialogues();
   const index = all.findIndex((dialogue) => dialogue.id === id);
   if (index < 0) return null;
 
@@ -155,21 +172,41 @@ export function updateDialogue(
 
   const next = [...all];
   next[index] = updated;
-  writeAllDialogues(next);
+  writeLocalDialogues(next);
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDialogue(updated);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
   return updated;
 }
 
-export function deleteDialogue(id: DialogueId): boolean {
-  const all = readAllDialogues();
-  const next = all.filter((dialogue) => dialogue.id !== id);
-  if (next.length === all.length) return false;
-  writeAllDialogues(next);
+export async function deleteDialogue(id: DialogueId): Promise<boolean> {
+  const all = await readAllDialogues();
+  const exists = all.some((dialogue) => dialogue.id === id);
+  if (!exists) return false;
+
+  writeLocalDialogues(all.filter((dialogue) => dialogue.id !== id));
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudDeleteDialogue(id);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
   return true;
 }
 
-/** 즐겨찾기 토글 — true면 목록 상단 고정 */
-export function toggleDialogueFavorite(id: DialogueId): Dialogue | null {
-  const all = readAllDialogues();
+export async function toggleDialogueFavorite(
+  id: DialogueId,
+): Promise<Dialogue | null> {
+  const all = await readAllDialogues();
   const index = all.findIndex((dialogue) => dialogue.id === id);
   if (index < 0) return null;
 
@@ -181,14 +218,19 @@ export function toggleDialogueFavorite(id: DialogueId): Dialogue | null {
 
   const next = [...all];
   next[index] = updated;
-  writeAllDialogues(next);
+  writeLocalDialogues(next);
+
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertDialogue(updated);
+    } catch {
+      // 로컬 백업 유지
+    }
+  }
+
   return updated;
 }
 
-/**
- * 대사 내용 + 태그를 동시에 검색 (대소문자 무시).
- * query가 비어 있으면 원본 목록을 그대로 반환.
- */
 export function filterDialogues(
   dialogues: Dialogue[],
   query: string,

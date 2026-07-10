@@ -1,12 +1,10 @@
 /**
  * =============================================================================
- * Dashboard용 LocalStorage 읽기
+ * Dashboard용 데이터 읽기
  * -----------------------------------------------------------------------------
  * Dashboard는 수정하지 않는다. 읽기만 한다.
- *
- * Manuscript / Memo / Character CRUD는 아직 없을 수 있다.
- * 키가 없거나 깨져 있으면 빈 배열로 취급해 통계를 0으로 보여 준다.
- * 이후 각 기능이 같은 키로 저장하면 Dashboard가 자동으로 숫자를 반영한다.
+ * Documents / Manuscripts 는 Cloud 우선 저장소를 사용한다.
+ * Memo / Character는 아직 LocalStorage만.
  * =============================================================================
  */
 
@@ -16,42 +14,27 @@ import type { Character } from "@/features/characters/types/character";
 import type { Memo } from "@/features/memo/types/memo";
 import type { ProjectId } from "@/types/ids";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
+import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
 import {
   countCharsWithoutSpaces,
   countCharsWithSpaces,
   estimateBookPages,
   estimateManuscriptSheets,
-} from "@/features/dashboard/lib/stats";
+} from "@/lib/stats";
+import {
+  CHARACTERS_STORAGE_KEY,
+  MEMOS_STORAGE_KEY,
+} from "@/lib/storage/keys";
+import { readJsonArray } from "@/lib/storage/browser";
 
-export const MANUSCRIPTS_STORAGE_KEY = "novel-studio:manuscripts";
-export const MEMOS_STORAGE_KEY = "novel-studio:memos";
-export const CHARACTERS_STORAGE_KEY = "novel-studio:characters";
+export { CHARACTERS_STORAGE_KEY, MEMOS_STORAGE_KEY };
+export { MANUSCRIPTS_STORAGE_KEY } from "@/lib/storage/keys";
 
-function canUseStorage(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.localStorage !== "undefined"
-  );
-}
-
-function readJsonArray<T>(key: string): T[] {
-  if (!canUseStorage()) return [];
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as T[];
-  } catch {
-    return [];
-  }
-}
-
-export function readManuscriptsByProject(projectId: ProjectId): Manuscript[] {
-  return readJsonArray<Manuscript>(MANUSCRIPTS_STORAGE_KEY).filter(
-    (item) => item.projectId === projectId,
-  );
+export async function readManuscriptsByProject(
+  projectId: ProjectId,
+): Promise<Manuscript[]> {
+  const all = await readAllManuscripts();
+  return all.filter((item) => item.projectId === projectId);
 }
 
 export function readMemosByProject(projectId: ProjectId): Memo[] {
@@ -66,17 +49,14 @@ export function readCharactersByProject(projectId: ProjectId): Character[] {
   );
 }
 
-/** 최근 수정 Document 목록에 쓰는 요약 */
 export interface RecentDocumentItem {
   id: string;
   title: string;
   summary?: string;
-  /** 목록 번호 (1화…) */
   number: number;
   updatedAt: string;
 }
 
-/** Dashboard 한 화면에 필요한 집계 결과 */
 export interface DashboardSnapshot {
   totalChars: number;
   charsWithoutSpaces: number;
@@ -87,17 +67,11 @@ export interface DashboardSnapshot {
   recentDocuments: RecentDocumentItem[];
 }
 
-/**
- * 작품 단위 Dashboard 스냅샷.
- *
- * 글자 수 우선순위
- * 1) Manuscript.plainText (또는 content) 합산
- * 2) Manuscript가 없으면 Chapter.wordCount 합산
- *    (wordCount는 “단어” 캐시이지만, 원고 기능 전에는 0인 경우가 많다)
- */
-export function buildDashboardSnapshot(projectId: ProjectId): DashboardSnapshot {
-  const documents = readChaptersByProject(projectId);
-  const manuscripts = readManuscriptsByProject(projectId);
+export async function buildDashboardSnapshot(
+  projectId: ProjectId,
+): Promise<DashboardSnapshot> {
+  const documents = await readChaptersByProject(projectId);
+  const manuscripts = await readManuscriptsByProject(projectId);
   const memos = readMemosByProject(projectId);
   const characters = readCharactersByProject(projectId);
 
@@ -111,14 +85,11 @@ export function buildDashboardSnapshot(projectId: ProjectId): DashboardSnapshot 
       charsWithoutSpaces += countCharsWithoutSpaces(text);
     }
   } else {
-    // 원고 본문이 아직 없을 때: Document(Chapter)에 캐시된 분량이 있으면 참고
     for (const document of documents) {
       totalChars += document.wordCount;
       charsWithoutSpaces += document.wordCount;
     }
   }
-
-  const recentDocuments = buildRecentDocuments(documents);
 
   return {
     totalChars,
@@ -127,11 +98,10 @@ export function buildDashboardSnapshot(projectId: ProjectId): DashboardSnapshot 
     bookPages: estimateBookPages(charsWithoutSpaces),
     memoCount: memos.length,
     characterCount: characters.length,
-    recentDocuments,
+    recentDocuments: buildRecentDocuments(documents),
   };
 }
 
-/** updatedAt 기준 최근 Document (최대 5개) */
 function buildRecentDocuments(documents: Chapter[]): RecentDocumentItem[] {
   const sortedByOrder = [...documents].sort(
     (a, b) => a.sortOrder - b.sortOrder,

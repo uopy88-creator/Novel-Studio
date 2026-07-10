@@ -91,7 +91,9 @@ export function DialogueVaultPage({ projectId }: DialogueVaultPageProps) {
             isSearchEmpty={isSearchEmpty}
             onEdit={(dialogue) => setModal({ type: "edit", dialogue })}
             onDelete={(dialogue) => setDeleting(dialogue)}
-            onToggleFavorite={(dialogue) => toggleFavorite(dialogue.id)}
+            onToggleFavorite={(dialogue) => {
+              void toggleFavorite(dialogue.id);
+            }}
             emptyAction={
               <Button
                 type="button"
@@ -111,11 +113,13 @@ export function DialogueVaultPage({ projectId }: DialogueVaultPageProps) {
         dialogue={modal.type === "edit" ? modal.dialogue : null}
         onClose={closeModal}
         onSubmit={(input) => {
-          if (modal.type === "edit") {
-            update(modal.dialogue.id, input);
-          } else {
-            create(input);
-          }
+          void (async () => {
+            if (modal.type === "edit") {
+              await update(modal.dialogue.id, input);
+            } else {
+              await create(input);
+            }
+          })();
         }}
       />
 
@@ -123,7 +127,9 @@ export function DialogueVaultPage({ projectId }: DialogueVaultPageProps) {
         open={Boolean(deleting)}
         dialogue={deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={(dialogue) => remove(dialogue.id)}
+        onConfirm={(dialogue) => {
+          void remove(dialogue.id);
+        }}
       />
     </ContentContainer>
   );

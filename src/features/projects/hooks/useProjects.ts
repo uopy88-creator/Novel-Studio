@@ -4,10 +4,7 @@
  * =============================================================================
  * useProjects
  * -----------------------------------------------------------------------------
- * 작품 목록 상태 + LocalStorage CRUD를 화면에 연결하는 훅.
- *
- * - 마운트 후에만 storage를 읽어 hydration mismatch를 피한다.
- * - 모든 변경은 storage에 쓴 뒤 state를 갱신한다.
+ * 작품 목록 — Cloud(DB) 우선, LocalStorage 백업.
  * =============================================================================
  */
 
@@ -23,45 +20,48 @@ import {
 } from "@/features/projects/lib/project-storage";
 
 export interface UseProjectsResult {
-  /** 작품 목록 (sortOrder 정렬됨) */
   projects: Project[];
-  /** LocalStorage 첫 로드가 끝났는지 */
   isReady: boolean;
-  create: (input: ProjectInput) => Project;
-  update: (id: ProjectId, input: ProjectInput) => Project | null;
-  remove: (id: ProjectId) => boolean;
-  /** storage에서 다시 읽기 */
-  refresh: () => void;
+  create: (input: ProjectInput) => Promise<Project>;
+  update: (id: ProjectId, input: ProjectInput) => Promise<Project | null>;
+  remove: (id: ProjectId) => Promise<boolean>;
+  refresh: () => Promise<void>;
 }
 
 export function useProjects(): UseProjectsResult {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isReady, setIsReady] = useState(false);
 
-  const refresh = useCallback(() => {
-    setProjects(readProjects());
+  const refresh = useCallback(async () => {
+    setProjects(await readProjects());
   }, []);
 
   useEffect(() => {
-    refresh();
-    setIsReady(true);
+    let cancelled = false;
+    void (async () => {
+      await refresh();
+      if (!cancelled) setIsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
-  const create = useCallback((input: ProjectInput) => {
-    const project = createProject(input);
-    setProjects(readProjects());
+  const create = useCallback(async (input: ProjectInput) => {
+    const project = await createProject(input);
+    setProjects(await readProjects());
     return project;
   }, []);
 
-  const update = useCallback((id: ProjectId, input: ProjectInput) => {
-    const project = updateProject(id, input);
-    setProjects(readProjects());
+  const update = useCallback(async (id: ProjectId, input: ProjectInput) => {
+    const project = await updateProject(id, input);
+    setProjects(await readProjects());
     return project;
   }, []);
 
-  const remove = useCallback((id: ProjectId) => {
-    const ok = deleteProject(id);
-    setProjects(readProjects());
+  const remove = useCallback(async (id: ProjectId) => {
+    const ok = await deleteProject(id);
+    setProjects(await readProjects());
     return ok;
   }, []);
 

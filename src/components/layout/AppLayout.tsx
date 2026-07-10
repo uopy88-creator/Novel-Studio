@@ -24,10 +24,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { getProjectById } from "@/features/projects/lib/project-storage";
+import { SIDEBAR_COLLAPSED_KEY } from "@/lib/storage/keys";
+import {
+  readStorageString,
+  writeStorageString,
+} from "@/lib/storage/browser";
 import { cn } from "@/lib/utils/cn";
-
-/** 사이드바 접힘 상태 저장 키 */
-const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";
 
 export interface AppLayoutProps {
   /** URL의 작품 ID */
@@ -41,31 +43,32 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // 작품 제목 — LocalStorage에서 읽기 (SSR 이후)
+  // 작품 제목 — Cloud/LocalStorage에서 읽기 (SSR 이후)
   useEffect(() => {
-    const project = getProjectById(projectId);
-    setProjectTitle(project?.title ?? "알 수 없는 작품");
-    setTitleLoading(false);
+    let cancelled = false;
+    void (async () => {
+      setTitleLoading(true);
+      const project = await getProjectById(projectId);
+      if (cancelled) return;
+      setProjectTitle(project?.title ?? "알 수 없는 작품");
+      setTitleLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   // 접힘 상태 복원
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      if (raw === "true") setCollapsed(true);
-    } catch {
-      // storage 접근 실패 시 기본값(펼침) 유지
+    if (readStorageString(SIDEBAR_COLLAPSED_KEY) === "true") {
+      setCollapsed(true);
     }
   }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
-      try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      } catch {
-        // ignore
-      }
+      writeStorageString(SIDEBAR_COLLAPSED_KEY, String(next));
       return next;
     });
   };

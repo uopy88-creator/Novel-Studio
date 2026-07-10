@@ -15,8 +15,11 @@ export type EntityId = string;
 /** 작품(Project) ID */
 export type ProjectId = EntityId;
 
-/** 챕터 ID */
+/** 챕터 / Document ID (저장 JSON 필드명은 chapterId 유지) */
 export type ChapterId = EntityId;
+
+/** 제품 언어 별칭 — Document ≈ Chapter */
+export type DocumentId = ChapterId;
 
 /** 원고(Manuscript) 문서 ID */
 export type ManuscriptId = EntityId;

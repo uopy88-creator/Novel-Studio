@@ -1,86 +1,74 @@
 /**
  * =============================================================================
- * Project LocalStorage
+ * Project Storage (Cloud 우선 + LocalStorage 백업)
  * -----------------------------------------------------------------------------
- * 작품 데이터의 유일한 저장소 (브라우저 LocalStorage).
- *
- * 왜 화면/훅과 분리하나?
- * - 저장 방식을 나중에 API로 바꿔도 UI는 그대로 둘 수 있다.
- * - SSR 중에는 window가 없으므로, 읽기/쓰기는 클라이언트에서만 호출한다.
+ * 온라인·로그인 시 Supabase `projects` 테이블을 사용한다.
+ * LocalStorage는 오프라인 백업용으로만 유지한다.
  * =============================================================================
  */
 
 import type { Project } from "@/features/projects/types/project";
 import type { ProjectId } from "@/types/ids";
+import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  cloudDeleteProject,
+  cloudListProjects,
+  cloudUpsertProject,
+} from "@/database/supabase/projects-repo";
+import { PROJECTS_STORAGE_KEY } from "@/lib/storage/keys";
+import {
+  nowIso,
+  readJsonArray,
+  writeJsonArray,
+} from "@/lib/storage/browser";
 
-/** LocalStorage 키 — 다른 기능과 충돌하지 않게 네임스페이스를 둔다 */
-export const PROJECTS_STORAGE_KEY = "novel-studio:projects";
+export { PROJECTS_STORAGE_KEY };
 
-/**
- * 새 작품 생성 시 폼에서 받는 값.
- * Project 전체 필드가 아니라, 사용자가 직접 입력하는 것만 담는다.
- */
 export interface ProjectInput {
-  /** 작품 제목 (필수) */
   title: string;
-  /** 작품 설명 → Project.premise 에 저장 */
   description: string;
 }
 
-/** 브라우저 환경인지 확인 (Next.js SSR 대비) */
-function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+/** LocalStorage 백업 읽기 */
+function readLocalProjects(): Project[] {
+  return readJsonArray<Project>(PROJECTS_STORAGE_KEY);
 }
 
-/**
- * 저장된 작품 목록을 읽는다.
- * 없거나 깨져 있으면 빈 배열을 반환한다.
- */
-export function readProjects(): Project[] {
-  if (!canUseStorage()) return [];
-
-  try {
-    const raw = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed as Project[];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * 작품 목록 전체를 저장한다.
- * sortOrder 기준으로 정렬해 일관된 순서를 유지한다.
- */
-export function writeProjects(projects: Project[]): void {
-  if (!canUseStorage()) return;
-
+/** LocalStorage 백업 쓰기 */
+function writeLocalProjects(projects: Project[]): void {
   const sorted = [...projects].sort((a, b) => a.sortOrder - b.sortOrder);
-  window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(sorted));
+  writeJsonArray(PROJECTS_STORAGE_KEY, sorted);
 }
 
-/** 새 ID 생성 */
 export function createProjectId(): ProjectId {
   return crypto.randomUUID();
 }
 
-/** 현재 시각 ISO 문자열 */
-function nowIso(): string {
-  return new Date().toISOString();
+export async function readProjects(): Promise<Project[]> {
+  if (await canUseCloudDb()) {
+    try {
+      const projects = await cloudListProjects();
+      writeLocalProjects(projects);
+      return projects;
+    } catch {
+      return readLocalProjects();
+    }
+  }
+  return readLocalProjects();
 }
 
-/**
- * 작품 생성.
- * 새 작품은 목록 맨 앞(sortOrder 최소)에 오도록 한다.
- */
-export function createProject(input: ProjectInput): Project {
-  const projects = readProjects();
+export async function createProject(input: ProjectInput): Promise<Project> {
+  let existing = readLocalProjects();
+  if (await canUseCloudDb()) {
+    try {
+      existing = await cloudListProjects();
+    } catch {
+      // 로컬 백업 기준
+    }
+  }
+
   const timestamp = nowIso();
-  const minSort = projects.reduce(
+  const minSort = existing.reduce(
     (min, project) => Math.min(min, project.sortOrder),
     0,
   );
@@ -95,19 +83,26 @@ export function createProject(input: ProjectInput): Project {
     updatedAt: timestamp,
   };
 
-  writeProjects([project, ...projects]);
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertProject(project);
+      const projects = await cloudListProjects();
+      writeLocalProjects(projects);
+      return project;
+    } catch {
+      // 클라우드 실패 시 로컬 백업만
+    }
+  }
+
+  writeLocalProjects([project, ...existing]);
   return project;
 }
 
-/**
- * 작품 수정 (제목·설명).
- * 없는 id면 null을 반환한다.
- */
-export function updateProject(
+export async function updateProject(
   id: ProjectId,
   input: ProjectInput,
-): Project | null {
-  const projects = readProjects();
+): Promise<Project | null> {
+  const projects = await readProjects();
   const index = projects.findIndex((project) => project.id === id);
   if (index < 0) return null;
 
@@ -118,26 +113,44 @@ export function updateProject(
     updatedAt: nowIso(),
   };
 
+  if (await canUseCloudDb()) {
+    try {
+      await cloudUpsertProject(updated);
+      const next = await cloudListProjects();
+      writeLocalProjects(next);
+      return updated;
+    } catch {
+      // fall through to local
+    }
+  }
+
   const next = [...projects];
   next[index] = updated;
-  writeProjects(next);
+  writeLocalProjects(next);
   return updated;
 }
 
-/**
- * 작품 삭제.
- * 삭제되었으면 true.
- */
-export function deleteProject(id: ProjectId): boolean {
-  const projects = readProjects();
-  const next = projects.filter((project) => project.id !== id);
-  if (next.length === projects.length) return false;
+export async function deleteProject(id: ProjectId): Promise<boolean> {
+  const projects = await readProjects();
+  const exists = projects.some((project) => project.id === id);
+  if (!exists) return false;
 
-  writeProjects(next);
+  if (await canUseCloudDb()) {
+    try {
+      await cloudDeleteProject(id);
+      const next = await cloudListProjects();
+      writeLocalProjects(next);
+      return true;
+    } catch {
+      // fall through
+    }
+  }
+
+  writeLocalProjects(projects.filter((project) => project.id !== id));
   return true;
 }
 
-/** id로 단건 조회 */
-export function getProjectById(id: ProjectId): Project | null {
-  return readProjects().find((project) => project.id === id) ?? null;
+export async function getProjectById(id: ProjectId): Promise<Project | null> {
+  const projects = await readProjects();
+  return projects.find((project) => project.id === id) ?? null;
 }

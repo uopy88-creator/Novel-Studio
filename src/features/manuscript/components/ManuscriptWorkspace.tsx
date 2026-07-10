@@ -15,7 +15,7 @@
  * =============================================================================
  */
 
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
 import { ManuscriptEditor } from "@/features/manuscript/components/ManuscriptEditor";
@@ -31,7 +31,7 @@ import {
   countCharsWithSpaces,
   estimateBookPages,
   estimateManuscriptSheets,
-} from "@/features/dashboard/lib/stats";
+} from "@/lib/stats";
 import { cn } from "@/lib/utils/cn";
 
 export interface ManuscriptWorkspaceProps {
@@ -74,19 +74,21 @@ export function ManuscriptWorkspace({
   }, [content]);
 
   /** 검색 결과 → textarea 선택 영역으로 이동 */
-  const jumpToMatch = (start: number, end: number) => {
-    const el = editorRef.current;
-    if (!el) return;
+  const jumpToMatch = useCallback(
+    (start: number, end: number) => {
+      const el = editorRef.current;
+      if (!el) return;
 
-    el.focus();
-    el.setSelectionRange(start, end);
+      el.focus();
+      el.setSelectionRange(start, end);
 
-    // 대략적인 스크롤: 줄 높이 기준으로 맞춤
-    const before = content.slice(0, start);
-    const lineNumber = before.split("\n").length;
-    const lineHeight = 28;
-    el.scrollTop = Math.max(0, (lineNumber - 3) * lineHeight);
-  };
+      const before = content.slice(0, start);
+      const lineNumber = before.split("\n").length;
+      const lineHeight = 28;
+      el.scrollTop = Math.max(0, (lineNumber - 3) * lineHeight);
+    },
+    [content],
+  );
 
   return (
     <ContentContainer width="full" className="max-w-7xl">

@@ -4,7 +4,7 @@
  * =============================================================================
  * useChapters
  * -----------------------------------------------------------------------------
- * 특정 작품(projectId)의 챕터 목록 + CRUD + 위/아래 이동.
+ * Document 목록 — Cloud(DB) 우선, LocalStorage 백업.
  * =============================================================================
  */
 
@@ -23,66 +23,72 @@ import {
 export interface UseChaptersResult {
   chapters: Chapter[];
   isReady: boolean;
-  create: (input: ChapterInput) => Chapter;
-  update: (id: ChapterId, input: ChapterInput) => Chapter | null;
-  remove: (id: ChapterId) => boolean;
-  moveUp: (id: ChapterId) => void;
-  moveDown: (id: ChapterId) => void;
-  refresh: () => void;
+  create: (input: ChapterInput) => Promise<Chapter>;
+  update: (id: ChapterId, input: ChapterInput) => Promise<Chapter | null>;
+  remove: (id: ChapterId) => Promise<boolean>;
+  moveUp: (id: ChapterId) => Promise<void>;
+  moveDown: (id: ChapterId) => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 export function useChapters(projectId: ProjectId): UseChaptersResult {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isReady, setIsReady] = useState(false);
 
-  const refresh = useCallback(() => {
-    setChapters(readChaptersByProject(projectId));
+  const refresh = useCallback(async () => {
+    setChapters(await readChaptersByProject(projectId));
   }, [projectId]);
 
   useEffect(() => {
-    refresh();
-    setIsReady(true);
+    let cancelled = false;
+    void (async () => {
+      await refresh();
+      if (!cancelled) setIsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   const create = useCallback(
-    (input: ChapterInput) => {
-      const chapter = createChapter(projectId, input);
-      setChapters(readChaptersByProject(projectId));
+    async (input: ChapterInput) => {
+      const chapter = await createChapter(projectId, input);
+      setChapters(await readChaptersByProject(projectId));
       return chapter;
     },
     [projectId],
   );
 
   const update = useCallback(
-    (id: ChapterId, input: ChapterInput) => {
-      const chapter = updateChapter(id, input);
-      setChapters(readChaptersByProject(projectId));
+    async (id: ChapterId, input: ChapterInput) => {
+      const chapter = await updateChapter(id, input);
+      setChapters(await readChaptersByProject(projectId));
       return chapter;
     },
     [projectId],
   );
 
   const remove = useCallback(
-    (id: ChapterId) => {
-      const ok = deleteChapter(id);
-      setChapters(readChaptersByProject(projectId));
+    async (id: ChapterId) => {
+      const ok = await deleteChapter(id);
+      setChapters(await readChaptersByProject(projectId));
       return ok;
     },
     [projectId],
   );
 
   const moveUp = useCallback(
-    (id: ChapterId) => {
-      moveChapter(id, "up");
-      setChapters(readChaptersByProject(projectId));
+    async (id: ChapterId) => {
+      await moveChapter(id, "up");
+      setChapters(await readChaptersByProject(projectId));
     },
     [projectId],
   );
 
   const moveDown = useCallback(
-    (id: ChapterId) => {
-      moveChapter(id, "down");
-      setChapters(readChaptersByProject(projectId));
+    async (id: ChapterId) => {
+      await moveChapter(id, "down");
+      setChapters(await readChaptersByProject(projectId));
     },
     [projectId],
   );
@@ -98,3 +104,5 @@ export function useChapters(projectId: ProjectId): UseChaptersResult {
     refresh,
   };
 }
+
+export const useDocuments = useChapters;
