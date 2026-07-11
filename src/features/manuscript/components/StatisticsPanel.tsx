@@ -7,12 +7,12 @@
  *
  * 계산 기준
  * - 원고지: 200자(공백 제외) = 1매 (반올림)
- * - 책 페이지: 700자(공백 제외) = 1페이지 (반올림)
+ * - 소설책 페이지: 총 글자수 ÷ 700 (소수점 첫째 자리)
  * =============================================================================
  */
 
 import { Card } from "@/components/ui/Card";
-import { formatCount } from "@/lib/stats";
+import { formatBookPages, formatCount } from "@/lib/stats";
 import { cn } from "@/lib/utils/cn";
 
 export interface StatisticsPanelProps {
@@ -71,13 +71,13 @@ export function StatisticsPanel({
         hint="공백·개행 제외"
       />
       <StatRow
-        label="예상 원고지 매수"
+        label="원고지 분량"
         value={formatCount(manuscriptSheets)}
         hint="200자 = 1매"
       />
       <StatRow
-        label="예상 책 페이지"
-        value={formatCount(bookPages)}
+        label="예상 소설책 페이지"
+        value={formatBookPages(bookPages)}
         hint="700자 = 1페이지"
       />
     </Card>

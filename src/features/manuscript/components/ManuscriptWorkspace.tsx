@@ -231,7 +231,7 @@ export function ManuscriptWorkspace({
       totalChars,
       charsWithoutSpaces,
       manuscriptSheets: estimateManuscriptSheets(charsWithoutSpaces),
-      bookPages: estimateBookPages(charsWithoutSpaces),
+      bookPages: estimateBookPages(totalChars),
     };
   }, [content]);
 

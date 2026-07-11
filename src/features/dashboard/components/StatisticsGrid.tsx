@@ -14,7 +14,7 @@
  */
 
 import { DashboardCard } from "@/features/dashboard/components/DashboardCard";
-import { formatCount } from "@/lib/stats";
+import { formatBookPages, formatCount } from "@/lib/stats";
 import { cn } from "@/lib/utils/cn";
 
 export interface StatisticsGridProps {
@@ -54,14 +54,14 @@ export function StatisticsGrid({
         hint="공백·개행 제외"
       />
       <DashboardCard
-        label="예상 원고지 매수"
+        label="원고지 분량"
         value={formatCount(manuscriptSheets)}
         hint="200자 = 1매 (반올림)"
       />
       <DashboardCard
-        label="예상 책 페이지"
-        value={formatCount(bookPages)}
-        hint="250자 = 1페이지 (반올림)"
+        label="예상 소설책 페이지"
+        value={formatBookPages(bookPages)}
+        hint="700자 = 1페이지"
       />
       <DashboardCard
         label="메모"

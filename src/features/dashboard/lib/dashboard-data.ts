@@ -97,7 +97,7 @@ export async function buildDashboardSnapshot(
     totalChars,
     charsWithoutSpaces,
     manuscriptSheets: estimateManuscriptSheets(charsWithoutSpaces),
-    bookPages: estimateBookPages(charsWithoutSpaces),
+    bookPages: estimateBookPages(totalChars),
     memoCount: memos.length,
     characterCount: characters.length,
     recentDocuments: buildRecentDocuments(documents),
