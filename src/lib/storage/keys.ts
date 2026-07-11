@@ -33,6 +33,7 @@ export const MEMOS_STORAGE_KEY = "novel-studio:memos";
 export const SCENE_DELIMITER_SETTINGS_KEY =
   "novel-studio:scene-delimiter-settings";
 
+
 /** 캐릭터 프로필 */
 export const CHARACTERS_STORAGE_KEY = "novel-studio:characters";
 
@@ -47,6 +48,13 @@ export const FORESHADOWINGS_STORAGE_KEY = "novel-studio:foreshadowings";
 
 /** Scene 상태·메모·접힘 (원고와 분리, export 제외) */
 export const SCENE_METAS_STORAGE_KEY = "novel-studio:scene-metas";
+
+/**
+ * 원고 Auto Recovery 임시 초안 (LocalStorage ONLY).
+ * Supabase·WORK_DATA_BACKUP 에 포함하지 않는다.
+ */
+export const MANUSCRIPT_RECOVERY_STORAGE_KEY =
+  "novel-studio:manuscript-recovery";
 
 /** 사이드바 접힘 상태 */
 export const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";

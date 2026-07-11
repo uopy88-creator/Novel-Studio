@@ -2,7 +2,6 @@
  * manuscript feature 공개 진입점.
  * - Documents: Document(목차) 관리
  * - Manuscript: 원고 편집
- * (Export는 features/export — manuscript index에는 포함하지 않음)
  */
 export { DocumentsPage } from "./components/DocumentsPage";
 export { DocumentCard } from "./components/DocumentCard";
@@ -16,11 +15,17 @@ export { ManuscriptEditor } from "./components/ManuscriptEditor";
 export { SearchBar } from "./components/SearchBar";
 export { StatisticsPanel } from "./components/StatisticsPanel";
 export { AutoSaveIndicator } from "./components/AutoSaveIndicator";
+export { AutoRecoveryDialog } from "./components/AutoRecoveryDialog";
 export { SceneNavigator } from "./components/scene-navigator";
 export { ManuscriptVersionModal } from "./components/version-history";
 export { useManuscript } from "./hooks/useManuscript";
 export { useScenes } from "./hooks/useScenes";
 export { useManuscriptVersions } from "./hooks/useManuscriptVersions";
+export { useAutoRecovery } from "./hooks/useAutoRecovery";
 export type { Scene, SceneDelimiterConfig } from "./types/scene";
 export type { ManuscriptVersion } from "./types/manuscript-version";
 export { displayVersionName } from "./types/manuscript-version";
+export type {
+  ManuscriptRecoveryDraft,
+  RecoveryOffer,
+} from "./types/manuscript-recovery";

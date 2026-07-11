@@ -33,6 +33,8 @@ import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPane
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
 import { ManuscriptVersionModal } from "@/features/manuscript/components/version-history";
 import { useManuscriptVersions } from "@/features/manuscript/hooks/useManuscriptVersions";
+import { useAutoRecovery } from "@/features/manuscript/hooks/useAutoRecovery";
+import { AutoRecoveryDialog } from "@/features/manuscript/components/AutoRecoveryDialog";
 import { ExportModal } from "@/features/export/components/ExportModal";
 import { DOCUMENT_KIND_LABELS } from "@/features/manuscript/types/chapter";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
@@ -88,6 +90,20 @@ export function ManuscriptWorkspace({
     saveCurrent: saveVersion,
     rename: renameVersion,
   } = useManuscriptVersions(projectId, selectedChapterId);
+
+  const {
+    offer: recoveryOffer,
+    showDiff: recoveryShowDiff,
+    setShowDiff: setRecoveryShowDiff,
+    acceptRecovery,
+    discardRecovery,
+  } = useAutoRecovery({
+    projectId,
+    chapterId: selectedChapterId,
+    content,
+    setContent,
+    saveStatus,
+  });
 
   const {
     create: createInspiration,
@@ -481,6 +497,14 @@ export function ManuscriptWorkspace({
         chapterId={selectedChapterId}
         liveContent={content}
         scenes={scenes}
+      />
+
+      <AutoRecoveryDialog
+        offer={recoveryOffer}
+        showDiff={recoveryShowDiff}
+        onToggleDiff={() => setRecoveryShowDiff(!recoveryShowDiff)}
+        onAccept={acceptRecovery}
+        onDiscard={discardRecovery}
       />
     </ContentContainer>
   );
