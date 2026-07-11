@@ -33,6 +33,7 @@ import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPane
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
 import { ManuscriptVersionModal } from "@/features/manuscript/components/version-history";
 import { useManuscriptVersions } from "@/features/manuscript/hooks/useManuscriptVersions";
+import { ExportModal } from "@/features/export/components/ExportModal";
 import { DOCUMENT_KIND_LABELS } from "@/features/manuscript/types/chapter";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import { ContentContainer } from "@/components/layout";
@@ -107,6 +108,7 @@ export function ManuscriptWorkspace({
     useState<Inspiration | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -251,6 +253,14 @@ export function ManuscriptWorkspace({
                   </Button>
                 </>
               ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setExportModalOpen(true)}
+              >
+                Export
+              </Button>
             </div>
             {selectedDocument ? (
               <AutoSaveIndicator
@@ -462,6 +472,15 @@ export function ManuscriptWorkspace({
           void renameVersion(id, name);
         }}
         onRestore={handleRestoreVersion}
+      />
+
+      <ExportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        projectId={projectId}
+        chapterId={selectedChapterId}
+        liveContent={content}
+        scenes={scenes}
       />
     </ContentContainer>
   );

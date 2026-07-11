@@ -2,6 +2,7 @@
  * manuscript feature 공개 진입점.
  * - Documents: Document(목차) 관리
  * - Manuscript: 원고 편집
+ * (Export는 features/export — manuscript index에는 포함하지 않음)
  */
 export { DocumentsPage } from "./components/DocumentsPage";
 export { DocumentCard } from "./components/DocumentCard";

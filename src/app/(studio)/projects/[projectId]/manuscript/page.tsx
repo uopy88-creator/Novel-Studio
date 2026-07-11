@@ -3,7 +3,7 @@
  * ?documentId= 로 특정 Document를 바로 열 수 있다.
  */
 
-import { ManuscriptWorkspace } from "@/features/manuscript";
+import { ManuscriptWorkspace } from "@/features/manuscript/components/ManuscriptWorkspace";
 
 interface ManuscriptRoutePageProps {
   params: Promise<{

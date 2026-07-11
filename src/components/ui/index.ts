@@ -22,3 +22,6 @@ export type { InputProps } from "./Input";
 
 export { Modal, ModalSection } from "./Modal";
 export type { ModalProps } from "./Modal";
+
+export { Checkbox } from "./Checkbox";
+export type { CheckboxProps } from "./Checkbox";

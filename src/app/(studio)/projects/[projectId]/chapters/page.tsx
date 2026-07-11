@@ -3,7 +3,7 @@
  * (제품 언어: Document, 라우트 세그먼트는 chapters 유지)
  */
 
-import { DocumentsPage } from "@/features/manuscript";
+import { DocumentsPage } from "@/features/manuscript/components/DocumentsPage";
 
 interface ChaptersRoutePageProps {
   params: Promise<{
