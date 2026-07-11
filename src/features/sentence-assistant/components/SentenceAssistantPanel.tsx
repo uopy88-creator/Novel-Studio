@@ -5,8 +5,7 @@
  * SentenceAssistantPanel
  * -----------------------------------------------------------------------------
  * 우측 Side Panel.
- * 단어 탭 · 표현 탭은 각각 전용 컴포넌트로 분리한다.
- * Show·Tell 탭은 아직 비어 있다.
+ * 단어 · 표현 · Show/Tell 탭은 각각 전용 컴포넌트로 분리한다.
  * =============================================================================
  */
 
@@ -17,6 +16,7 @@ import {
 } from "@/features/sentence-assistant/types";
 import { SentenceAssistantWord } from "@/features/sentence-assistant/components/SentenceAssistantWord";
 import { SentenceAssistantExpression } from "@/features/sentence-assistant/components/SentenceAssistantExpression";
+import { SentenceAssistantShowTell } from "@/features/sentence-assistant/components/SentenceAssistantShowTell";
 import { cn } from "@/lib/utils/cn";
 
 export interface SentenceAssistantPanelProps {
@@ -135,7 +135,7 @@ export function SentenceAssistantPanel({
           ) : tab === "expression" ? (
             <SentenceAssistantExpression selectedText={selectedText} />
           ) : (
-            <PlaceholderTab selectedText={selectedText} />
+            <SentenceAssistantShowTell selectedText={selectedText} />
           )}
         </div>
 
@@ -143,31 +143,6 @@ export function SentenceAssistantPanel({
           Esc · 바깥 클릭으로 닫기
         </footer>
       </aside>
-    </div>
-  );
-}
-
-function PlaceholderTab({ selectedText }: { selectedText: string }) {
-  return (
-    <div className="flex flex-col gap-ns-4">
-      {selectedText.trim() ? (
-        <section>
-          <h3 className="text-ns-xs font-semibold uppercase tracking-wide text-ns-ink-tertiary">
-            선택
-          </h3>
-          <p className="mt-ns-2 whitespace-pre-wrap break-words text-ns-sm text-ns-ink">
-            “{selectedText.trim()}”
-          </p>
-        </section>
-      ) : null}
-      <h3 className="text-ns-sm font-semibold text-ns-ink">👁 Show / Tell</h3>
-      <p className="text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
-        설명(Tell)과 보여 주기(Show)를 구분하는 참고가 여기에 표시됩니다. (준비
-        중)
-      </p>
-      <div className="rounded-ns-md border border-dashed border-ns-border px-ns-4 py-ns-8 text-center text-ns-xs text-ns-ink-tertiary">
-        아직 참고 데이터가 없습니다.
-      </div>
     </div>
   );
 }
