@@ -18,6 +18,7 @@ import {
   cloudListProjects,
   cloudUpsertProject,
 } from "@/database/supabase/projects-repo";
+import { purgeLocalProjectData } from "@/features/projects/lib/purge-project-data";
 import { PROJECTS_STORAGE_KEY } from "@/lib/storage/keys";
 import { writeWorkDataBackup } from "@/lib/storage/backup";
 import {
@@ -140,12 +141,19 @@ export async function updateProject(
   return updated;
 }
 
+/**
+ * 작품을 삭제한다.
+ * - Supabase: projects 행 삭제 → FK CASCADE 로 Chapters/Manuscript/Characters
+ *   /Writing Vault/Memo/Foreshadowing 등 클라우드 데이터가 함께 삭제됨
+ * - LocalStorage: 동일 작품에 속한 백업·복구 초안도 purge
+ */
 export async function deleteProject(id: ProjectId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
     const projects = await cloudListProjects();
     if (!projects.some((project) => project.id === id)) return false;
     await cloudDeleteProject(id);
+    purgeLocalProjectData(id);
     backupProjects(await cloudListProjects());
     return true;
   }
@@ -153,6 +161,7 @@ export async function deleteProject(id: ProjectId): Promise<boolean> {
   const projects = readLocalProjects();
   if (!projects.some((project) => project.id === id)) return false;
   writeLocalProjects(projects.filter((project) => project.id !== id));
+  purgeLocalProjectData(id);
   return true;
 }
 

@@ -30,6 +30,7 @@ export function ProjectsPage() {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<Project | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const openCreate = () => setModal({ type: "create" });
@@ -139,11 +140,16 @@ export function ProjectsPage() {
       <ProjectDeleteDialog
         open={Boolean(deleting)}
         project={deleting}
-        onClose={() => setDeleting(null)}
+        confirming={deletingBusy}
+        onClose={() => {
+          if (deletingBusy) return;
+          setDeleting(null);
+        }}
         onConfirm={(project) => {
           void (async () => {
             try {
               setActionError(null);
+              setDeletingBusy(true);
               await remove(project.id);
               setDeleting(null);
             } catch (error) {
@@ -157,6 +163,8 @@ export function ProjectsPage() {
                     ? (error as { message: string }).message
                     : "클라우드 삭제에 실패했습니다.";
               setActionError(message);
+            } finally {
+              setDeletingBusy(false);
             }
           })();
         }}
