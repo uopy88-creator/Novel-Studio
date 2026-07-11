@@ -1,19 +1,18 @@
 /**
- * Dialogue Vault — 대사 금고.
- * 사이드바 Dialogue Vault 메뉴와 연결된다.
+ * 구 Dialogue Vault 경로 → Writing Vault 로 리다이렉트.
  */
 
-import { DialogueVaultPage } from "@/features/dialogue-vault";
+import { redirect } from "next/navigation";
 
-interface DialogueVaultRoutePageProps {
+interface LegacyDialogueVaultRouteProps {
   params: Promise<{
     projectId: string;
   }>;
 }
 
-export default async function DialogueVaultRoutePage({
+export default async function LegacyDialogueVaultRoute({
   params,
-}: DialogueVaultRoutePageProps) {
+}: LegacyDialogueVaultRouteProps) {
   const { projectId } = await params;
-  return <DialogueVaultPage projectId={projectId} />;
+  redirect(`/projects/${projectId}/writing-vault`);
 }

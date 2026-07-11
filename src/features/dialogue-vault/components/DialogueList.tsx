@@ -2,23 +2,20 @@
 
 /**
  * =============================================================================
- * DialogueList
- * -----------------------------------------------------------------------------
- * 즐겨찾기가 이미 상단으로 정렬된 목록을 카드로 렌더한다.
+ * DialogueList → Writing Vault 목록
  * =============================================================================
  */
 
 import type { ReactNode } from "react";
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
 import { DialogueCard } from "@/features/dialogue-vault/components/DialogueCard";
 import { cn } from "@/lib/utils/cn";
 
 export interface DialogueListProps {
-  dialogues: Dialogue[];
-  onEdit: (dialogue: Dialogue) => void;
-  onDelete: (dialogue: Dialogue) => void;
-  onToggleFavorite: (dialogue: Dialogue) => void;
-  /** 검색 중인데 결과가 없을 때 */
+  dialogues: WritingVaultEntry[];
+  onEdit: (dialogue: WritingVaultEntry) => void;
+  onDelete: (dialogue: WritingVaultEntry) => void;
+  onToggleFavorite: (dialogue: WritingVaultEntry) => void;
   isSearchEmpty?: boolean;
   emptyAction?: ReactNode;
   className?: string;
@@ -47,16 +44,17 @@ export function DialogueList({
               검색 결과가 없습니다
             </p>
             <p className="mt-ns-2 max-w-sm text-ns-sm text-ns-ink-secondary">
-              다른 단어나 태그로 다시 검색해 보세요.
+              다른 단어·태그·종류로 다시 검색해 보세요.
             </p>
           </>
         ) : (
           <>
             <p className="text-ns-lg font-medium text-ns-ink">
-              아직 보관된 대사가 없습니다
+              아직 보관된 항목이 없습니다
             </p>
             <p className="mt-ns-2 max-w-sm text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
-              문득 떠오른 한 줄을 여기에 남겨 두세요. 원고와는 따로 관리됩니다.
+              문장·단어·아이디어를 여기에 남겨 두세요. 원고와는 따로
+              관리됩니다.
             </p>
             {emptyAction ? <div className="mt-ns-6">{emptyAction}</div> : null}
           </>

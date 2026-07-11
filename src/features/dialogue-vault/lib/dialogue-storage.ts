@@ -1,14 +1,26 @@
 /**
  * =============================================================================
- * Dialogue Storage (Cloud 우선 + LocalStorage 백업)
+ * Writing Vault Storage — Supabase Database 단일 소스
  * -----------------------------------------------------------------------------
- * 온라인 시 Supabase `dialogues` 테이블. LocalStorage는 백업.
+ * 테이블: writing_vault
+ * 종류: sentence | word | idea
  * =============================================================================
  */
 
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type {
+  WritingVaultEntry,
+  WritingVaultReference,
+  WritingVaultType,
+} from "@/features/dialogue-vault/types/dialogue";
+import {
+  emptyWritingVaultReference,
+  isWritingVaultType,
+} from "@/features/dialogue-vault/types/dialogue";
 import type { DialogueId, ProjectId } from "@/types/ids";
-import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  isSupabaseDataMode,
+  requireCloudDb,
+} from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteDialogue,
   cloudListDialogues,
@@ -16,18 +28,43 @@ import {
   cloudUpsertDialogue,
 } from "@/database/supabase/dialogues-repo";
 import { DIALOGUES_STORAGE_KEY } from "@/lib/storage/keys";
+import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { DIALOGUES_STORAGE_KEY };
 
-export interface DialogueInput {
+/** 생성/수정 입력 */
+export interface WritingVaultInput {
+  type: WritingVaultType;
+  title?: string;
   content: string;
   tags: string[];
+  reference?: Partial<WritingVaultReference>;
 }
 
-function normalizeDialogue(raw: unknown): Dialogue | null {
+/** @deprecated WritingVaultInput 사용 */
+export type DialogueInput = WritingVaultInput;
+
+function normalizeReference(
+  raw: unknown,
+): WritingVaultReference {
+  if (!raw || typeof raw !== "object") {
+    return emptyWritingVaultReference();
+  }
+  const item = raw as Partial<WritingVaultReference>;
+  return {
+    workTitle: typeof item.workTitle === "string" ? item.workTitle : "",
+    author: typeof item.author === "string" ? item.author : "",
+    memo: typeof item.memo === "string" ? item.memo : "",
+  };
+}
+
+function normalizeEntry(raw: unknown): WritingVaultEntry | null {
   if (!raw || typeof raw !== "object") return null;
-  const item = raw as Partial<Dialogue> & { text?: string };
+  const item = raw as Partial<WritingVaultEntry> & {
+    text?: string;
+    kind?: string;
+  };
 
   if (typeof item.id !== "string" || typeof item.projectId !== "string") {
     return null;
@@ -40,13 +77,22 @@ function normalizeDialogue(raw: unknown): Dialogue | null {
         ? item.text
         : "";
 
+  const type: WritingVaultType = isWritingVaultType(item.type)
+    ? item.type
+    : isWritingVaultType(item.kind)
+      ? item.kind
+      : "sentence";
+
   return {
     id: item.id,
     projectId: item.projectId,
+    type,
+    title: typeof item.title === "string" ? item.title : "",
     content,
     tags: Array.isArray(item.tags)
       ? item.tags.filter((tag): tag is string => typeof tag === "string")
       : [],
+    reference: normalizeReference(item.reference),
     isFavorite: Boolean(item.isFavorite),
     createdAt:
       typeof item.createdAt === "string" ? item.createdAt : nowIso(),
@@ -55,66 +101,84 @@ function normalizeDialogue(raw: unknown): Dialogue | null {
   };
 }
 
-function readLocalDialogues(): Dialogue[] {
+function readLocalEntries(): WritingVaultEntry[] {
   return readJsonArray<unknown>(DIALOGUES_STORAGE_KEY)
-    .map(normalizeDialogue)
-    .filter((item): item is Dialogue => item !== null);
+    .map(normalizeEntry)
+    .filter((item): item is WritingVaultEntry => item !== null);
 }
 
-function writeLocalDialogues(dialogues: Dialogue[]): void {
-  writeJsonArray(DIALOGUES_STORAGE_KEY, dialogues);
+function writeLocalEntries(entries: WritingVaultEntry[]): void {
+  writeJsonArray(DIALOGUES_STORAGE_KEY, entries);
 }
 
-function createDialogueId(): DialogueId {
+function backupEntries(entries: WritingVaultEntry[]): void {
+  writeWorkDataBackup(DIALOGUES_STORAGE_KEY, entries);
+}
+
+function createEntryId(): DialogueId {
   return crypto.randomUUID();
 }
 
-export async function readAllDialogues(): Promise<Dialogue[]> {
-  if (await canUseCloudDb()) {
-    try {
-      const dialogues = await cloudListDialogues();
-      writeLocalDialogues(dialogues);
-      return dialogues;
-    } catch {
-      return readLocalDialogues();
-    }
-  }
-  return readLocalDialogues();
-}
-
-export async function writeAllDialogues(dialogues: Dialogue[]): Promise<void> {
-  writeLocalDialogues(dialogues);
-}
-
-export async function readDialoguesByProject(
-  projectId: ProjectId,
-): Promise<Dialogue[]> {
-  let list: Dialogue[];
-
-  if (await canUseCloudDb()) {
-    try {
-      list = await cloudListDialoguesByProject(projectId);
-      const others = readLocalDialogues().filter(
-        (dialogue) => dialogue.projectId !== projectId,
-      );
-      writeLocalDialogues([...others, ...list]);
-    } catch {
-      list = readLocalDialogues().filter(
-        (dialogue) => dialogue.projectId === projectId,
-      );
-    }
-  } else {
-    list = readLocalDialogues().filter(
-      (dialogue) => dialogue.projectId === projectId,
-    );
-  }
-
-  return list.sort((a, b) => {
+function sortEntries(list: WritingVaultEntry[]): WritingVaultEntry[] {
+  return [...list].sort((a, b) => {
     if (a.isFavorite !== b.isFavorite) {
       return a.isFavorite ? -1 : 1;
     }
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
+}
+
+function buildReference(
+  input?: Partial<WritingVaultReference>,
+): WritingVaultReference {
+  return {
+    workTitle: (input?.workTitle ?? "").trim(),
+    author: (input?.author ?? "").trim(),
+    memo: (input?.memo ?? "").trim(),
+  };
+}
+
+export async function readAllDialogues(): Promise<WritingVaultEntry[]> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const entries = await cloudListDialogues();
+    backupEntries(entries);
+    return entries;
+  }
+  return readLocalEntries();
+}
+
+export async function writeAllDialogues(
+  entries: WritingVaultEntry[],
+): Promise<void> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    for (const entry of entries) {
+      await cloudUpsertDialogue(entry);
+    }
+    backupEntries(await cloudListDialogues());
+    return;
+  }
+  writeLocalEntries(entries);
+}
+
+export async function readDialoguesByProject(
+  projectId: ProjectId,
+): Promise<WritingVaultEntry[]> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const list = await cloudListDialoguesByProject(projectId);
+    try {
+      backupEntries(await cloudListDialogues());
+    } catch {
+      // 백업 실패 무시
+    }
+    return sortEntries(list);
+  }
+
+  return sortEntries(
+    readLocalEntries().filter((entry) => entry.projectId === projectId),
+  );
 }
 
 export function parseTagsInput(raw: string): string[] {
@@ -127,119 +191,169 @@ export function parseTagsInput(raw: string): string[] {
 
 export async function createDialogue(
   projectId: ProjectId,
-  input: DialogueInput,
-): Promise<Dialogue> {
+  input: WritingVaultInput,
+): Promise<WritingVaultEntry> {
   const timestamp = nowIso();
 
-  const dialogue: Dialogue = {
-    id: createDialogueId(),
+  const entry: WritingVaultEntry = {
+    id: createEntryId(),
     projectId,
+    type: input.type,
+    title: (input.title ?? "").trim(),
     content: input.content.trim(),
     tags: input.tags,
+    reference: buildReference(input.reference),
     isFavorite: false,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
 
-  const local = readLocalDialogues();
-  writeLocalDialogues([...local, dialogue]);
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertDialogue(entry);
     try {
-      await cloudUpsertDialogue(dialogue);
+      backupEntries(await cloudListDialogues());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return entry;
   }
 
-  return dialogue;
+  writeLocalEntries([...readLocalEntries(), entry]);
+  return entry;
 }
 
 export async function updateDialogue(
   id: DialogueId,
-  input: DialogueInput,
-): Promise<Dialogue | null> {
-  const all = await readAllDialogues();
-  const index = all.findIndex((dialogue) => dialogue.id === id);
-  if (index < 0) return null;
+  input: WritingVaultInput,
+): Promise<WritingVaultEntry | null> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDialogues();
+    const index = all.findIndex((entry) => entry.id === id);
+    if (index < 0) return null;
 
-  const updated: Dialogue = {
-    ...all[index],
-    content: input.content.trim(),
-    tags: input.tags,
-    updatedAt: nowIso(),
-  };
-
-  const next = [...all];
-  next[index] = updated;
-  writeLocalDialogues(next);
-
-  if (await canUseCloudDb()) {
+    const updated: WritingVaultEntry = {
+      ...all[index],
+      type: input.type,
+      title: (input.title ?? "").trim(),
+      content: input.content.trim(),
+      tags: input.tags,
+      reference: buildReference(input.reference),
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertDialogue(updated);
     try {
-      await cloudUpsertDialogue(updated);
+      backupEntries(await cloudListDialogues());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return updated;
   }
 
+  const all = readLocalEntries();
+  const index = all.findIndex((entry) => entry.id === id);
+  if (index < 0) return null;
+  const updated: WritingVaultEntry = {
+    ...all[index],
+    type: input.type,
+    title: (input.title ?? "").trim(),
+    content: input.content.trim(),
+    tags: input.tags,
+    reference: buildReference(input.reference),
+    updatedAt: nowIso(),
+  };
+  const next = [...all];
+  next[index] = updated;
+  writeLocalEntries(next);
   return updated;
 }
 
 export async function deleteDialogue(id: DialogueId): Promise<boolean> {
-  const all = await readAllDialogues();
-  const exists = all.some((dialogue) => dialogue.id === id);
-  if (!exists) return false;
-
-  writeLocalDialogues(all.filter((dialogue) => dialogue.id !== id));
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDialogues();
+    if (!all.some((entry) => entry.id === id)) return false;
+    await cloudDeleteDialogue(id);
     try {
-      await cloudDeleteDialogue(id);
+      backupEntries(await cloudListDialogues());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return true;
   }
 
+  const all = readLocalEntries();
+  if (!all.some((entry) => entry.id === id)) return false;
+  writeLocalEntries(all.filter((entry) => entry.id !== id));
   return true;
 }
 
 export async function toggleDialogueFavorite(
   id: DialogueId,
-): Promise<Dialogue | null> {
-  const all = await readAllDialogues();
-  const index = all.findIndex((dialogue) => dialogue.id === id);
-  if (index < 0) return null;
+): Promise<WritingVaultEntry | null> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDialogues();
+    const index = all.findIndex((entry) => entry.id === id);
+    if (index < 0) return null;
+    const updated: WritingVaultEntry = {
+      ...all[index],
+      isFavorite: !all[index].isFavorite,
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertDialogue(updated);
+    try {
+      backupEntries(await cloudListDialogues());
+    } catch {
+      // 백업 실패 무시
+    }
+    return updated;
+  }
 
-  const updated: Dialogue = {
+  const all = readLocalEntries();
+  const index = all.findIndex((entry) => entry.id === id);
+  if (index < 0) return null;
+  const updated: WritingVaultEntry = {
     ...all[index],
     isFavorite: !all[index].isFavorite,
     updatedAt: nowIso(),
   };
-
   const next = [...all];
   next[index] = updated;
-  writeLocalDialogues(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDialogue(updated);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
-
+  writeLocalEntries(next);
   return updated;
 }
 
+/**
+ * 검색 — 본문 · 제목 · 태그 · Reference(작품/작가/메모)
+ * 태그 전용 검색도 같은 쿼리로 처리 (예: #유머 또는 유머)
+ */
 export function filterDialogues(
-  dialogues: Dialogue[],
+  entries: WritingVaultEntry[],
   query: string,
-): Dialogue[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return dialogues;
+): WritingVaultEntry[] {
+  const raw = query.trim().toLowerCase();
+  if (!raw) return entries;
 
-  return dialogues.filter((dialogue) => {
-    if (dialogue.content.toLowerCase().includes(needle)) return true;
-    return dialogue.tags.some((tag) => tag.toLowerCase().includes(needle));
+  const needle = raw.startsWith("#") ? raw.slice(1).trim() : raw;
+  if (!needle) return entries;
+
+  return entries.filter((entry) => {
+    if (entry.content.toLowerCase().includes(needle)) return true;
+    if (entry.title.toLowerCase().includes(needle)) return true;
+    if (entry.reference.workTitle.toLowerCase().includes(needle)) return true;
+    if (entry.reference.author.toLowerCase().includes(needle)) return true;
+    if (entry.reference.memo.toLowerCase().includes(needle)) return true;
+    return entry.tags.some((tag) => tag.toLowerCase().includes(needle));
   });
+}
+
+/** 종류 필터 — null/"all" 이면 전체 */
+export function filterDialoguesByType(
+  entries: WritingVaultEntry[],
+  type: WritingVaultType | "all",
+): WritingVaultEntry[] {
+  if (type === "all") return entries;
+  return entries.filter((entry) => entry.type === type);
 }

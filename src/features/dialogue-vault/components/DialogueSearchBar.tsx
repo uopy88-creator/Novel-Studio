@@ -28,16 +28,16 @@ export function DialogueSearchBar({
   const hint =
     value.trim().length > 0 && typeof resultCount === "number"
       ? `${resultCount}건`
-      : "대사 내용과 태그를 함께 검색합니다";
+      : "제목·내용·태그·Reference를 검색합니다";
 
   return (
     <div className={cn("w-full", className)}>
       <Input
         label="검색"
-        name="dialogue-search"
+        name="writing-vault-search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="단어, 문장, 태그…"
+        placeholder="단어, 문장, 태그, 작품명…"
         hint={hint}
       />
     </div>

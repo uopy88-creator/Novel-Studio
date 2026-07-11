@@ -1,39 +1,67 @@
 /**
  * =============================================================================
- * Dialogue (대사 금고 — Dialogue Vault)
+ * Writing Vault Entry (구 Dialogue)
  * -----------------------------------------------------------------------------
- * 문득 떠오른 대사를 원고와 독립적으로 보관한다.
- *
- * 필수 필드 (제품 요구)
- * - id, projectId, content, tags, isFavorite
- *
- * Timestamps는 정렬·동기화를 위해 함께 둔다.
+ * sentence | word | idea 를 하나의 금고에서 관리합니다.
  * =============================================================================
  */
 
-import type { DialogueId, ProjectId, Timestamps } from "@/types/ids";
+import type { Timestamps } from "@/types/ids";
+import type { DialogueId, ProjectId } from "@/types/ids";
+
+/** Writing Vault 항목 종류 */
+export type WritingVaultType = "sentence" | "word" | "idea";
+
+export const WRITING_VAULT_TYPES: WritingVaultType[] = [
+  "sentence",
+  "word",
+  "idea",
+];
+
+export const WRITING_VAULT_TYPE_LABELS: Record<WritingVaultType, string> = {
+  sentence: "문장",
+  word: "단어",
+  idea: "아이디어",
+};
+
+/** 영감을 받은 작품 (Reference) */
+export interface WritingVaultReference {
+  /** 작품명 */
+  workTitle: string;
+  /** 작가명 (선택) */
+  author: string;
+  /** 메모 */
+  memo: string;
+}
+
+export function emptyWritingVaultReference(): WritingVaultReference {
+  return { workTitle: "", author: "", memo: "" };
+}
 
 /**
- * 대사 엔티티.
- *
- * 관계
- * - Project 1 ── * Dialogue
- * - 원고(Manuscript)와는 직접 연결하지 않는다 (독립 보관)
+ * Writing Vault 한 항목.
+ * - type: sentence | word | idea
+ * - title: 선택
+ * - content: 본문 (필수)
+ * - reference: 영감 출처 (선택 필드들의 묶음)
  */
-export interface Dialogue extends Timestamps {
+export interface WritingVaultEntry extends Timestamps {
   id: DialogueId;
-
   projectId: ProjectId;
-
-  /** 대사 본문 */
+  type: WritingVaultType;
+  title: string;
   content: string;
-
-  /**
-   * 자유 태그.
-   * @example ["유머", "반전"]
-   */
   tags: string[];
-
-  /** 즐겨찾기 — 목록 상단에 고정 */
+  reference: WritingVaultReference;
+  /** 즐겨찾기(북마크) */
   isFavorite: boolean;
+}
+
+/** @deprecated WritingVaultEntry 사용 — 하위 호환 별칭 */
+export type Dialogue = WritingVaultEntry;
+
+export function isWritingVaultType(value: unknown): value is WritingVaultType {
+  return (
+    value === "sentence" || value === "word" || value === "idea"
+  );
 }

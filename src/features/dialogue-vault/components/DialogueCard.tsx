@@ -2,23 +2,23 @@
 
 /**
  * =============================================================================
- * DialogueCard
+ * DialogueCard → Writing Vault 카드
  * -----------------------------------------------------------------------------
- * 카드에 표시: 대사 · 태그 · 즐겨찾기 여부
- * 수정/삭제는 카드 액션으로 처리한다.
+ * 종류 · 제목 · 내용 · 태그 · Reference · 즐겨찾기
  * =============================================================================
  */
 
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
+import { WRITING_VAULT_TYPE_LABELS } from "@/features/dialogue-vault/types/dialogue";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
 
 export interface DialogueCardProps {
-  dialogue: Dialogue;
-  onEdit: (dialogue: Dialogue) => void;
-  onDelete: (dialogue: Dialogue) => void;
-  onToggleFavorite: (dialogue: Dialogue) => void;
+  dialogue: WritingVaultEntry;
+  onEdit: (dialogue: WritingVaultEntry) => void;
+  onDelete: (dialogue: WritingVaultEntry) => void;
+  onToggleFavorite: (dialogue: WritingVaultEntry) => void;
   className?: string;
 }
 
@@ -29,6 +29,11 @@ export function DialogueCard({
   onToggleFavorite,
   className,
 }: DialogueCardProps) {
+  const hasReference =
+    dialogue.reference.workTitle.trim() ||
+    dialogue.reference.author.trim() ||
+    dialogue.reference.memo.trim();
+
   return (
     <Card
       variant="outlined"
@@ -40,7 +45,6 @@ export function DialogueCard({
       )}
     >
       <div className="flex items-start gap-ns-3">
-        {/* 즐겨찾기 토글 */}
         <button
           type="button"
           onClick={() => onToggleFavorite(dialogue)}
@@ -59,12 +63,36 @@ export function DialogueCard({
         </button>
 
         <div className="min-w-0 flex-1">
-          {/* 대사 */}
+          <div className="mb-ns-2 flex flex-wrap items-center gap-ns-2">
+            <span className="text-ns-xs font-medium text-ns-ink-tertiary">
+              {WRITING_VAULT_TYPE_LABELS[dialogue.type]}
+            </span>
+            {dialogue.title.trim() ? (
+              <span className="text-ns-sm font-semibold text-ns-ink">
+                {dialogue.title}
+              </span>
+            ) : null}
+          </div>
+
           <p className="whitespace-pre-wrap text-ns-base leading-ns-relaxed text-ns-ink">
             {dialogue.content}
           </p>
 
-          {/* 태그 */}
+          {hasReference ? (
+            <p className="mt-ns-3 text-ns-xs leading-ns-relaxed text-ns-ink-secondary">
+              <span className="font-medium text-ns-ink-tertiary">Ref · </span>
+              {dialogue.reference.workTitle.trim() || "제목 없음"}
+              {dialogue.reference.author.trim()
+                ? ` · ${dialogue.reference.author.trim()}`
+                : ""}
+              {dialogue.reference.memo.trim() ? (
+                <span className="mt-ns-1 block text-ns-ink-tertiary">
+                  {dialogue.reference.memo.trim()}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+
           {dialogue.tags.length > 0 ? (
             <ul className="mt-ns-3 flex flex-wrap gap-ns-2">
               {dialogue.tags.map((tag) => (
@@ -87,7 +115,7 @@ export function DialogueCard({
           type="button"
           variant="ghost"
           size="sm"
-          aria-label="대사 수정"
+          aria-label="항목 수정"
           onClick={() => onEdit(dialogue)}
         >
           수정
@@ -96,7 +124,7 @@ export function DialogueCard({
           type="button"
           variant="danger-ghost"
           size="sm"
-          aria-label="대사 삭제"
+          aria-label="항목 삭제"
           onClick={() => onDelete(dialogue)}
         >
           삭제

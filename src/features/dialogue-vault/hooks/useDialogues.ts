@@ -2,42 +2,54 @@
 
 /**
  * =============================================================================
- * useDialogues
+ * useDialogues → Writing Vault
  * -----------------------------------------------------------------------------
- * Dialogue Vault — Cloud(DB) 우선, LocalStorage 백업.
+ * 검색 · 종류 필터 · CRUD · 즐겨찾기
  * =============================================================================
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type {
+  WritingVaultEntry,
+  WritingVaultType,
+} from "@/features/dialogue-vault/types/dialogue";
 import type { DialogueId, ProjectId } from "@/types/ids";
 import {
   createDialogue,
   deleteDialogue,
   filterDialogues,
+  filterDialoguesByType,
   readDialoguesByProject,
   toggleDialogueFavorite,
   updateDialogue,
-  type DialogueInput,
+  type WritingVaultInput,
 } from "@/features/dialogue-vault/lib/dialogue-storage";
 
+export type WritingVaultTypeFilter = WritingVaultType | "all";
+
 export interface UseDialoguesResult {
-  dialogues: Dialogue[];
-  filtered: Dialogue[];
+  dialogues: WritingVaultEntry[];
+  filtered: WritingVaultEntry[];
   isReady: boolean;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  create: (input: DialogueInput) => Promise<Dialogue>;
-  update: (id: DialogueId, input: DialogueInput) => Promise<Dialogue | null>;
+  typeFilter: WritingVaultTypeFilter;
+  setTypeFilter: (type: WritingVaultTypeFilter) => void;
+  create: (input: WritingVaultInput) => Promise<WritingVaultEntry>;
+  update: (
+    id: DialogueId,
+    input: WritingVaultInput,
+  ) => Promise<WritingVaultEntry | null>;
   remove: (id: DialogueId) => Promise<boolean>;
   toggleFavorite: (id: DialogueId) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 export function useDialogues(projectId: ProjectId): UseDialoguesResult {
-  const [dialogues, setDialogues] = useState<Dialogue[]>([]);
+  const [dialogues, setDialogues] = useState<WritingVaultEntry[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<WritingVaultTypeFilter>("all");
 
   const refresh = useCallback(async () => {
     setDialogues(await readDialoguesByProject(projectId));
@@ -46,33 +58,36 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await refresh();
-      if (!cancelled) setIsReady(true);
+      try {
+        await refresh();
+      } finally {
+        if (!cancelled) setIsReady(true);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [refresh]);
 
-  const filtered = useMemo(
-    () => filterDialogues(dialogues, searchQuery),
-    [dialogues, searchQuery],
-  );
+  const filtered = useMemo(() => {
+    const byType = filterDialoguesByType(dialogues, typeFilter);
+    return filterDialogues(byType, searchQuery);
+  }, [dialogues, searchQuery, typeFilter]);
 
   const create = useCallback(
-    async (input: DialogueInput) => {
-      const dialogue = await createDialogue(projectId, input);
+    async (input: WritingVaultInput) => {
+      const entry = await createDialogue(projectId, input);
       setDialogues(await readDialoguesByProject(projectId));
-      return dialogue;
+      return entry;
     },
     [projectId],
   );
 
   const update = useCallback(
-    async (id: DialogueId, input: DialogueInput) => {
-      const dialogue = await updateDialogue(id, input);
+    async (id: DialogueId, input: WritingVaultInput) => {
+      const entry = await updateDialogue(id, input);
       setDialogues(await readDialoguesByProject(projectId));
-      return dialogue;
+      return entry;
     },
     [projectId],
   );
@@ -100,6 +115,8 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
     isReady,
     searchQuery,
     setSearchQuery,
+    typeFilter,
+    setTypeFilter,
     create,
     update,
     remove,

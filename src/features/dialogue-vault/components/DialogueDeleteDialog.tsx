@@ -35,7 +35,7 @@ export function DialogueDeleteDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="대사 삭제"
+      title="항목 삭제"
       description={
         dialogue
           ? `「${preview}」을(를) 삭제합니다. 이 작업은 되돌릴 수 없습니다.`

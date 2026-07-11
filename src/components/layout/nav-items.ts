@@ -25,7 +25,7 @@ export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { segment: "manuscript", label: "Manuscript", icon: "✍" },
   { segment: "chapters", label: "Chapters", icon: "📖" },
   { segment: "characters", label: "Characters", icon: "👤" },
-  { segment: "dialogue-vault", label: "Dialogue Vault", icon: "💬" },
+  { segment: "writing-vault", label: "Writing Vault", icon: "💬" },
   { segment: "inspiration", label: "Inspiration", icon: "💡" },
   { segment: "foreshadowing", label: "Foreshadowing", icon: "🎯" },
   { segment: "memo", label: "Memo", icon: "📝" },
