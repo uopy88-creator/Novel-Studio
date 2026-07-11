@@ -30,7 +30,8 @@ export interface DocumentsPageProps {
 }
 
 export function DocumentsPage({ projectId }: DocumentsPageProps) {
-  const { chapters, isReady, create, update, remove } = useChapters(projectId);
+  const { chapters, isReady, create, update, remove, reorder } =
+    useChapters(projectId);
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<Chapter | null>(null);
 
@@ -42,9 +43,10 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
       <header className="mb-ns-8 flex flex-col gap-ns-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="ns-caption mb-ns-2">목차</p>
-          <h2 className="ns-heading">Documents</h2>
+          <h2 className="ns-heading">Chapters</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            문서를 만들고 카드를 눌러 원고를 작성하세요.
+            Chapter는 원고를 구분합니다. Manuscript에는 전체가 하나의 긴
+            글로 이어집니다. ☰ 로 순서를 바꾸면 원고 순서도 함께 바뀝니다.
           </p>
         </div>
         <Button
@@ -52,7 +54,7 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
           onClick={openCreate}
           className="shrink-0 rounded-ns-full px-ns-5"
         >
-          새 문서
+          새 Chapter
         </Button>
       </header>
 
@@ -66,13 +68,16 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
           projectId={projectId}
           onEdit={(document) => setModal({ type: "edit", document })}
           onDelete={(document) => setDeleting(document)}
+          onReorder={(a, b) => {
+            void reorder(a, b);
+          }}
           emptyAction={
             <Button
               type="button"
               onClick={openCreate}
               className="rounded-ns-full px-ns-5"
             >
-              새 문서
+              새 Chapter
             </Button>
           }
         />

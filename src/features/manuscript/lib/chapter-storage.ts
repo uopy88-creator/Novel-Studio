@@ -301,6 +301,77 @@ export async function moveChapter(
     .sort((x, y) => x.sortOrder - y.sortOrder);
 }
 
+/**
+ * Drag & Drop 등으로 순서를 통째로 바꾼다.
+ * orderedIds 순서대로 sortOrder 0..n-1 을 부여한다.
+ */
+export async function reorderChaptersByIds(
+  projectId: ProjectId,
+  orderedIds: ChapterId[],
+): Promise<Chapter[]> {
+  const timestamp = nowIso();
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDocuments();
+    const siblings = all
+      .filter((chapter) => chapter.projectId === projectId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const byId = new Map(siblings.map((c) => [c.id, c]));
+    const reordered: Chapter[] = [];
+    orderedIds.forEach((id, index) => {
+      const chapter = byId.get(id);
+      if (!chapter) return;
+      reordered.push({
+        ...chapter,
+        sortOrder: index,
+        updatedAt: timestamp,
+      });
+      byId.delete(id);
+    });
+    for (const leftover of byId.values()) {
+      reordered.push({
+        ...leftover,
+        sortOrder: reordered.length,
+        updatedAt: timestamp,
+      });
+    }
+
+    await cloudUpsertDocuments(reordered);
+    void backupAllChaptersFromCloud();
+    return reordered.sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  const all = readLocalAllChapters();
+  const siblings = all
+    .filter((chapter) => chapter.projectId === projectId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const byId = new Map(siblings.map((c) => [c.id, c]));
+  const reordered: Chapter[] = [];
+  orderedIds.forEach((id, index) => {
+    const chapter = byId.get(id);
+    if (!chapter) return;
+    reordered.push({
+      ...chapter,
+      sortOrder: index,
+      updatedAt: timestamp,
+    });
+    byId.delete(id);
+  });
+  for (const leftover of byId.values()) {
+    reordered.push({
+      ...leftover,
+      sortOrder: reordered.length,
+      updatedAt: timestamp,
+    });
+  }
+
+  const others = all.filter((chapter) => chapter.projectId !== projectId);
+  writeLocalAllChapters([...others, ...reordered]);
+  return reordered.sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 function renumberProjectChapters(
   chapters: Chapter[],
   projectId: ProjectId,

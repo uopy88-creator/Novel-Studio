@@ -6,7 +6,7 @@
  *
  * 규칙
  * - 원고지: 200자(공백 제외) = 1매 → 반올림
- * - 예상 책 페이지: 250자(공백 제외) = 1페이지 → 반올림
+ * - 예상 책 페이지: 700자(공백 제외) = 1페이지 → 반올림
  * =============================================================================
  */
 
@@ -31,11 +31,11 @@ export function estimateManuscriptSheets(charsWithoutSpaces: number): number {
 
 /**
  * 예상 책 페이지.
- * 250자(공백 제외) = 1페이지, 반올림.
+ * 700자(공백 제외) = 1페이지, 반올림.
  */
 export function estimateBookPages(charsWithoutSpaces: number): number {
   if (charsWithoutSpaces <= 0) return 0;
-  return Math.round(charsWithoutSpaces / 250);
+  return Math.round(charsWithoutSpaces / 700);
 }
 
 /** 천 단위 구분 표시 */

@@ -69,18 +69,22 @@ export function ProjectCard({
           variant="ghost"
           size="sm"
           aria-label={`${project.title} 수정`}
+          title="수정"
           onClick={() => onEdit(project)}
+          className="min-w-9 px-ns-2"
         >
-          수정
+          ✏️
         </Button>
         <Button
           type="button"
           variant="danger-ghost"
           size="sm"
           aria-label={`${project.title} 삭제`}
+          title="삭제"
           onClick={() => onDelete(project)}
+          className="min-w-9 px-ns-2"
         >
-          삭제
+          🗑
         </Button>
       </div>
     </Card>

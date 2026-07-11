@@ -16,6 +16,7 @@ import {
   deleteChapter,
   moveChapter,
   readChaptersByProject,
+  reorderChaptersByIds,
   updateChapter,
   type ChapterInput,
 } from "@/features/manuscript/lib/chapter-storage";
@@ -28,6 +29,7 @@ export interface UseChaptersResult {
   remove: (id: ChapterId) => Promise<boolean>;
   moveUp: (id: ChapterId) => Promise<void>;
   moveDown: (id: ChapterId) => Promise<void>;
+  reorder: (activeId: string, overId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -98,6 +100,31 @@ export function useChapters(projectId: ProjectId): UseChaptersResult {
     [projectId],
   );
 
+  const reorder = useCallback(
+    async (activeId: string, overId: string) => {
+      const from = chapters.findIndex((c) => c.id === activeId);
+      const to = chapters.findIndex((c) => c.id === overId);
+      if (from < 0 || to < 0 || from === to) return;
+
+      const next = [...chapters];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      setChapters(next.map((c, i) => ({ ...c, sortOrder: i })));
+
+      try {
+        const saved = await reorderChaptersByIds(
+          projectId,
+          next.map((c) => c.id),
+        );
+        setChapters(saved);
+      } catch (error) {
+        console.error("[useChapters] reorder failed", error);
+        setChapters(await readChaptersByProject(projectId));
+      }
+    },
+    [chapters, projectId],
+  );
+
   return {
     chapters,
     isReady,
@@ -106,6 +133,7 @@ export function useChapters(projectId: ProjectId): UseChaptersResult {
     remove,
     moveUp,
     moveDown,
+    reorder,
     refresh,
   };
 }
