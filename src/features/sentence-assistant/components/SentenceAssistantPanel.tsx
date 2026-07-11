@@ -5,8 +5,8 @@
  * SentenceAssistantPanel
  * -----------------------------------------------------------------------------
  * 우측 Side Panel.
- * 단어 탭은 SentenceAssistantWord 로 분리되어 「뜻」만 제공한다.
- * 표현 / Show·Tell 탭은 독립적으로 비어 있다.
+ * 단어 탭 · 표현 탭은 각각 전용 컴포넌트로 분리한다.
+ * Show·Tell 탭은 아직 비어 있다.
  * =============================================================================
  */
 
@@ -16,6 +16,7 @@ import {
   type SentenceAssistantTabId,
 } from "@/features/sentence-assistant/types";
 import { SentenceAssistantWord } from "@/features/sentence-assistant/components/SentenceAssistantWord";
+import { SentenceAssistantExpression } from "@/features/sentence-assistant/components/SentenceAssistantExpression";
 import { cn } from "@/lib/utils/cn";
 
 export interface SentenceAssistantPanelProps {
@@ -131,8 +132,10 @@ export function SentenceAssistantPanel({
         >
           {tab === "word" ? (
             <SentenceAssistantWord selectedText={selectedText} />
+          ) : tab === "expression" ? (
+            <SentenceAssistantExpression selectedText={selectedText} />
           ) : (
-            <PlaceholderTab tab={tab} selectedText={selectedText} />
+            <PlaceholderTab selectedText={selectedText} />
           )}
         </div>
 
@@ -144,24 +147,7 @@ export function SentenceAssistantPanel({
   );
 }
 
-function PlaceholderTab({
-  tab,
-  selectedText,
-}: {
-  tab: Exclude<SentenceAssistantTabId, "word">;
-  selectedText: string;
-}) {
-  const meta =
-    tab === "expression"
-      ? {
-          title: "✍ 표현",
-          body: "비슷한 문장 표현·어감 참고가 여기에 표시됩니다. (준비 중)",
-        }
-      : {
-          title: "👁 Show / Tell",
-          body: "설명(Tell)과 보여 주기(Show)를 구분하는 참고가 여기에 표시됩니다. (준비 중)",
-        };
-
+function PlaceholderTab({ selectedText }: { selectedText: string }) {
   return (
     <div className="flex flex-col gap-ns-4">
       {selectedText.trim() ? (
@@ -174,9 +160,10 @@ function PlaceholderTab({
           </p>
         </section>
       ) : null}
-      <h3 className="text-ns-sm font-semibold text-ns-ink">{meta.title}</h3>
+      <h3 className="text-ns-sm font-semibold text-ns-ink">👁 Show / Tell</h3>
       <p className="text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
-        {meta.body}
+        설명(Tell)과 보여 주기(Show)를 구분하는 참고가 여기에 표시됩니다. (준비
+        중)
       </p>
       <div className="rounded-ns-md border border-dashed border-ns-border px-ns-4 py-ns-8 text-center text-ns-xs text-ns-ink-tertiary">
         아직 참고 데이터가 없습니다.
