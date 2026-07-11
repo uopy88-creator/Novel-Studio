@@ -19,6 +19,7 @@ import { DocumentModal } from "@/features/manuscript/components/DocumentModal";
 import { DocumentDeleteDialog } from "@/features/manuscript/components/DocumentDeleteDialog";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
+import { ContextHelp } from "@/features/help";
 
 type ModalState =
   | { type: "closed" }
@@ -41,7 +42,7 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
   return (
     <ContentContainer width="wide">
       <header className="mb-ns-8 flex flex-col gap-ns-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="ns-caption mb-ns-2">목차</p>
           <h2 className="ns-heading">Chapters</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
@@ -49,13 +50,16 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
             글로 이어집니다. ☰ 로 순서를 바꾸면 원고 순서도 함께 바뀝니다.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={openCreate}
-          className="shrink-0 rounded-ns-full px-ns-5"
-        >
-          새 Chapter
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
+          <ContextHelp topic="chapters" projectId={projectId} />
+          <Button
+            type="button"
+            onClick={openCreate}
+            className="rounded-ns-full px-ns-5"
+          >
+            새 Chapter
+          </Button>
+        </div>
       </header>
 
       {!isReady ? (

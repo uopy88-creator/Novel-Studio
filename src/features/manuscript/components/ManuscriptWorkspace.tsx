@@ -46,6 +46,7 @@ import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ContextHelp } from "@/features/help";
 import { useUserSettings } from "@/features/settings";
 import { EDITOR_WIDTH_CLASS } from "@/features/settings/types/user-settings";
 import {
@@ -378,7 +379,7 @@ export function ManuscriptWorkspace({
       className={EDITOR_WIDTH_CLASS[settings.editorWidth]}
     >
       <header className="mb-ns-6 flex flex-col gap-ns-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="ns-caption mb-ns-2">집필</p>
           <h2 className="ns-heading">Manuscript</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
@@ -389,6 +390,7 @@ export function ManuscriptWorkspace({
         {isReady ? (
           <div className="flex flex-col items-stretch gap-ns-2 sm:items-end">
             <div className="flex flex-wrap items-center justify-end gap-ns-2">
+              <ContextHelp topic="manuscript" projectId={projectId} />
               {selectedDocument ? (
                 <>
                   <Button
@@ -411,6 +413,11 @@ export function ManuscriptWorkspace({
                   </Button>
                 </>
               ) : null}
+              <ContextHelp
+                topic="export"
+                projectId={projectId}
+                label="Export 도움말"
+              />
               <Button
                 type="button"
                 size="sm"
@@ -426,7 +433,9 @@ export function ManuscriptWorkspace({
               className="sm:mb-1"
             />
           </div>
-        ) : null}
+        ) : (
+          <ContextHelp topic="manuscript" projectId={projectId} />
+        )}
       </header>
 
       {!isReady ? (

@@ -22,6 +22,7 @@ import { DialogueDeleteDialog } from "@/features/dialogue-vault/components/Dialo
 import { WritingVaultTypeFilter } from "@/features/dialogue-vault/components/WritingVaultTypeFilter";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
+import { ContextHelp } from "@/features/help";
 
 type ModalState =
   | { type: "closed" }
@@ -87,7 +88,7 @@ export function DialogueVaultPage({
   return (
     <ContentContainer width="wide">
       <header className="mb-ns-8 flex flex-col gap-ns-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="ns-caption mb-ns-2">보관함</p>
           <h2 className="ns-heading">Writing Vault</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
@@ -95,13 +96,16 @@ export function DialogueVaultPage({
             관리됩니다.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={openCreate}
-          className="shrink-0 rounded-ns-full px-ns-5"
-        >
-          항목 추가
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
+          <ContextHelp topic="vault" projectId={projectId} />
+          <Button
+            type="button"
+            onClick={openCreate}
+            className="rounded-ns-full px-ns-5"
+          >
+            항목 추가
+          </Button>
+        </div>
       </header>
 
       {actionError ? (

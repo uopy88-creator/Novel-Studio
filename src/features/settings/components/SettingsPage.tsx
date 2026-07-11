@@ -43,6 +43,7 @@ import {
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { ContextHelp } from "@/features/help";
 
 export interface SettingsPageProps {
   projectId: ProjectId;
@@ -57,9 +58,6 @@ export function SettingsPage({ projectId }: SettingsPageProps) {
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
-
-  // projectId 는 작품 작업실 경로에서 열리며, 향후 작품별 설정 확장에 사용
-  void projectId;
 
   const handleLogout = async () => {
     setSigningOut(true);
@@ -94,12 +92,15 @@ export function SettingsPage({ projectId }: SettingsPageProps) {
 
   return (
     <ContentContainer width="default">
-      <header className="mb-ns-8">
-        <p className="ns-caption mb-ns-2">환경</p>
-        <h2 className="ns-heading">Settings</h2>
-        <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-          에디터·테마·Export·백업을 이 기기에서 관리합니다.
-        </p>
+      <header className="mb-ns-8 flex items-start justify-between gap-ns-3">
+        <div>
+          <p className="ns-caption mb-ns-2">환경</p>
+          <h2 className="ns-heading">Settings</h2>
+          <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
+            에디터·테마·Export·백업을 이 기기에서 관리합니다.
+          </p>
+        </div>
+        <ContextHelp topic="settings" projectId={projectId} />
       </header>
 
       <div className="flex flex-col gap-ns-4">

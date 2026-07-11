@@ -16,6 +16,7 @@ import { CharacterToolbar } from "@/features/characters/components/CharacterTool
 import { CharacterDeleteDialog } from "@/features/characters/components/CharacterDeleteDialog";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
+import { ContextHelp } from "@/features/help";
 
 type ModalState =
   | { type: "closed" }
@@ -65,20 +66,23 @@ export function CharactersPage({
   return (
     <ContentContainer width="wide">
       <header className="mb-ns-8 flex flex-col gap-ns-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="ns-caption mb-ns-2">인물</p>
           <h2 className="ns-heading">Characters</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
             작가가 계속 참고하는 인물 프로필을 모아 둡니다.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={openCreate}
-          className="shrink-0 rounded-ns-full px-ns-5"
-        >
-          + 캐릭터 추가
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
+          <ContextHelp topic="character" projectId={projectId} />
+          <Button
+            type="button"
+            onClick={openCreate}
+            className="rounded-ns-full px-ns-5"
+          >
+            + 캐릭터 추가
+          </Button>
+        </div>
       </header>
 
       {!isReady ? (

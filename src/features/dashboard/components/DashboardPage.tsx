@@ -17,6 +17,7 @@ import { FeaturedCharacterCard } from "@/features/characters/components/Featured
 import { RecentInspirationCard } from "@/features/inspiration/components/RecentInspirationCard";
 import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
+import { ContextHelp } from "@/features/help";
 
 export interface DashboardPageProps {
   projectId: ProjectId;
@@ -27,12 +28,15 @@ export function DashboardPage({ projectId }: DashboardPageProps) {
 
   return (
     <ContentContainer width="wide">
-      <header className="mb-ns-8">
-        <p className="ns-caption mb-ns-2">작업실</p>
-        <h2 className="ns-heading">Dashboard</h2>
-        <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-          작품 현황을 한눈에 확인합니다. 이 화면에서는 수정할 수 없습니다.
-        </p>
+      <header className="mb-ns-8 flex items-start justify-between gap-ns-3">
+        <div>
+          <p className="ns-caption mb-ns-2">작업실</p>
+          <h2 className="ns-heading">Dashboard</h2>
+          <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
+            작품 현황을 한눈에 확인합니다. 이 화면에서는 수정할 수 없습니다.
+          </p>
+        </div>
+        <ContextHelp topic="dashboard" projectId={projectId} />
       </header>
 
       {!isReady ? (

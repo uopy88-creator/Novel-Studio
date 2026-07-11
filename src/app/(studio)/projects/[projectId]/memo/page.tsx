@@ -1,6 +1,20 @@
+/**
+ * Memo — 기능 미구현, Context Help 제공
+ */
+
 import { ComingSoon } from "@/components/layout";
 
-/** Memo — 기능 미구현, 준비 중만 표시 */
-export default function MemoPage() {
-  return <ComingSoon featureName="Memo" />;
+interface MemoPageProps {
+  params: Promise<{ projectId: string }>;
+}
+
+export default async function MemoPage({ params }: MemoPageProps) {
+  const { projectId } = await params;
+  return (
+    <ComingSoon
+      featureName="Memo"
+      helpTopic="memo"
+      projectId={projectId}
+    />
+  );
 }

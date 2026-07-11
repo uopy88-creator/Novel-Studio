@@ -18,6 +18,7 @@ import { ProjectModal } from "@/features/projects/components/ProjectModal";
 import { ProjectDeleteDialog } from "@/features/projects/components/ProjectDeleteDialog";
 import { useAuth } from "@/auth";
 import { Button } from "@/components/ui/Button";
+import { ContextHelp } from "@/features/help";
 
 type ModalState =
   | { type: "closed" }
@@ -58,6 +59,7 @@ export function ProjectsPage() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-ns-3">
+          <ContextHelp topic="project" />
           <Button
             type="button"
             variant="ghost"
