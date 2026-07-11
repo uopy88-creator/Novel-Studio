@@ -4,7 +4,7 @@
  * =============================================================================
  * useProjects
  * -----------------------------------------------------------------------------
- * 작품 목록 — Cloud(DB) 우선, LocalStorage 백업.
+ * 작품 목록 — Supabase Database 단일 소스 (설정 시).
  * =============================================================================
  */
 
@@ -33,14 +33,24 @@ export function useProjects(): UseProjectsResult {
   const [isReady, setIsReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    setProjects(await readProjects());
+    try {
+      setProjects(await readProjects());
+    } catch (error) {
+      console.error("[useProjects] 작품 목록을 불러오지 못했습니다.", error);
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await refresh();
-      if (!cancelled) setIsReady(true);
+      try {
+        await refresh();
+      } catch {
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setIsReady(true);
+      }
     })();
     return () => {
       cancelled = true;

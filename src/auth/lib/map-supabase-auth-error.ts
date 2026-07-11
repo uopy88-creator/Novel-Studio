@@ -45,12 +45,27 @@ export function mapSupabaseAuthError(error: AuthError | Error | unknown): Error 
   }
 
   // 잘못된 이메일 / 비밀번호 (로그인)
+  // Confirm email 이 켜져 있고 미인증이면 Supabase가 같은 메시지를 줄 수 있다.
   if (
     codeLower === "invalid_credentials" ||
     text.includes("invalid login credentials") ||
     text.includes("invalid credentials")
   ) {
-    return new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+    return new Error(
+      "이메일 또는 비밀번호가 올바르지 않습니다. 아직 회원가입하지 않았거나, Supabase 이메일 인증(Confirm email)이 켜져 있으면 인증 메일의 링크를 누른 뒤 다시 시도해 주세요.",
+    );
+  }
+
+  // PostgREST PGRST125 / 잘못된 Auth URL path
+  // (SUPABASE_URL 에 /auth/v1 · /rest/v1 이 붙어 있을 때 자주 발생)
+  if (
+    text.includes("invalid path") ||
+    text.includes("path specified in request url") ||
+    codeLower === "pgrst125"
+  ) {
+    return new Error(
+      "Supabase URL 경로가 올바르지 않습니다. Vercel의 NEXT_PUBLIC_SUPABASE_URL 은 https://xxxx.supabase.co 형태(경로 없음)여야 합니다. /auth/v1 또는 /rest/v1 을 붙이지 마세요.",
+    );
   }
 
   // 이메일 형식

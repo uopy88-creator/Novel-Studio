@@ -12,4 +12,6 @@ export {
   getSupabaseUrl,
   getSupabaseAnonKey,
   hasSupabasePublicEnv,
+  getSupabaseAuthBaseUrl,
+  getSignInWithPasswordUrl,
 } from "./public-env";

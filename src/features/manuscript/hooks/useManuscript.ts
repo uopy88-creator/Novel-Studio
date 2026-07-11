@@ -4,7 +4,7 @@
  * =============================================================================
  * useManuscript
  * -----------------------------------------------------------------------------
- * Document 원고 편집 — Cloud(DB) 우선 자동 저장, LocalStorage 백업.
+ * Document 원고 편집 — Supabase Database 자동 저장.
  * =============================================================================
  */
 
@@ -58,13 +58,22 @@ export function useManuscript(
 
   const loadDocument = useCallback(
     async (chapterId: ChapterId) => {
-      const existing = await getManuscriptByChapterId(projectId, chapterId);
-      dirtyRef.current = false;
-      setSelectedChapterId(chapterId);
-      setContentState(existing?.content ?? "");
-      setSaveStatus("idle");
-      setLastSavedAt(existing?.updatedAt ?? null);
-      void touchManuscriptOpened(projectId, chapterId);
+      try {
+        const existing = await getManuscriptByChapterId(projectId, chapterId);
+        dirtyRef.current = false;
+        setSelectedChapterId(chapterId);
+        setContentState(existing?.content ?? "");
+        setSaveStatus("idle");
+        setLastSavedAt(existing?.updatedAt ?? null);
+        void touchManuscriptOpened(projectId, chapterId).catch(() => {
+          // 열람 시각 갱신 실패는 본문 로드를 막지 않음
+        });
+      } catch {
+        setSelectedChapterId(chapterId);
+        setContentState("");
+        setSaveStatus("error");
+        setLastSavedAt(null);
+      }
     },
     [projectId],
   );
@@ -72,18 +81,25 @@ export function useManuscript(
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const list = await readChaptersByProject(projectId);
-      if (cancelled) return;
-      setDocuments(list);
-      setIsReady(true);
+      try {
+        const list = await readChaptersByProject(projectId);
+        if (cancelled) return;
+        setDocuments(list);
+        setIsReady(true);
 
-      if (
-        !didApplyInitial.current &&
-        initialDocumentId &&
-        list.some((document) => document.id === initialDocumentId)
-      ) {
-        didApplyInitial.current = true;
-        await loadDocument(initialDocumentId);
+        if (
+          !didApplyInitial.current &&
+          initialDocumentId &&
+          list.some((document) => document.id === initialDocumentId)
+        ) {
+          didApplyInitial.current = true;
+          await loadDocument(initialDocumentId);
+        }
+      } catch {
+        if (cancelled) return;
+        setDocuments([]);
+        setIsReady(true);
+        setSaveStatus("error");
       }
     })();
     return () => {

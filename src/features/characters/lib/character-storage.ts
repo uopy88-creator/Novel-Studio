@@ -1,13 +1,16 @@
 /**
  * =============================================================================
- * Character Storage (Cloud 우선 + LocalStorage 백업)
+ * Character Storage — Supabase Database 단일 소스
  * =============================================================================
  */
 
 import type { Character } from "@/features/characters/types/character";
 import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
 import type { CharacterId, ProjectId } from "@/types/ids";
-import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  isSupabaseDataMode,
+  requireCloudDb,
+} from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteCharacter,
   cloudListCharacters,
@@ -15,6 +18,7 @@ import {
   cloudUpsertCharacter,
 } from "@/database/supabase/characters-repo";
 import { CHARACTERS_STORAGE_KEY } from "@/lib/storage/keys";
+import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { CHARACTERS_STORAGE_KEY };
@@ -35,9 +39,6 @@ export interface CharacterInput {
   color: string;
 }
 
-/**
- * 구버전(summary/notes)과 신버전 필드를 모두 읽는다.
- */
 function normalizeCharacter(raw: unknown): Character | null {
   if (!raw || typeof raw !== "object") return null;
   const item = raw as Partial<Character> & {
@@ -51,7 +52,10 @@ function normalizeCharacter(raw: unknown): Character | null {
   if (typeof item.name !== "string" || !item.name.trim()) return null;
 
   const legacyMemo = [item.summary, item.notes]
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0,
+    )
     .join("\n");
 
   return {
@@ -92,6 +96,10 @@ function readLocalCharacters(): Character[] {
 
 function writeLocalCharacters(characters: Character[]): void {
   writeJsonArray(CHARACTERS_STORAGE_KEY, characters);
+}
+
+function backupCharacters(characters: Character[]): void {
+  writeWorkDataBackup(CHARACTERS_STORAGE_KEY, characters);
 }
 
 function createCharacterId(): CharacterId {
@@ -146,14 +154,11 @@ export function filterCharactersByName(
 }
 
 export async function readAllCharacters(): Promise<Character[]> {
-  if (await canUseCloudDb()) {
-    try {
-      const characters = await cloudListCharacters();
-      writeLocalCharacters(characters);
-      return characters;
-    } catch {
-      return readLocalCharacters();
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const characters = await cloudListCharacters();
+    backupCharacters(characters);
+    return characters;
   }
   return readLocalCharacters();
 }
@@ -161,27 +166,23 @@ export async function readAllCharacters(): Promise<Character[]> {
 export async function readCharactersByProject(
   projectId: ProjectId,
 ): Promise<Character[]> {
-  let list: Character[];
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const list = await cloudListCharactersByProject(projectId);
     try {
-      list = await cloudListCharactersByProject(projectId);
-      const others = readLocalCharacters().filter(
-        (character) => character.projectId !== projectId,
-      );
-      writeLocalCharacters([...others, ...list]);
+      backupCharacters(await cloudListCharacters());
     } catch {
-      list = readLocalCharacters().filter(
-        (character) => character.projectId === projectId,
-      );
+      // 백업 실패 무시
     }
-  } else {
-    list = readLocalCharacters().filter(
-      (character) => character.projectId === projectId,
-    );
+    return sortCharacters(list, "favorite");
   }
 
-  return sortCharacters(list, "favorite");
+  return sortCharacters(
+    readLocalCharacters().filter(
+      (character) => character.projectId === projectId,
+    ),
+    "favorite",
+  );
 }
 
 export async function createCharacter(
@@ -215,17 +216,18 @@ export async function createCharacter(
     updatedAt: timestamp,
   };
 
-  const local = readLocalCharacters();
-  writeLocalCharacters([...local, character]);
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertCharacter(character);
     try {
-      await cloudUpsertCharacter(character);
+      backupCharacters(await cloudListCharacters());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return character;
   }
 
+  writeLocalCharacters([...readLocalCharacters(), character]);
   return character;
 }
 
@@ -233,10 +235,39 @@ export async function updateCharacter(
   id: CharacterId,
   input: CharacterInput,
 ): Promise<Character | null> {
-  const all = await readAllCharacters();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListCharacters();
+    const index = all.findIndex((character) => character.id === id);
+    if (index < 0) return null;
+
+    const updated: Character = {
+      ...all[index],
+      name: input.name.trim(),
+      role: input.role.trim(),
+      age: input.age.trim(),
+      gender: input.gender.trim(),
+      occupation: input.occupation.trim(),
+      personality: input.personality.trim(),
+      goal: input.goal.trim(),
+      secret: input.secret.trim(),
+      memo: input.memo.trim(),
+      image: input.image,
+      color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertCharacter(updated);
+    try {
+      backupCharacters(await cloudListCharacters());
+    } catch {
+      // 백업 실패 무시
+    }
+    return updated;
+  }
+
+  const all = readLocalCharacters();
   const index = all.findIndex((character) => character.id === id);
   if (index < 0) return null;
-
   const updated: Character = {
     ...all[index],
     name: input.name.trim(),
@@ -252,69 +283,68 @@ export async function updateCharacter(
     color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
     updatedAt: nowIso(),
   };
-
   const next = [...all];
   next[index] = updated;
   writeLocalCharacters(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertCharacter(updated);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
-
   return updated;
 }
 
 export async function deleteCharacter(id: CharacterId): Promise<boolean> {
-  const all = await readAllCharacters();
-  const exists = all.some((character) => character.id === id);
-  if (!exists) return false;
-
-  writeLocalCharacters(all.filter((character) => character.id !== id));
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListCharacters();
+    if (!all.some((character) => character.id === id)) return false;
+    await cloudDeleteCharacter(id);
     try {
-      await cloudDeleteCharacter(id);
+      backupCharacters(await cloudListCharacters());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return true;
   }
 
+  const all = readLocalCharacters();
+  if (!all.some((character) => character.id === id)) return false;
+  writeLocalCharacters(all.filter((character) => character.id !== id));
   return true;
 }
 
 export async function toggleCharacterFavorite(
   id: CharacterId,
 ): Promise<Character | null> {
-  const all = await readAllCharacters();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListCharacters();
+    const index = all.findIndex((character) => character.id === id);
+    if (index < 0) return null;
+    const updated: Character = {
+      ...all[index],
+      isFavorite: !all[index].isFavorite,
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertCharacter(updated);
+    try {
+      backupCharacters(await cloudListCharacters());
+    } catch {
+      // 백업 실패 무시
+    }
+    return updated;
+  }
+
+  const all = readLocalCharacters();
   const index = all.findIndex((character) => character.id === id);
   if (index < 0) return null;
-
   const updated: Character = {
     ...all[index],
     isFavorite: !all[index].isFavorite,
     updatedAt: nowIso(),
   };
-
   const next = [...all];
   next[index] = updated;
   writeLocalCharacters(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertCharacter(updated);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
-
   return updated;
 }
 
-/** Dashboard 미리보기 — 즐겨찾기 우선, 최대 4명 */
 export function pickFeaturedCharacters(
   characters: Character[],
   limit = 4,
@@ -322,9 +352,6 @@ export function pickFeaturedCharacters(
   return sortCharacters(characters, "favorite").slice(0, limit);
 }
 
-/**
- * 이미지 파일을 data URL로 읽는다 (최대 ~800KB 권장).
- */
 export function readImageAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {

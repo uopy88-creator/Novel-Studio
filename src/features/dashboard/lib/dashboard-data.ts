@@ -10,7 +10,6 @@ import type { Chapter } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
-import type { Memo } from "@/features/memo/types/memo";
 import type { ProjectId } from "@/types/ids";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
@@ -22,19 +21,18 @@ import {
   pickRecentInspirations,
   readInspirationsByProject,
 } from "@/features/inspiration/lib/inspiration-storage";
+import { readMemosByProject } from "@/features/memo/lib/memo-storage";
 import {
   countCharsWithoutSpaces,
   countCharsWithSpaces,
   estimateBookPages,
   estimateManuscriptSheets,
 } from "@/lib/stats";
-import { MEMOS_STORAGE_KEY } from "@/lib/storage/keys";
-import { readJsonArray } from "@/lib/storage/browser";
 
-export { MEMOS_STORAGE_KEY };
 export {
   CHARACTERS_STORAGE_KEY,
   MANUSCRIPTS_STORAGE_KEY,
+  MEMOS_STORAGE_KEY,
 } from "@/lib/storage/keys";
 
 export async function readManuscriptsByProject(
@@ -42,12 +40,6 @@ export async function readManuscriptsByProject(
 ): Promise<Manuscript[]> {
   const all = await readAllManuscripts();
   return all.filter((item) => item.projectId === projectId);
-}
-
-export function readMemosByProject(projectId: ProjectId): Memo[] {
-  return readJsonArray<Memo>(MEMOS_STORAGE_KEY).filter(
-    (item) => item.projectId === projectId,
-  );
 }
 
 export async function readCharactersByProject(
@@ -81,7 +73,7 @@ export async function buildDashboardSnapshot(
 ): Promise<DashboardSnapshot> {
   const documents = await readChaptersByProject(projectId);
   const manuscripts = await readManuscriptsByProject(projectId);
-  const memos = readMemosByProject(projectId);
+  const memos = await readMemosByProject(projectId);
   const characters = await readCharactersByProject(projectId);
   const inspirations = await readInspirationsByProject(projectId);
 

@@ -1,8 +1,6 @@
 /**
  * =============================================================================
- * Chapter / Document Storage (Cloud 우선 + LocalStorage 백업)
- * -----------------------------------------------------------------------------
- * 온라인 시 Supabase `documents` 테이블. LocalStorage는 백업.
+ * Chapter / Document Storage — Supabase Database 단일 소스
  * =============================================================================
  */
 
@@ -15,7 +13,10 @@ import {
   DOCUMENT_KIND_OPTIONS,
 } from "@/features/manuscript/types/chapter";
 import type { ChapterId, ProjectId } from "@/types/ids";
-import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  isSupabaseDataMode,
+  requireCloudDb,
+} from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteDocument,
   cloudListDocuments,
@@ -24,6 +25,7 @@ import {
   cloudUpsertDocuments,
 } from "@/database/supabase/documents-repo";
 import { CHAPTERS_STORAGE_KEY } from "@/lib/storage/keys";
+import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { CHAPTERS_STORAGE_KEY };
@@ -83,49 +85,50 @@ function writeLocalAllChapters(chapters: Chapter[]): void {
   writeJsonArray(CHAPTERS_STORAGE_KEY, sorted);
 }
 
+function backupChapters(chapters: Chapter[]): void {
+  writeWorkDataBackup(CHAPTERS_STORAGE_KEY, chapters);
+}
+
+async function backupAllChaptersFromCloud(): Promise<void> {
+  try {
+    backupChapters(await cloudListDocuments());
+  } catch {
+    // 백업 실패는 본 저장에 영향 없음
+  }
+}
+
 export function createChapterId(): ChapterId {
   return crypto.randomUUID();
 }
 
 export async function readAllChapters(): Promise<Chapter[]> {
-  if (await canUseCloudDb()) {
-    try {
-      const chapters = await cloudListDocuments();
-      writeLocalAllChapters(chapters);
-      return chapters;
-    } catch {
-      return readLocalAllChapters();
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const chapters = await cloudListDocuments();
+    backupChapters(chapters);
+    return chapters;
   }
   return readLocalAllChapters();
 }
 
 export async function writeAllChapters(chapters: Chapter[]): Promise<void> {
-  writeLocalAllChapters(chapters);
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDocuments(chapters);
-    } catch {
-      // 로컬 백업은 이미 저장됨
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertDocuments(chapters);
+    backupChapters(await cloudListDocuments());
+    return;
   }
+  writeLocalAllChapters(chapters);
 }
 
 export async function readChaptersByProject(
   projectId: ProjectId,
 ): Promise<Chapter[]> {
-  if (await canUseCloudDb()) {
-    try {
-      const chapters = await cloudListDocumentsByProject(projectId);
-      // 해당 작품분만 로컬에 병합 백업
-      const others = readLocalAllChapters().filter(
-        (chapter) => chapter.projectId !== projectId,
-      );
-      writeLocalAllChapters([...others, ...chapters]);
-      return chapters;
-    } catch {
-      // fall through
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const chapters = await cloudListDocumentsByProject(projectId);
+    void backupAllChaptersFromCloud();
+    return chapters.sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
   return readLocalAllChapters()
@@ -158,19 +161,14 @@ export async function createChapter(
     updatedAt: timestamp,
   };
 
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDocument(chapter);
-      const all = readLocalAllChapters();
-      writeLocalAllChapters([...all.filter((c) => c.id !== chapter.id), chapter]);
-      return chapter;
-    } catch {
-      // fall through
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertDocument(chapter);
+    void backupAllChaptersFromCloud();
+    return chapter;
   }
 
-  const all = readLocalAllChapters();
-  writeLocalAllChapters([...all, chapter]);
+  writeLocalAllChapters([...readLocalAllChapters(), chapter]);
   return chapter;
 }
 
@@ -178,10 +176,28 @@ export async function updateChapter(
   id: ChapterId,
   input: ChapterInput,
 ): Promise<Chapter | null> {
-  const all = await readAllChapters();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDocuments();
+    const index = all.findIndex((chapter) => chapter.id === id);
+    if (index < 0) return null;
+
+    const title = input.title.trim() || DEFAULT_DOCUMENT_TITLE;
+    const updated: Chapter = {
+      ...all[index],
+      title,
+      kind: input.kind,
+      summary: input.description?.trim() || undefined,
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertDocument(updated);
+    void backupAllChaptersFromCloud();
+    return updated;
+  }
+
+  const all = readLocalAllChapters();
   const index = all.findIndex((chapter) => chapter.id === id);
   if (index < 0) return null;
-
   const title = input.title.trim() || DEFAULT_DOCUMENT_TITLE;
   const updated: Chapter = {
     ...all[index],
@@ -190,19 +206,6 @@ export async function updateChapter(
     summary: input.description?.trim() || undefined,
     updatedAt: nowIso(),
   };
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDocument(updated);
-      const next = [...all];
-      next[index] = updated;
-      writeLocalAllChapters(next);
-      return updated;
-    } catch {
-      // fall through
-    }
-  }
-
   const next = [...all];
   next[index] = updated;
   writeLocalAllChapters(next);
@@ -210,25 +213,25 @@ export async function updateChapter(
 }
 
 export async function deleteChapter(id: ChapterId): Promise<boolean> {
-  const all = await readAllChapters();
-  const target = all.find((chapter) => chapter.id === id);
-  if (!target) return false;
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDocuments();
+    const target = all.find((chapter) => chapter.id === id);
+    if (!target) return false;
 
-  if (await canUseCloudDb()) {
-    try {
-      await cloudDeleteDocument(id);
-      const remaining = all.filter((chapter) => chapter.id !== id);
-      const renumbered = renumberProjectChapters(remaining, target.projectId);
-      await cloudUpsertDocuments(
-        renumbered.filter((chapter) => chapter.projectId === target.projectId),
-      );
-      writeLocalAllChapters(renumbered);
-      return true;
-    } catch {
-      // fall through
-    }
+    await cloudDeleteDocument(id);
+    const remaining = all.filter((chapter) => chapter.id !== id);
+    const renumbered = renumberProjectChapters(remaining, target.projectId);
+    await cloudUpsertDocuments(
+      renumbered.filter((chapter) => chapter.projectId === target.projectId),
+    );
+    backupChapters(renumbered);
+    return true;
   }
 
+  const all = readLocalAllChapters();
+  const target = all.find((chapter) => chapter.id === id);
+  if (!target) return false;
   const remaining = all.filter((chapter) => chapter.id !== id);
   writeLocalAllChapters(renumberProjectChapters(remaining, target.projectId));
   return true;
@@ -238,7 +241,35 @@ export async function moveChapter(
   id: ChapterId,
   direction: "up" | "down",
 ): Promise<Chapter[] | null> {
-  const all = await readAllChapters();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDocuments();
+    const target = all.find((chapter) => chapter.id === id);
+    if (!target) return null;
+
+    const siblings = all
+      .filter((chapter) => chapter.projectId === target.projectId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const index = siblings.findIndex((chapter) => chapter.id === id);
+    const swapWith = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
+      return siblings;
+    }
+
+    const a = siblings[index];
+    const b = siblings[swapWith];
+    const timestamp = nowIso();
+    const changed = [
+      { ...a, sortOrder: b.sortOrder, updatedAt: timestamp },
+      { ...b, sortOrder: a.sortOrder, updatedAt: timestamp },
+    ];
+    await cloudUpsertDocuments(changed);
+    void backupAllChaptersFromCloud();
+    return cloudListDocumentsByProject(target.projectId);
+  }
+
+  const all = readLocalAllChapters();
   const target = all.find((chapter) => chapter.id === id);
   if (!target) return null;
 
@@ -249,40 +280,25 @@ export async function moveChapter(
   const index = siblings.findIndex((chapter) => chapter.id === id);
   const swapWith = direction === "up" ? index - 1 : index + 1;
   if (index < 0 || swapWith < 0 || swapWith >= siblings.length) {
-    return readChaptersByProject(target.projectId);
+    return siblings;
   }
 
   const a = siblings[index];
   const b = siblings[swapWith];
-  const orderA = a.sortOrder;
-  const orderB = b.sortOrder;
   const timestamp = nowIso();
-
   const next = all.map((chapter) => {
     if (chapter.id === a.id) {
-      return { ...chapter, sortOrder: orderB, updatedAt: timestamp };
+      return { ...chapter, sortOrder: b.sortOrder, updatedAt: timestamp };
     }
     if (chapter.id === b.id) {
-      return { ...chapter, sortOrder: orderA, updatedAt: timestamp };
+      return { ...chapter, sortOrder: a.sortOrder, updatedAt: timestamp };
     }
     return chapter;
   });
-
-  const changed = next.filter(
-    (chapter) => chapter.id === a.id || chapter.id === b.id,
-  );
-
   writeLocalAllChapters(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDocuments(changed);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
-
-  return readChaptersByProject(target.projectId);
+  return next
+    .filter((chapter) => chapter.projectId === target.projectId)
+    .sort((x, y) => x.sortOrder - y.sortOrder);
 }
 
 function renumberProjectChapters(
@@ -309,25 +325,30 @@ export async function syncChapterAfterManuscriptWrite(
   chapterId: ChapterId,
   wordCount: number,
 ): Promise<void> {
-  const all = await readAllChapters();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListDocuments();
+    const index = all.findIndex((chapter) => chapter.id === chapterId);
+    if (index < 0) return;
+
+    const updated: Chapter = {
+      ...all[index],
+      wordCount,
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertDocument(updated);
+    void backupAllChaptersFromCloud();
+    return;
+  }
+
+  const all = readLocalAllChapters();
   const index = all.findIndex((chapter) => chapter.id === chapterId);
   if (index < 0) return;
-
-  const updated: Chapter = {
+  const next = [...all];
+  next[index] = {
     ...all[index],
     wordCount,
     updatedAt: nowIso(),
   };
-
-  const next = [...all];
-  next[index] = updated;
   writeLocalAllChapters(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertDocument(updated);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
 }

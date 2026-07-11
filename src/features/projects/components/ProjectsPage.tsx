@@ -30,6 +30,7 @@ export function ProjectsPage() {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<Project | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const openCreate = () => setModal({ type: "create" });
   const closeModal = () => setModal({ type: "closed" });
@@ -73,6 +74,15 @@ export function ProjectsPage() {
         </div>
       </header>
 
+      {actionError ? (
+        <p
+          className="mb-ns-4 text-ns-sm text-ns-danger"
+          role="alert"
+        >
+          {actionError}
+        </p>
+      ) : null}
+
       {/* 목록 — hydration 전에는 빈 자리만 유지 */}
       {!isReady ? (
         <div className="rounded-ns-xl border border-ns-border bg-ns-surface px-ns-6 py-ns-12 text-center text-ns-sm text-ns-ink-tertiary">
@@ -102,10 +112,25 @@ export function ProjectsPage() {
         onClose={closeModal}
         onSubmit={(input) => {
           void (async () => {
-            if (modal.type === "edit") {
-              await update(modal.project.id, input);
-            } else {
-              await create(input);
+            try {
+              setActionError(null);
+              if (modal.type === "edit") {
+                await update(modal.project.id, input);
+              } else {
+                await create(input);
+              }
+              closeModal();
+            } catch (error) {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : error &&
+                      typeof error === "object" &&
+                      "message" in error &&
+                      typeof (error as { message: unknown }).message === "string"
+                    ? (error as { message: string }).message
+                    : "클라우드 저장에 실패했습니다.";
+              setActionError(message);
             }
           })();
         }}
@@ -116,7 +141,24 @@ export function ProjectsPage() {
         project={deleting}
         onClose={() => setDeleting(null)}
         onConfirm={(project) => {
-          void remove(project.id);
+          void (async () => {
+            try {
+              setActionError(null);
+              await remove(project.id);
+              setDeleting(null);
+            } catch (error) {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : error &&
+                      typeof error === "object" &&
+                      "message" in error &&
+                      typeof (error as { message: unknown }).message === "string"
+                    ? (error as { message: string }).message
+                    : "클라우드 삭제에 실패했습니다.";
+              setActionError(message);
+            }
+          })();
         }}
       />
     </div>

@@ -2,12 +2,8 @@
  * =============================================================================
  * Supabase Browser Client
  * -----------------------------------------------------------------------------
- * Next.js App Router · 브라우저용 클라이언트.
- *
- * 환경변수는 `public-env.ts` 에서만 읽는다.
- * (NEXT_PUBLIC_* 가 클라이언트 번들에 올바르게 인라인되도록)
- *
- * Auth 세션은 persistSession 으로 브라우저 localStorage에 유지된다.
+ * Auth / DB 모두 @supabase/supabase-js 의 createClient 만 사용한다.
+ * fetch·axios·/auth/v1·/rest/v1 직접 호출 금지.
  * =============================================================================
  */
 
@@ -15,22 +11,20 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   getSupabaseAnonKey,
   getSupabaseUrl,
+  getSignInWithPasswordUrl,
   hasSupabasePublicEnv,
 } from "@/lib/supabase/public-env";
 
 const AUTH_STORAGE_KEY = "novel-studio:supabase-auth";
 
 let browserClient: SupabaseClient | null = null;
+/** 싱글톤이 잘못된 URL로 캐시되지 않도록 생성 시 URL을 기억한다 */
+let browserClientUrl: string | null = null;
 
-/** 환경변수가 채워져 있는지 (플레이스홀더 제외) */
 export function isSupabaseConfigured(): boolean {
   return hasSupabasePublicEnv();
 }
 
-/**
- * Safari 비공개 모드 등에서 localStorage 접근이 막힐 때를 위한 안전한 래퍼.
- * 세션 유지는 못 할 수 있어도, 로그인 API 호출 자체는 가능하게 한다.
- */
 function createAuthStorage(): Storage {
   if (typeof window === "undefined") {
     return {
@@ -56,7 +50,7 @@ function createAuthStorage(): Storage {
     return window.localStorage;
   } catch {
     console.warn(
-      "[Novel Studio Auth] localStorage unavailable — session will not persist (Safari private mode?)",
+      "[Novel Studio Auth] localStorage unavailable — session will not persist",
     );
     const memory = new Map<string, string>();
     return {
@@ -84,9 +78,7 @@ function createAuthStorage(): Storage {
 
 /**
  * 브라우저용 Supabase 클라이언트.
- * 미설정이면 null — 작품 데이터 LocalStorage 기능은 그대로 동작한다.
- *
- * SSR에서는 싱글톤에 넣지 않는다 (localStorage 없는 클라이언트가 캐시되는 것 방지).
+ * URL은 origin 만 사용한다 (public-env 에서 정규화).
  */
 export function createSupabaseClient(): SupabaseClient | null {
   if (!isSupabaseConfigured()) {
@@ -95,6 +87,10 @@ export function createSupabaseClient(): SupabaseClient | null {
 
   const url = getSupabaseUrl();
   const anonKey = getSupabaseAnonKey();
+
+  if (!url || !anonKey) {
+    return null;
+  }
 
   if (typeof window === "undefined") {
     return createClient(url, anonKey, {
@@ -106,33 +102,41 @@ export function createSupabaseClient(): SupabaseClient | null {
     });
   }
 
+  // URL이 바뀌었으면 싱글톤 폐기 (잘못된 path 캐시 방지)
+  if (browserClient && browserClientUrl !== url) {
+    browserClient = null;
+    browserClientUrl = null;
+  }
+
   if (browserClient) {
     return browserClient;
   }
+
+  console.log("[Novel Studio Auth] createClient", {
+    supabaseUrl: url,
+    signInWithPasswordUrl: getSignInWithPasswordUrl(),
+    anonKeyLength: anonKey.length,
+  });
 
   browserClient = createClient(url, anonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      flowType: "pkce",
+      // password 로그인은 PKCE 불필요 — 기본 flow 사용
       storage: createAuthStorage(),
       storageKey: AUTH_STORAGE_KEY,
     },
   });
+  browserClientUrl = url;
 
   return browserClient;
 }
 
-/** 설정된 경우에만 클라이언트를 반환 */
 export function getSupabaseClient(): SupabaseClient | null {
   return createSupabaseClient();
 }
 
-/**
- * Auth 호출용 — 미설정이면 명확한 오류.
- * (작품 CRUD 등에는 쓰지 않는다.)
- */
 export function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseClient();
   if (!client) {

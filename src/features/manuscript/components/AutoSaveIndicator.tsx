@@ -27,7 +27,7 @@ function statusLabel(status: SaveStatus, lastSavedAt: string | null): string {
         ? `저장됨 · ${formatShortTime(lastSavedAt)}`
         : "저장됨";
     case "error":
-      return "저장 실패";
+      return "저장 실패 · 클라우드에 쓰지 못했습니다";
     case "idle":
     default:
       return lastSavedAt

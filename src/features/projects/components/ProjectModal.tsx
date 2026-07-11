@@ -74,7 +74,7 @@ export function ProjectModal({
       title: trimmed,
       description: description.trim(),
     });
-    onClose();
+    // 모달은 부모에서 저장 성공 시 닫는다 (클라우드 실패 시 오류 표시)
   };
 
   const isEdit = mode === "edit";

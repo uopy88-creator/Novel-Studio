@@ -1,12 +1,18 @@
 /**
  * =============================================================================
- * Inspiration Storage (Cloud 우선 + LocalStorage 백업)
+ * Inspiration Storage — Supabase Database 단일 소스
+ * -----------------------------------------------------------------------------
+ * Supabase 설정 시: CRUD 는 클라우드만. LocalStorage 는 성공 후 백업 쓰기만.
+ * Supabase 미설정(로컬 개발) 시에만 LocalStorage 를 데이터 소스로 사용.
  * =============================================================================
  */
 
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { DocumentId, InspirationId, ProjectId } from "@/types/ids";
-import { canUseCloudDb } from "@/database/supabase/cloud-mode";
+import {
+  isSupabaseDataMode,
+  requireCloudDb,
+} from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteInspiration,
   cloudListInspirations,
@@ -14,6 +20,7 @@ import {
   cloudUpsertInspiration,
 } from "@/database/supabase/inspirations-repo";
 import { INSPIRATIONS_STORAGE_KEY } from "@/lib/storage/keys";
+import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { INSPIRATIONS_STORAGE_KEY };
@@ -63,6 +70,7 @@ function normalizeInspiration(raw: unknown): Inspiration | null {
   };
 }
 
+/** 로컬 전용 모드(Supabase 미설정)에서만 사용 */
 function readLocalInspirations(): Inspiration[] {
   return readJsonArray<unknown>(INSPIRATIONS_STORAGE_KEY)
     .map(normalizeInspiration)
@@ -71,6 +79,10 @@ function readLocalInspirations(): Inspiration[] {
 
 function writeLocalInspirations(items: Inspiration[]): void {
   writeJsonArray(INSPIRATIONS_STORAGE_KEY, items);
+}
+
+function backupInspirations(items: Inspiration[]): void {
+  writeWorkDataBackup(INSPIRATIONS_STORAGE_KEY, items);
 }
 
 function createInspirationId(): InspirationId {
@@ -116,14 +128,11 @@ export function filterInspirations(
 }
 
 export async function readAllInspirations(): Promise<Inspiration[]> {
-  if (await canUseCloudDb()) {
-    try {
-      const items = await cloudListInspirations();
-      writeLocalInspirations(items);
-      return items;
-    } catch {
-      return readLocalInspirations();
-    }
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const items = await cloudListInspirations();
+    backupInspirations(items);
+    return items;
   }
   return readLocalInspirations();
 }
@@ -131,27 +140,21 @@ export async function readAllInspirations(): Promise<Inspiration[]> {
 export async function readInspirationsByProject(
   projectId: ProjectId,
 ): Promise<Inspiration[]> {
-  let list: Inspiration[];
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const list = await cloudListInspirationsByProject(projectId);
     try {
-      list = await cloudListInspirationsByProject(projectId);
-      const others = readLocalInspirations().filter(
-        (item) => item.projectId !== projectId,
-      );
-      writeLocalInspirations([...others, ...list]);
+      backupInspirations(await cloudListInspirations());
     } catch {
-      list = readLocalInspirations().filter(
-        (item) => item.projectId === projectId,
-      );
+      // 백업 실패 무시
     }
-  } else {
-    list = readLocalInspirations().filter(
-      (item) => item.projectId === projectId,
-    );
+    return sortInspirations(list, "recent");
   }
 
-  return sortInspirations(list, "recent");
+  return sortInspirations(
+    readLocalInspirations().filter((item) => item.projectId === projectId),
+    "recent",
+  );
 }
 
 export async function readInspirationsByDocument(
@@ -186,17 +189,18 @@ export async function createInspiration(
     updatedAt: timestamp,
   };
 
-  const local = readLocalInspirations();
-  writeLocalInspirations([...local, inspiration]);
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertInspiration(inspiration);
     try {
-      await cloudUpsertInspiration(inspiration);
+      backupInspirations(await cloudListInspirations());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return inspiration;
   }
 
+  writeLocalInspirations([...readLocalInspirations(), inspiration]);
   return inspiration;
 }
 
@@ -204,7 +208,29 @@ export async function updateInspiration(
   id: InspirationId,
   input: InspirationInput,
 ): Promise<Inspiration | null> {
-  const all = await readAllInspirations();
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListInspirations();
+    const index = all.findIndex((item) => item.id === id);
+    if (index < 0) return null;
+
+    const updated: Inspiration = {
+      ...all[index],
+      workTitle: input.workTitle.trim(),
+      author: input.author.trim(),
+      memo: input.memo.trim(),
+      updatedAt: nowIso(),
+    };
+    await cloudUpsertInspiration(updated);
+    try {
+      backupInspirations(await cloudListInspirations());
+    } catch {
+      // 백업 실패 무시
+    }
+    return updated;
+  }
+
+  const all = readLocalInspirations();
   const index = all.findIndex((item) => item.id === id);
   if (index < 0) return null;
 
@@ -215,37 +241,29 @@ export async function updateInspiration(
     memo: input.memo.trim(),
     updatedAt: nowIso(),
   };
-
   const next = [...all];
   next[index] = updated;
   writeLocalInspirations(next);
-
-  if (await canUseCloudDb()) {
-    try {
-      await cloudUpsertInspiration(updated);
-    } catch {
-      // 로컬 백업 유지
-    }
-  }
-
   return updated;
 }
 
 export async function deleteInspiration(id: InspirationId): Promise<boolean> {
-  const all = await readAllInspirations();
-  const exists = all.some((item) => item.id === id);
-  if (!exists) return false;
-
-  writeLocalInspirations(all.filter((item) => item.id !== id));
-
-  if (await canUseCloudDb()) {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const all = await cloudListInspirations();
+    if (!all.some((item) => item.id === id)) return false;
+    await cloudDeleteInspiration(id);
     try {
-      await cloudDeleteInspiration(id);
+      backupInspirations(await cloudListInspirations());
     } catch {
-      // 로컬 백업 유지
+      // 백업 실패 무시
     }
+    return true;
   }
 
+  const all = readLocalInspirations();
+  if (!all.some((item) => item.id === id)) return false;
+  writeLocalInspirations(all.filter((item) => item.id !== id));
   return true;
 }
 

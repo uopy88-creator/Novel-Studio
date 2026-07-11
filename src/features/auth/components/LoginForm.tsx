@@ -85,8 +85,11 @@ export function LoginForm() {
       await signIn({ email: emailValue, password: passwordValue });
       router.replace("/");
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "로그인에 실패했습니다.";
+      console.log("[Novel Studio Auth] LoginForm caught message:", message);
       console.error("[Novel Studio Auth] LoginForm caught", err);
-      setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
+      setError(message);
     } finally {
       setSubmitting(false);
     }

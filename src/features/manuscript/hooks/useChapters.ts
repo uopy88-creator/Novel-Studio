@@ -42,8 +42,13 @@ export function useChapters(projectId: ProjectId): UseChaptersResult {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await refresh();
-      if (!cancelled) setIsReady(true);
+      try {
+        await refresh();
+      } catch {
+        if (!cancelled) setChapters([]);
+      } finally {
+        if (!cancelled) setIsReady(true);
+      }
     })();
     return () => {
       cancelled = true;
