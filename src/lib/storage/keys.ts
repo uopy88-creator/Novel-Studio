@@ -19,6 +19,10 @@ export const CHAPTERS_STORAGE_KEY = "novel-studio:chapters";
 /** 원고 본문 */
 export const MANUSCRIPTS_STORAGE_KEY = "novel-studio:manuscripts";
 
+/** 원고 버전 스냅샷 (명시적 저장 — 자동 저장과 별개) */
+export const MANUSCRIPT_VERSIONS_STORAGE_KEY =
+  "novel-studio:manuscript-versions";
+
 /** 대사 금고 */
 export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
 

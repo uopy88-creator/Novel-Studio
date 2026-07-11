@@ -31,7 +31,10 @@ import { SceneNavigator } from "@/features/manuscript/components/scene-navigator
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
+import { ManuscriptVersionModal } from "@/features/manuscript/components/version-history";
+import { useManuscriptVersions } from "@/features/manuscript/hooks/useManuscriptVersions";
 import { DOCUMENT_KIND_LABELS } from "@/features/manuscript/types/chapter";
+import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import { ContentContainer } from "@/components/layout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -77,6 +80,15 @@ export function ManuscriptWorkspace({
   } = useScenes(projectId, selectedChapterId, content, setContent);
 
   const {
+    versions,
+    isLoading: versionsLoading,
+    isSaving: versionSaving,
+    error: versionError,
+    saveCurrent: saveVersion,
+    rename: renameVersion,
+  } = useManuscriptVersions(projectId, selectedChapterId);
+
+  const {
     create: createInspiration,
     update: updateInspiration,
     remove: removeInspiration,
@@ -94,6 +106,7 @@ export function ManuscriptWorkspace({
   const [deletingInspiration, setDeletingInspiration] =
     useState<Inspiration | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,6 +203,18 @@ export function ManuscriptWorkspace({
     [scrollToOffset],
   );
 
+  const handleSaveVersion = useCallback(() => {
+    void saveVersion(content);
+  }, [saveVersion, content]);
+
+  const handleRestoreVersion = useCallback(
+    (version: ManuscriptVersion) => {
+      setContent(version.content);
+      setVersionModalOpen(false);
+    },
+    [setContent],
+  );
+
   return (
     <ContentContainer width="full" className="max-w-7xl">
       <header className="mb-ns-6 flex flex-col gap-ns-2 sm:flex-row sm:items-end sm:justify-between">
@@ -201,12 +226,40 @@ export function ManuscriptWorkspace({
             있습니다.
           </p>
         </div>
-        {selectedDocument ? (
-          <AutoSaveIndicator
-            status={saveStatus}
-            lastSavedAt={lastSavedAt}
-            className="sm:mb-1"
-          />
+        {selectedDocument || isReady ? (
+          <div className="flex flex-col items-stretch gap-ns-2 sm:items-end">
+            <div className="flex flex-wrap items-center justify-end gap-ns-2">
+              {selectedDocument ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={versionSaving}
+                    onClick={handleSaveVersion}
+                  >
+                    {versionSaving ? "저장 중…" : "현재 버전 저장"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setVersionModalOpen(true)}
+                  >
+                    버전 기록
+                    {versions.length > 0 ? ` (${versions.length})` : ""}
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            {selectedDocument ? (
+              <AutoSaveIndicator
+                status={saveStatus}
+                lastSavedAt={lastSavedAt}
+                className="sm:mb-1"
+              />
+            ) : null}
+          </div>
         ) : null}
       </header>
 
@@ -394,6 +447,21 @@ export function ManuscriptWorkspace({
             await refreshDocInspirations();
           })();
         }}
+      />
+
+      <ManuscriptVersionModal
+        open={versionModalOpen}
+        onClose={() => setVersionModalOpen(false)}
+        versions={versions}
+        isLoading={versionsLoading}
+        isSaving={versionSaving}
+        error={versionError}
+        currentContent={content}
+        onSaveCurrent={handleSaveVersion}
+        onRename={(id, name) => {
+          void renameVersion(id, name);
+        }}
+        onRestore={handleRestoreVersion}
       />
     </ContentContainer>
   );
