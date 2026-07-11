@@ -39,6 +39,9 @@ export type MemoId = EntityId;
 /** 영감 노트 ID */
 export type InspirationId = EntityId;
 
+/** 어휘 금고(Word Treasury) 항목 ID */
+export type WordTreasuryId = EntityId;
+
 /** 집필 세션 ID */
 export type WritingSessionId = EntityId;
 

@@ -62,7 +62,8 @@ cp .env.local.example .env.local
 ### 3. Supabase Auth + Database 준비
 
 1. 아래 **「Supabase Auth 설정」**  
-2. 아래 **「Supabase SQL · RLS 실행」** (`supabase/schema.sql`)
+2. 아래 **「Supabase Migration 적용 방법」**  
+   (`supabase/migrations/20260711000000_init_novel_studio.sql`)
 
 ### 4. 개발 서버
 
@@ -72,9 +73,8 @@ npm run dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 을 엽니다.
 
-- 로그인 후 작품·문서·원고·대사·캐릭터·영감 노트는 **Supabase Database**에 저장됩니다.  
-- LocalStorage는 **오프라인 백업**용입니다.  
-- 오프라인이거나 DB 오류 시 LocalStorage로 폴백합니다.
+- 로그인 후 작품·문서·원고·Writing Vault·캐릭터·영감 노트는 **Supabase Database**에 저장됩니다.  
+- LocalStorage는 **백업/복원** 전용입니다 (로그인 후 CRUD에 사용하지 않음).
 
 ### 5. 품질 확인 (배포 전 권장)
 
@@ -185,67 +185,191 @@ Deploy 하기 **전에** 환경변수를 넣습니다.
 
 ---
 
-## Supabase SQL · RLS 실행 (초보자용)
+## Supabase Migration 적용 방법
 
-작품 데이터를 클라우드에 저장하려면 **테이블 + RLS**를 한 번 실행해야 합니다.
+Table Editor가 **비어 있는** 새 Supabase 프로젝트에 Novel Studio DB를  
+처음부터 만드는 방법입니다. 초보자도 이 순서만 따라 하면 됩니다.
 
-### 1) SQL Editor 열기
+### 가장 흔한 실수 (지금 난 오류)
 
-1. Supabase 대시보드에 로그인합니다.  
-2. 왼쪽 메뉴에서 **SQL Editor** 를 클릭합니다.  
-3. **New query** 를 누릅니다.
+```
+ERROR: syntax error at or near "supabase"
+LINE 1: supabase/migrations/20260711000000_init_novel_studio.sql
+```
 
-### 2) SQL 붙여 넣기
+이 오류는 SQL 파일이 잘못된 게 **아닙니다**.
 
-1. 프로젝트의 `supabase/schema.sql` 파일을 엽니다.  
-2. **전체 내용**을 복사합니다.  
-3. SQL Editor에 붙여 넣습니다.
+- ❌ SQL Editor에 **파일 경로**(`supabase/migrations/...sql`)를 붙여 넣음  
+- ✅ SQL Editor에는 **파일 안의 내용**(SQL 문장)을 붙여 넣어야 함  
 
-이 SQL이 만드는 것:
+붙여 넣은 첫 줄이 아래처럼 **주석으로 시작**해야 합니다.
 
-| 테이블 | 내용 |
+```sql
+-- =============================================================================
+-- Novel Studio — Initial Database Migration
+```
+
+`supabase/migrations/...` 같은 **경로만** 보이면 잘못된 붙여넣기입니다. 지우고 다시 하세요.
+
+### 테이블은 있는데 앱에서 "클라우드 저장에 실패" 할 때
+
+테이블만 만들고 **권한(GRANT)** 이 없으면 저장이 실패합니다.
+
+1. Cursor에서 `supabase/migrations/20260711000001_grant_table_privileges.sql` 파일을 엽니다.  
+2. `Ctrl + A` → `Ctrl + C` (파일 **내용** 전체)  
+3. Supabase **SQL Editor → New query** 에 붙여 넣기  
+4. 첫 줄이 `-- Novel Studio — Table privileges` 인지 확인  
+5. **Run** → Success  
+6. 앱에서 작품 만들기를 다시 시도합니다.
+
+### 준비물
+
+- Supabase 계정과 **프로젝트** (이미 만들어 둔 것)
+- Cursor에서 열 파일:  
+  `supabase/migrations/20260711000000_init_novel_studio.sql`
+- 앱 `.env.local` 에 URL / anon key 가 들어 있는지 확인
+
+### 0단계 — Auth가 켜져 있는지 확인
+
+RLS는 `auth.uid()`(로그인한 사용자 ID)로 동작합니다.
+
+1. Supabase 대시보드 왼쪽 **Authentication**
+2. **Providers** → **Email** 이 켜져 있는지 확인
+3. 개발 중에는 **Confirm email** 을 꺼 두면 가입 직후 로그인하기 쉽습니다
+
+### 1단계 — SQL Editor 열기
+
+1. [https://supabase.com/dashboard](https://supabase.com/dashboard) 에 로그인합니다.  
+2. Novel Studio용 **프로젝트를 선택**합니다.  
+3. 왼쪽 메뉴에서 **SQL Editor** 를 클릭합니다.  
+4. 오른쪽 위(또는 상단) **New query** 를 누릅니다.  
+   - 빈 편집 창이 열리면 성공입니다.
+
+### 2단계 — 파일 “내용” 복사 (경로 아님!)
+
+1. **Cursor** 왼쪽 파일 트리에서 다음을 더블클릭해 **파일을 엽니다.**
+
+```
+supabase
+  └── migrations
+        └── 20260711000000_init_novel_studio.sql
+```
+
+2. 에디터에 SQL이 보이면, 그 안에서:
+
+   - Windows: `Ctrl + A` (전체 선택) → `Ctrl + C` (복사)  
+   - Mac: `Cmd + A` → `Cmd + C`
+
+3. Supabase SQL Editor 빈 칸을 클릭한 뒤 붙여 넣습니다.
+
+   - Windows: `Ctrl + V`  
+   - Mac: `Cmd + V`
+
+4. **확인:** SQL Editor 맨 위가 이렇게 보이면 성공입니다.
+
+```text
+-- =============================================================================
+-- Novel Studio — Initial Database Migration
+-- =============================================================================
+```
+
+5. **실패 예:** 맨 위가 아래처럼 보이면 잘못된 것입니다. 전부 지우고 2단계부터 다시.
+
+```text
+supabase/migrations/20260711000000_init_novel_studio.sql
+```
+
+> 경로 이름만 복사하지 마세요.  
+> **파일 안에 있는 `create table ...` 같은 SQL 전체**를 복사해야 합니다.
+
+### 3단계 — Run 실행
+
+1. SQL Editor 오른쪽 아래(또는 하단) **Run** 버튼을 누릅니다.  
+2. 몇 초 기다립니다.  
+3. 아래에 **Success** / 성공 메시지가 보이면 완료입니다.  
+4. 빨간 에러가 나면:
+   - 맨 위가 `-- Novel Studio` 주석인지 다시 확인
+   - SQL을 지우고 **파일 내용 전체**를 다시 붙여 넣었는지 확인
+   - 프로젝트를 잘못 고르지 않았는지 확인
+
+같은 SQL을 **다시 Run** 해도 되도록 작성되어 있습니다  
+(`create table if not exists`, `drop policy if exists`).
+
+### 4단계 — Table Editor에서 확인
+
+1. 왼쪽 메뉴 **Table Editor** 를 엽니다.  
+2. 왼쪽에 아래 테이블이 보이면 성공입니다.
+
+| 테이블 | 역할 |
 |--------|------|
 | `projects` | 작품 |
-| `documents` | 문서(목차) |
+| `documents` | Document(목차) — Manuscript가 참조 |
 | `manuscripts` | 원고 본문 |
-| `dialogues` | 대사 금고 |
-| `characters` | 인물 프로필 |
+| `manuscript_versions` | 원고 버전 Snapshot (명시적 저장) |
+| `scenes` | Scene 상태·메모·접힘 |
+| `characters` | 인물 |
+| `memos` | 메모 |
+| `writing_vault` | Writing Vault (대사·문장) |
 | `inspirations` | 영감 노트 |
+| `foreshadowings` | 복선 |
+| `word_treasury` | 어휘 금고 |
 
-각 행에는 `user_id`가 있고, **본인 데이터만** 보이도록 RLS가 켜집니다.
+3. 각 테이블을 클릭했을 때 행이 비어 있어도 정상입니다.  
+   (앱에서 작품을 만들면 데이터가 들어갑니다.)
 
-이미 예전에 `schema.sql` 을 실행했다면, 추가분만 필요할 수 있습니다.
+### 5단계 — RLS(보안) 확인
 
-- `supabase/characters.sql`  
-- `supabase/inspirations.sql`
+1. Table Editor에서 예: `projects` 테이블을 선택합니다.  
+2. 오른쪽 위 **…** 또는 테이블 설정에서 **RLS enabled** 인지 확인합니다.  
+   (Migration이 `enable row level security` 를 실행합니다.)  
+3. **Authentication → Users** 에 본인 계정이 있는지 확인합니다.  
+4. 앱에서 **회원가입/로그인** 후 작품을 하나 만듭니다.  
+5. Table Editor → `projects` 를 새로고침하면 행이 보여야 합니다.  
+6. 그 행의 `user_id` 가 **Authentication → Users** 의 본인 UUID 와 같으면  
+   “내 데이터만” 정책이 동작하는 것입니다.
 
-### 3) Run 실행
+### 6단계 — 앱에서 최종 확인
 
-1. 오른쪽 아래(또는 상단) **Run** 버튼을 누릅니다.  
-2. 성공 메시지(Success)가 보이면 완료입니다.  
-3. 같은 SQL을 다시 실행해도 되도록 `if not exists` / `drop policy if exists` 를 넣어 두었습니다.
+1. `.env.local` 의 URL / anon key 가 **방금 Migration을 실행한 프로젝트**와 같은지 확인  
+2. `npm run dev` 실행  
+3. 로그인 → 작품 생성 → Chapters에서 Document 생성 → Manuscript에 글 작성  
+4. 다른 기기(또는 시크릿 창)에서 **같은 계정**으로 로그인했을 때  
+   같은 작품·원고가 보이면 DB 연결이 완료된 것입니다.
 
-### 4) RLS가 켜졌는지 확인
+### 자주 하는 실수
 
-1. 왼쪽 **Table Editor** 를 엽니다.  
-2. 위 테이블들이 보이는지 확인합니다.  
-3. 앱에서 로그인한 뒤 작품을 만들어 봅니다.  
-4. Table Editor에서 해당 행의 `user_id`가 본인 사용자 UUID와 같은지 확인합니다.
+| 증상 | 원인 / 해결 |
+|------|-------------|
+| `syntax error at or near "supabase"` | **파일 경로**를 붙여 넣음 → 경로 지우고 **파일 내용**(SQL) 전체를 다시 붙여 넣기 |
+| Table Editor가 계속 비어 있음 | Migration을 Run 하지 않음 → 1~3단계 다시 |
+| `relation does not exist` | SQL 일부만 실행됨 → 파일 **내용 전체** 다시 Run |
+| 작품이 저장 안 됨 / 권한 오류 | RLS·로그인 확인, Confirm email 때문에 세션이 없을 수 있음 |
+| PC와 iPad 데이터가 다름 | 예전에 LocalStorage만 쓰던 데이터 → 로그인 후 **다시 저장** 필요 |
+| 다른 프로젝트 Table Editor를 봄 | 대시보드 상단에서 프로젝트 이름 확인 |
+| Vercel만 실패 | Vercel 환경변수가 이 Supabase 프로젝트와 같은지, Redeploy 했는지 |
 
-### 5) RLS 정책이 하는 일 (개념)
+### (참고) CLI로 적용하는 경우
 
-- `auth.uid()` = 지금 로그인한 사용자 ID  
-- 각 테이블의 `user_id`와 같을 때만 **조회·추가·수정·삭제** 가능  
+Supabase CLI를 쓰는 경우:
 
-### 6) 자주 하는 실수
+```bash
+supabase db push
+```
 
-| 증상 | 확인 |
+또는 SQL Editor 방식이 가장 확실합니다 (초보자 권장).
+
+### (참고) 예전 SQL 파일
+
+| 경로 | 상태 |
 |------|------|
-| 작품이 저장 안 됨 | `schema.sql` 을 Run 했는지 |
-| 빈 목록만 보임 | 다른 계정으로 로그인했는지 (`user_id` 분리) |
-| 권한 오류 | RLS 정책이 생성됐는지, Email Auth로 로그인했는지 |
-| 로컬에만 남음 | 오프라인이거나 환경변수 미설정 → LocalStorage 폴백 |
-| Vercel만 실패 | 환경변수 미등록 또는 Redeploy 안 함 |
+| `supabase/migrations/20260711000000_init_novel_studio.sql` | **권장 — 기본 테이블** |
+| `supabase/migrations/20260711000001_grant_table_privileges.sql` | 권한 (필요 시) |
+| `supabase/migrations/20260711000002_writing_vault_expand.sql` | Writing Vault 확장 |
+| `supabase/migrations/20260711000003_manuscript_versions.sql` | 원고 버전 Snapshot |
+| `supabase/migration_full_cloud.sql` | 구버전 안내용 (이름·테이블이 다를 수 있음) |
+| `supabase/schema.sql` | 구버전 참고용 |
+
+새 프로젝트는 **init SQL** 후, 필요한 추가 migration을 순서대로 실행하세요.
 
 ---
 
@@ -254,16 +378,17 @@ Deploy 하기 **전에** 환경변수를 넣습니다.
 | 구분 | 현재 |
 |------|------|
 | 로그인 | Supabase Auth |
-| Project / Documents / Manuscript / Dialogue / Characters / Inspiration | Supabase DB (온라인) + LocalStorage 백업 |
-| Memo / Foreshadowing 등 | Coming soon (LocalStorage 자리만) |
+| 작품 데이터 전체 | **Supabase Database** (주 저장소) |
+| LocalStorage | 클라우드 성공 후 **백업** + 명시적 복원용 |
+| Memo / Foreshadowing / Word Treasury UI | Coming soon (테이블·저장 계층은 준비됨) |
 
 | 경로 | 역할 |
 |------|------|
-| `supabase/schema.sql` | 테이블 + RLS |
+| `supabase/migrations/` | **권장** — DB Migration (테이블 + RLS) |
 | `src/database/supabase/` | DB 리포지토리 · 매핑 |
-| `src/features/*/lib/*-storage.ts` | Cloud 우선 + 로컬 백업 |
+| `src/features/*/lib/*-storage.ts` | Cloud CRUD + 백업 쓰기 |
+| `src/lib/storage/backup.ts` | 백업 내보내기/복원 헬퍼 |
 | `src/lib/supabase/` | Supabase 클라이언트 |
-| `next.config.ts` | Next / Vercel 빌드 설정 |
 
 ---
 
