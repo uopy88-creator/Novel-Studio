@@ -4,18 +4,22 @@
  * =============================================================================
  * useProjectSearch
  * -----------------------------------------------------------------------------
- * 쿼리 디바운스 → searchProject 호출. 로딩/에러/그룹 결과 관리.
+ * 쿼리 디바운스(~200ms) → SearchService 호출.
  * =============================================================================
  */
 
 import { useEffect, useState } from "react";
 import type { ProjectId } from "@/types/ids";
 import type { SearchResultGroup } from "@/features/global-search/types/search";
-import { searchProject } from "@/features/global-search/lib/search-project";
+import { searchService } from "@/features/global-search/lib/search-service";
 
-const DEBOUNCE_MS = 180;
+const DEBOUNCE_MS = 200;
 
-export function useProjectSearch(projectId: ProjectId, query: string) {
+export function useProjectSearch(
+  projectId: ProjectId,
+  query: string,
+  projectName = "",
+) {
   const [groups, setGroups] = useState<SearchResultGroup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +38,10 @@ export function useProjectSearch(projectId: ProjectId, query: string) {
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const next = await searchProject(projectId, trimmed);
+          const next = await searchService.search(projectId, trimmed, {
+            projectName,
+            mode: "keyword",
+          });
           if (cancelled) return;
           setGroups(next);
           setError(null);
@@ -55,7 +62,7 @@ export function useProjectSearch(projectId: ProjectId, query: string) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [projectId, query]);
+  }, [projectId, query, projectName]);
 
   return { groups, isSearching, error };
 }

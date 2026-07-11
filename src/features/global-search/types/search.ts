@@ -2,8 +2,8 @@
  * =============================================================================
  * Global Search — 타입
  * -----------------------------------------------------------------------------
- * 프로젝트 전체를 한 번에 검색한다.
- * 결과는 종류별 그룹으로 보여 주고, 클릭 시 해당 위치로 이동한다.
+ * 확장 가능한 검색 인덱스 / 결과 모델.
+ * 향후 AI 검색 프로바이더도 같은 SearchResultItem 을 반환하면 된다.
  * =============================================================================
  */
 
@@ -27,8 +27,8 @@ export const SEARCH_GROUP_META: Record<
   character: { label: "Character", icon: "👤", order: 3 },
   "writing-vault": { label: "Writing Vault", icon: "💎", order: 4 },
   memo: { label: "Memo", icon: "📝", order: 5 },
-  foreshadowing: { label: "복선", icon: "🎯", order: 6 },
-  reference: { label: "작품(Reference)", icon: "📚", order: 7 },
+  foreshadowing: { label: "Foreshadowing", icon: "📌", order: 6 },
+  reference: { label: "Reference", icon: "📚", order: 7 },
 };
 
 /** 표시 순서대로 정렬된 종류 목록 */
@@ -36,15 +36,30 @@ export const SEARCH_KIND_ORDER: SearchResultKind[] = (
   Object.keys(SEARCH_GROUP_META) as SearchResultKind[]
 ).sort((a, b) => SEARCH_GROUP_META[a].order - SEARCH_GROUP_META[b].order);
 
-export interface SearchResultItem {
-  /** 리스트 키 (종류+대상 id+오프셋 등) */
+/**
+ * 검색 인덱스에 들어가는 문서 단위.
+ * 종류가 늘어나면 이 형태로만 추가하면 SearchService 가 처리한다.
+ */
+export interface SearchDocument {
   id: string;
   kind: SearchResultKind;
-  /** 메인 제목 */
   title: string;
-  /** 미리보기 / 부제 */
+  /** 검색·미리보기용 본문 */
+  body: string;
+  projectId: string;
+  projectName: string;
+  href: string;
+}
+
+/** UI 한 행 */
+export interface SearchResultItem {
+  id: string;
+  kind: SearchResultKind;
+  title: string;
+  /** 미리보기 (최대 2줄 표시) */
   preview: string;
-  /** 이동 경로 (쿼리 포함) */
+  /** 소속 작품명 */
+  projectName: string;
   href: string;
 }
 
@@ -59,4 +74,11 @@ export interface SearchResultGroup {
 export interface RecentSearchEntry {
   query: string;
   searchedAt: string;
+}
+
+/** SearchService 옵션 — AI 검색 확장 시 mode 등 추가 */
+export interface SearchOptions {
+  projectName?: string;
+  /** 향후: "keyword" | "ai" */
+  mode?: "keyword" | "ai";
 }

@@ -119,6 +119,7 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
         open={searchOpen}
         onClose={closeSearch}
         projectId={projectId}
+        projectName={projectTitle}
       />
     </div>
   );

@@ -69,7 +69,7 @@ export function Header({
           )}
           aria-label="프로젝트 검색 (Ctrl+K)"
         >
-          <span aria-hidden>⌕</span>
+          <span aria-hidden>🔍</span>
           <span className="hidden sm:inline">검색</span>
           <kbd className="hidden rounded border border-ns-border px-1 py-px text-ns-xs text-ns-ink-tertiary md:inline">
             Ctrl+K

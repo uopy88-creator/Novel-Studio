@@ -15,7 +15,7 @@ import {
   writeJsonArray,
 } from "@/lib/storage/browser";
 
-const MAX_RECENT = 8;
+const MAX_RECENT = 10;
 
 interface StoredRecentBucket {
   projectId: string;
