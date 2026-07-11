@@ -11,18 +11,30 @@ import type {
   DocumentKind,
 } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
+import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
+import type { Memo, MemoKind } from "@/features/memo/types/memo";
+import type {
+  Foreshadowing,
+  ForeshadowingStatus,
+} from "@/features/foreshadowing/types/foreshadowing";
+import type { WordTreasuryEntry } from "@/features/word-treasury/types/word-treasury";
 import type {
   DbCharacterRow,
   DbDialogueRow,
   DbDocumentRow,
+  DbForeshadowingRow,
   DbInspirationRow,
   DbManuscriptRow,
+  DbManuscriptVersionRow,
+  DbMemoRow,
   DbProjectRow,
+  DbWordTreasuryRow,
 } from "@/database/supabase/types";
 import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
+import type { CharacterId, ChapterId, ForeshadowingId } from "@/types/ids";
 
 export function projectToRow(project: Project, userId: string): DbProjectRow {
   return {
@@ -112,13 +124,56 @@ export function rowToManuscript(row: DbManuscriptRow): Manuscript {
   };
 }
 
+export function manuscriptVersionToRow(
+  version: ManuscriptVersion,
+  userId: string,
+): DbManuscriptVersionRow {
+  return {
+    id: version.id,
+    project_id: version.projectId,
+    document_id: version.chapterId,
+    manuscript_id: version.manuscriptId,
+    user_id: userId,
+    version_number: version.versionNumber,
+    name: version.name,
+    content: version.content,
+    plain_text: version.plainText,
+    word_count: version.wordCount,
+    created_at: version.createdAt,
+    updated_at: version.updatedAt,
+  };
+}
+
+export function rowToManuscriptVersion(
+  row: DbManuscriptVersionRow,
+): ManuscriptVersion {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    chapterId: row.document_id,
+    manuscriptId: row.manuscript_id,
+    versionNumber: row.version_number,
+    name: row.name ?? "",
+    content: row.content,
+    plainText: row.plain_text,
+    wordCount: row.word_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function dialogueToRow(dialogue: Dialogue, userId: string): DbDialogueRow {
   return {
     id: dialogue.id,
     project_id: dialogue.projectId,
     user_id: userId,
+    entry_type: dialogue.type,
+    title: dialogue.title ?? "",
     content: dialogue.content,
     tags: dialogue.tags,
+    reference_work_title: dialogue.reference?.workTitle ?? "",
+    reference_author: dialogue.reference?.author ?? "",
+    reference_memo: dialogue.reference?.memo ?? "",
     is_favorite: dialogue.isFavorite,
     created_at: dialogue.createdAt,
     updated_at: dialogue.updatedAt,
@@ -126,11 +181,22 @@ export function dialogueToRow(dialogue: Dialogue, userId: string): DbDialogueRow
 }
 
 export function rowToDialogue(row: DbDialogueRow): Dialogue {
+  const rawType = (row as DbDialogueRow & { entry_type?: string }).entry_type;
+  const entryType =
+    rawType === "word" || rawType === "idea" ? rawType : "sentence";
+
   return {
     id: row.id,
     projectId: row.project_id,
+    type: entryType,
+    title: row.title ?? "",
     content: row.content,
     tags: row.tags ?? [],
+    reference: {
+      workTitle: row.reference_work_title ?? "",
+      author: row.reference_author ?? "",
+      memo: row.reference_memo ?? "",
+    },
     isFavorite: row.is_favorite,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -216,6 +282,122 @@ export function rowToInspiration(row: DbInspirationRow): Inspiration {
     memo: row.memo ?? "",
     startOffset: row.start_offset ?? 0,
     endOffset: row.end_offset ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function memoToRow(memo: Memo, userId: string): DbMemoRow {
+  return {
+    id: memo.id,
+    project_id: memo.projectId,
+    user_id: userId,
+    body: memo.body,
+    kind: memo.kind,
+    is_pinned: memo.isPinned,
+    is_resolved: memo.isResolved,
+    document_id: memo.chapterId ?? null,
+    character_id: memo.characterId ?? null,
+    foreshadowing_id: memo.foreshadowingId ?? null,
+    tags: memo.tags ?? [],
+    created_at: memo.createdAt,
+    updated_at: memo.updatedAt,
+  };
+}
+
+export function rowToMemo(row: DbMemoRow): Memo {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    body: row.body ?? "",
+    kind: (row.kind as MemoKind) || "note",
+    isPinned: Boolean(row.is_pinned),
+    isResolved: Boolean(row.is_resolved),
+    chapterId: (row.document_id as ChapterId | null) ?? undefined,
+    characterId: (row.character_id as CharacterId | null) ?? undefined,
+    foreshadowingId:
+      (row.foreshadowing_id as ForeshadowingId | null) ?? undefined,
+    tags: row.tags ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function wordTreasuryToRow(
+  entry: WordTreasuryEntry,
+  userId: string,
+): DbWordTreasuryRow {
+  return {
+    id: entry.id,
+    project_id: entry.projectId,
+    user_id: userId,
+    word: entry.word,
+    meaning: entry.meaning,
+    example: entry.example,
+    note: entry.note,
+    tags: entry.tags ?? [],
+    is_favorite: entry.isFavorite,
+    created_at: entry.createdAt,
+    updated_at: entry.updatedAt,
+  };
+}
+
+export function rowToWordTreasury(row: DbWordTreasuryRow): WordTreasuryEntry {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    word: row.word ?? "",
+    meaning: row.meaning ?? "",
+    example: row.example ?? "",
+    note: row.note ?? "",
+    tags: row.tags ?? [],
+    isFavorite: Boolean(row.is_favorite),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function clampImportance(value: number): 1 | 2 | 3 | 4 | 5 {
+  const n = Math.round(value);
+  if (n <= 1) return 1;
+  if (n === 2) return 2;
+  if (n === 3) return 3;
+  if (n === 4) return 4;
+  return 5;
+}
+
+export function foreshadowingToRow(
+  item: Foreshadowing,
+  userId: string,
+): DbForeshadowingRow {
+  return {
+    id: item.id,
+    project_id: item.projectId,
+    user_id: userId,
+    title: item.title,
+    description: item.description ?? null,
+    status: item.status,
+    planted_document_id: item.plantedChapterId ?? null,
+    payoff_document_id: item.payoffChapterId ?? null,
+    related_character_ids: item.relatedCharacterIds ?? [],
+    importance: item.importance,
+    created_at: item.createdAt,
+    updated_at: item.updatedAt,
+  };
+}
+
+export function rowToForeshadowing(row: DbForeshadowingRow): Foreshadowing {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    title: row.title ?? "",
+    description: row.description ?? undefined,
+    status: (row.status as ForeshadowingStatus) || "planned",
+    plantedChapterId:
+      (row.planted_document_id as ChapterId | null) ?? undefined,
+    payoffChapterId: (row.payoff_document_id as ChapterId | null) ?? undefined,
+    relatedCharacterIds: (row.related_character_ids ?? []) as CharacterId[],
+    importance: clampImportance(row.importance ?? 3),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

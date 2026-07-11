@@ -13,9 +13,19 @@ export {
   type DbCharacterRow,
   type DbDialogueRow,
   type DbDocumentRow,
+  type DbForeshadowingRow,
   type DbInspirationRow,
   type DbManuscriptRow,
+  type DbManuscriptVersionRow,
+  type DbMemoRow,
   type DbProjectRow,
+  type DbWordTreasuryRow,
 } from "./supabase/types";
 
-export { canUseCloudDb, getCloudUserId } from "./supabase/cloud-mode";
+export {
+  canUseCloudDb,
+  getCloudUserId,
+  isSupabaseDataMode,
+  requireCloudDb,
+  requireCloudUserId,
+} from "./supabase/cloud-mode";

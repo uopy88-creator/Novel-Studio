@@ -1,14 +1,8 @@
 /**
  * =============================================================================
- * Database 테이블 타입
+ * Database 테이블 타입 (Supabase Postgres ↔ TypeScript)
  * -----------------------------------------------------------------------------
- * Supabase Postgres 스키마와 1:1.
- *
- * users ← auth.users (Supabase Auth)
- * projects → user_id
- * documents → project_id   (로컬 Chapter)
- * manuscripts → document_id
- * dialogues → project_id
+ * snake_case = DB 컬럼, camelCase = 앱 도메인 (mappers.ts 에서 변환)
  * =============================================================================
  */
 
@@ -24,7 +18,7 @@ export interface DbProjectRow {
   updated_at: string;
 }
 
-/** documents (로컬 Chapter) */
+/** documents (앱의 Chapter / Document) */
 export interface DbDocumentRow {
   id: string;
   project_id: string;
@@ -53,13 +47,19 @@ export interface DbManuscriptRow {
   updated_at: string;
 }
 
-/** dialogues */
+/** writing_vault (Writing Vault / 구 dialogues) */
 export interface DbDialogueRow {
   id: string;
   project_id: string;
   user_id: string;
+  /** sentence | word | idea */
+  entry_type: string;
+  title: string;
   content: string;
   tags: string[];
+  reference_work_title: string;
+  reference_author: string;
+  reference_memo: string;
   is_favorite: boolean;
   created_at: string;
   updated_at: string;
@@ -103,13 +103,97 @@ export interface DbInspirationRow {
   updated_at: string;
 }
 
+/** memos */
+export interface DbMemoRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  body: string;
+  kind: string;
+  is_pinned: boolean;
+  is_resolved: boolean;
+  document_id: string | null;
+  character_id: string | null;
+  foreshadowing_id: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** word_treasury */
+export interface DbWordTreasuryRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  word: string;
+  meaning: string;
+  example: string;
+  note: string;
+  tags: string[];
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** foreshadowings */
+export interface DbForeshadowingRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  planted_document_id: string | null;
+  payoff_document_id: string | null;
+  related_character_ids: string[];
+  importance: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** scene_metas 행 타입 — DB 테이블명은 `scenes` */
+export type DbSceneMetaRow = {
+  id: string;
+  user_id: string;
+  project_id: string;
+  document_id: string;
+  scene_number: number;
+  status: string;
+  memo: string;
+  is_collapsed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** manuscript_versions — 명시적 스냅샷 (자동 저장과 별개) */
+export interface DbManuscriptVersionRow {
+  id: string;
+  project_id: string;
+  document_id: string;
+  manuscript_id: string;
+  user_id: string;
+  version_number: number;
+  name: string;
+  content: string;
+  plain_text: string;
+  word_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 /** 테이블 이름 — SQL / 리포지토리에서 동일하게 사용 */
 export const DB_TABLES = {
   projects: "projects",
   documents: "documents",
   manuscripts: "manuscripts",
-  dialogues: "dialogues",
+  manuscript_versions: "manuscript_versions",
+  /** Writing Vault (구 dialogues) */
+  dialogues: "writing_vault",
   characters: "characters",
   inspirations: "inspirations",
   memos: "memos",
+  word_treasury: "word_treasury",
+  foreshadowings: "foreshadowings",
+  /** Scene 메타 (구 scene_metas) */
+  scene_metas: "scenes",
 } as const;
