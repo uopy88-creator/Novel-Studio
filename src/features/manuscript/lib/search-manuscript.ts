@@ -1,64 +1,106 @@
 /**
- * =============================================================================
- * 원고 내 검색
- * -----------------------------------------------------------------------------
- * plain text 기준으로 대소문자 구분 없이 모든 출현 위치를 찾는다.
- * =============================================================================
+ * 원고 검색 — 단어 / 문장(구문) 모드
  */
 
+export type ManuscriptSearchMode = "word" | "sentence";
+
 export interface ManuscriptSearchMatch {
-  /** 결과 목록용 순번 (1부터) */
   index: number;
-  /** content 안 시작 오프셋 */
   start: number;
-  /** content 안 끝 오프셋 (미포함) */
   end: number;
-  /** 주변 문맥 미리보기 */
   preview: string;
 }
 
 const PREVIEW_RADIUS = 28;
 
-/**
- * query가 비어 있으면 빈 배열.
- * 겹치지 않는 순차 매치를 모두 반환한다.
- */
-export function findManuscriptMatches(
+function buildPreview(content: string, start: number, end: number): string {
+  const previewStart = Math.max(0, start - PREVIEW_RADIUS);
+  const previewEnd = Math.min(content.length, end + PREVIEW_RADIUS);
+  const slice = content.slice(previewStart, previewEnd);
+  return (
+    (previewStart > 0 ? "…" : "") +
+    slice +
+    (previewEnd < content.length ? "…" : "")
+  );
+}
+
+/** 문장·구문 검색 — 대소문자 무시 부분 문자열(모든 출현) */
+function findSentenceMatches(
   content: string,
   query: string,
 ): ManuscriptSearchMatch[] {
-  const trimmed = query.trim();
-  if (!trimmed || !content) return [];
-
   const haystack = content.toLowerCase();
-  const needle = trimmed.toLowerCase();
+  const needle = query.toLowerCase();
   const matches: ManuscriptSearchMatch[] = [];
-  let from = 0;
   let index = 1;
+  let from = 0;
 
-  while (from <= haystack.length) {
-    const found = haystack.indexOf(needle, from);
-    if (found < 0) break;
+  while (from <= haystack.length - needle.length) {
+    const foundAt = haystack.indexOf(needle, from);
+    if (foundAt < 0) break;
 
-    const start = found;
-    const end = found + needle.length;
-    const previewStart = Math.max(0, start - PREVIEW_RADIUS);
-    const previewEnd = Math.min(content.length, end + PREVIEW_RADIUS);
-    const slice = content.slice(previewStart, previewEnd);
-
+    const start = foundAt;
+    const end = start + query.length;
     matches.push({
       index,
       start,
       end,
-      preview:
-        (previewStart > 0 ? "…" : "") +
-        slice +
-        (previewEnd < content.length ? "…" : ""),
+      preview: buildPreview(content, start, end),
     });
-
     index += 1;
-    from = end;
+    from = foundAt + Math.max(1, needle.length);
   }
 
   return matches;
+}
+
+/** 단어 단위 — 유니코드 글자 경계를 최대한 존중 */
+function findWordMatches(
+  content: string,
+  query: string,
+): ManuscriptSearchMatch[] {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // 앞뒤가 글자/숫자가 아닐 때만 매치 (한글·영문 공통)
+  const re = new RegExp(
+    `(^|[^\\p{L}\\p{N}_])(${escaped})(?=[^\\p{L}\\p{N}_]|$)`,
+    "giu",
+  );
+  const matches: ManuscriptSearchMatch[] = [];
+  let index = 1;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(content)) !== null) {
+    const prefix = match[1] ?? "";
+    const start = match.index + prefix.length;
+    const end = start + query.length;
+    matches.push({
+      index,
+      start,
+      end,
+      preview: buildPreview(content, start, end),
+    });
+    index += 1;
+    if (match.index === re.lastIndex) re.lastIndex += 1;
+  }
+
+  return matches;
+}
+
+/**
+ * mode
+ * - word: 단어 경계 매치
+ * - sentence: 문장·구문(부분 문자열) 검색
+ */
+export function findManuscriptMatches(
+  content: string,
+  query: string,
+  mode: ManuscriptSearchMode = "sentence",
+): ManuscriptSearchMatch[] {
+  const trimmed = query.trim();
+  if (!trimmed || !content) return [];
+
+  if (mode === "word") {
+    return findWordMatches(content, trimmed);
+  }
+  return findSentenceMatches(content, trimmed);
 }

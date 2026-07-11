@@ -15,4 +15,7 @@ export { ManuscriptEditor } from "./components/ManuscriptEditor";
 export { SearchBar } from "./components/SearchBar";
 export { StatisticsPanel } from "./components/StatisticsPanel";
 export { AutoSaveIndicator } from "./components/AutoSaveIndicator";
+export { SceneNavigator } from "./components/scene-navigator";
 export { useManuscript } from "./hooks/useManuscript";
+export { useScenes } from "./hooks/useScenes";
+export type { Scene, SceneDelimiterConfig } from "./types/scene";

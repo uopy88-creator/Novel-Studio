@@ -25,6 +25,10 @@ export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
 /** 메모 (Dashboard 읽기 · CRUD 준비 — LocalStorage 백업 전용 키) */
 export const MEMOS_STORAGE_KEY = "novel-studio:memos";
 
+/** Scene 구분자 설정 (#1, #2 …) — Settings 연동용 */
+export const SCENE_DELIMITER_SETTINGS_KEY =
+  "novel-studio:scene-delimiter-settings";
+
 /** 캐릭터 프로필 */
 export const CHARACTERS_STORAGE_KEY = "novel-studio:characters";
 
@@ -36,6 +40,9 @@ export const WORD_TREASURY_STORAGE_KEY = "novel-studio:word-treasury";
 
 /** 복선 (Foreshadowing) — LocalStorage 백업 전용 */
 export const FORESHADOWINGS_STORAGE_KEY = "novel-studio:foreshadowings";
+
+/** Scene 상태·메모·접힘 (원고와 분리, export 제외) */
+export const SCENE_METAS_STORAGE_KEY = "novel-studio:scene-metas";
 
 /** 사이드바 접힘 상태 */
 export const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";
