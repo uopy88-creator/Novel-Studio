@@ -9,6 +9,10 @@
  */
 
 import type { Character } from "@/features/characters/types/character";
+import {
+  extractCharacterOccupation,
+  extractCharacterSubtitle,
+} from "@/features/characters/lib/character-template";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
@@ -73,11 +77,15 @@ export function CharacterCard({
             </h3>
           </div>
           <p className="text-ns-sm text-ns-ink-secondary">
-            {character.role || "역할 미정"}
+            {extractCharacterSubtitle(character.content) ||
+              character.role ||
+              "프로필"}
           </p>
-          {character.occupation ? (
+          {extractCharacterOccupation(character.content) ||
+          character.occupation ? (
             <p className="text-ns-xs text-ns-ink-tertiary">
-              {character.occupation}
+              {extractCharacterOccupation(character.content) ||
+                character.occupation}
             </p>
           ) : null}
         </div>

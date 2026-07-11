@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import type { Character } from "@/features/characters/types/character";
+import { extractCharacterSubtitle } from "@/features/characters/lib/character-template";
 import { studioPath } from "@/components/layout/nav-items";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
@@ -67,7 +68,9 @@ export function FeaturedCharacterCard({
             ) : null}
           </div>
           <p className="mt-ns-1 truncate text-ns-xs text-ns-ink-secondary">
-            {character.role || "역할 미정"}
+            {extractCharacterSubtitle(character.content) ||
+              character.role ||
+              "프로필"}
           </p>
         </div>
       </Card>

@@ -71,6 +71,8 @@ export interface DbCharacterRow {
   project_id: string;
   user_id: string;
   name: string;
+  /** 자유 형식 프로필 본문 (마이그레이션 전 행은 없을 수 있음) */
+  content?: string;
   role: string;
   age: string;
   gender: string;

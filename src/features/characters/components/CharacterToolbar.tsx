@@ -38,7 +38,7 @@ export function CharacterToolbar({
           label="검색"
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="이름으로 검색"
+          placeholder="이름·본문으로 검색"
           hint={searchQuery.trim() ? `${resultCount}명` : undefined}
         />
       </div>

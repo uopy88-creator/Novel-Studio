@@ -34,6 +34,7 @@ import type {
   DbWordTreasuryRow,
 } from "@/database/supabase/types";
 import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
+import { buildContentFromLegacyFields } from "@/features/characters/lib/character-template";
 import type { CharacterId, ChapterId, ForeshadowingId } from "@/types/ids";
 
 export function projectToRow(project: Project, userId: string): DbProjectRow {
@@ -212,6 +213,7 @@ export function characterToRow(
     project_id: character.projectId,
     user_id: userId,
     name: character.name,
+    content: character.content,
     role: character.role,
     age: character.age,
     gender: character.gender,
@@ -230,10 +232,26 @@ export function characterToRow(
 }
 
 export function rowToCharacter(row: DbCharacterRow): Character {
+  const content =
+    typeof row.content === "string" && row.content.trim().length > 0
+      ? row.content
+      : buildContentFromLegacyFields({
+          name: row.name,
+          role: row.role,
+          age: row.age,
+          gender: row.gender,
+          occupation: row.occupation,
+          personality: row.personality,
+          goal: row.goal,
+          secret: row.secret,
+          memo: row.memo,
+        });
+
   return {
     id: row.id,
     projectId: row.project_id,
     name: row.name,
+    content,
     role: row.role ?? "",
     age: row.age ?? "",
     gender: row.gender ?? "",

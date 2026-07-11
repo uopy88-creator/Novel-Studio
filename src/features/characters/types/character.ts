@@ -46,36 +46,45 @@ export const DEFAULT_CHARACTER_COLOR = "#2563eb";
  * 관계
  * - Project 1 ── * Character
  * - Manuscript @멘션으로 이름을 참조
+ *
+ * 프로필 본문은 `content` 자유 텍스트 에디터로 관리한다.
+ * role/age/… 레거시 필드는 content에서 동기화해 목록·멘션 호환을 유지한다.
  */
 export interface Character extends Timestamps {
   id: CharacterId;
   projectId: ProjectId;
 
-  /** 이름 (필수) */
+  /** 이름 (필수) — content의 `이름 :` 과 동기화, @멘션 키 */
   name: string;
 
-  /** 역할 (주인공/조연 등 — 자유 텍스트) */
+  /**
+   * 자유 형식 프로필 본문.
+   * 새 캐릭터는 CHARACTER_CONTENT_TEMPLATE 로 시작한다.
+   */
+  content: string;
+
+  /** @deprecated content의 `별명 :` 동기화값 — 목록 부제 호환 */
   role: string;
 
-  /** 나이 */
+  /** @deprecated content의 `나이 :` 동기화값 */
   age: string;
 
-  /** 성별 */
+  /** @deprecated content의 `성별 :` 동기화값 (있을 때만) */
   gender: string;
 
-  /** 직업 */
+  /** @deprecated content의 `직업 :` 동기화값 */
   occupation: string;
 
-  /** 성격 */
+  /** @deprecated content의 `성격 :` 동기화값 */
   personality: string;
 
-  /** 목표 */
+  /** @deprecated content의 `목표 :` 동기화값 */
   goal: string;
 
-  /** 비밀 */
+  /** @deprecated content의 `비밀 :` 동기화값 */
   secret: string;
 
-  /** 메모 */
+  /** @deprecated content의 `메모 :` 동기화값 */
   memo: string;
 
   /**

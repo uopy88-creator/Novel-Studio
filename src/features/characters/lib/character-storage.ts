@@ -6,6 +6,12 @@
 
 import type { Character } from "@/features/characters/types/character";
 import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
+import {
+  buildContentFromLegacyFields,
+  CHARACTER_CONTENT_TEMPLATE,
+  extractCharacterName,
+  syncLegacyFieldsFromContent,
+} from "@/features/characters/lib/character-template";
 import type { CharacterId, ProjectId } from "@/types/ids";
 import {
   isSupabaseDataMode,
@@ -22,21 +28,55 @@ import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { CHARACTERS_STORAGE_KEY };
+export { CHARACTER_CONTENT_TEMPLATE };
 
 export type CharacterSortMode = "favorite" | "name" | "updated";
 
+/** 생성·수정 입력 — 본문은 자유 에디터, 메타는 이미지·색상 */
 export interface CharacterInput {
-  name: string;
-  role: string;
-  age: string;
-  gender: string;
-  occupation: string;
-  personality: string;
-  goal: string;
-  secret: string;
-  memo: string;
+  content: string;
   image: string;
   color: string;
+  /** 생략 시 content의 `이름 :` 에서 추출 */
+  name?: string;
+}
+
+function resolveContent(raw: {
+  content?: unknown;
+  name?: string;
+  role?: string;
+  age?: string;
+  gender?: string;
+  occupation?: string;
+  personality?: string;
+  goal?: string;
+  secret?: string;
+  memo?: string;
+  summary?: string;
+  notes?: string;
+}): string {
+  if (typeof raw.content === "string" && raw.content.trim().length > 0) {
+    return raw.content;
+  }
+
+  const legacyMemo = [raw.summary, raw.notes, raw.memo]
+    .filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0,
+    )
+    .join("\n");
+
+  return buildContentFromLegacyFields({
+    name: raw.name,
+    role: raw.role,
+    age: raw.age,
+    gender: raw.gender,
+    occupation: raw.occupation,
+    personality: raw.personality,
+    goal: raw.goal,
+    secret: raw.secret,
+    memo: legacyMemo,
+  });
 }
 
 function normalizeCharacter(raw: unknown): Character | null {
@@ -49,31 +89,29 @@ function normalizeCharacter(raw: unknown): Character | null {
   if (typeof item.id !== "string" || typeof item.projectId !== "string") {
     return null;
   }
-  if (typeof item.name !== "string" || !item.name.trim()) return null;
 
-  const legacyMemo = [item.summary, item.notes]
-    .filter(
-      (value): value is string =>
-        typeof value === "string" && value.trim().length > 0,
-    )
-    .join("\n");
+  const content = resolveContent(item);
+  const synced = syncLegacyFieldsFromContent(content);
+  const name =
+    (typeof item.name === "string" && item.name.trim()) ||
+    synced.name ||
+    extractCharacterName(content);
+
+  if (!name.trim()) return null;
 
   return {
     id: item.id,
     projectId: item.projectId,
-    name: item.name.trim(),
-    role: typeof item.role === "string" ? item.role : "",
-    age: typeof item.age === "string" ? item.age : "",
-    gender: typeof item.gender === "string" ? item.gender : "",
-    occupation: typeof item.occupation === "string" ? item.occupation : "",
-    personality:
-      typeof item.personality === "string" ? item.personality : "",
-    goal: typeof item.goal === "string" ? item.goal : "",
-    secret: typeof item.secret === "string" ? item.secret : "",
-    memo:
-      typeof item.memo === "string" && item.memo.trim()
-        ? item.memo
-        : legacyMemo,
+    name: name.trim(),
+    content,
+    role: synced.role,
+    age: synced.age,
+    gender: synced.gender,
+    occupation: synced.occupation,
+    personality: synced.personality,
+    goal: synced.goal,
+    secret: synced.secret,
+    memo: synced.memo,
     image: typeof item.image === "string" ? item.image : "",
     color:
       typeof item.color === "string" && item.color
@@ -85,6 +123,45 @@ function normalizeCharacter(raw: unknown): Character | null {
       typeof item.createdAt === "string" ? item.createdAt : nowIso(),
     updatedAt:
       typeof item.updatedAt === "string" ? item.updatedAt : nowIso(),
+  };
+}
+
+function applyInput(
+  base: Pick<Character, "name" | "image" | "color">,
+  input: CharacterInput,
+): Pick<
+  Character,
+  | "name"
+  | "content"
+  | "role"
+  | "age"
+  | "gender"
+  | "occupation"
+  | "personality"
+  | "goal"
+  | "secret"
+  | "memo"
+  | "image"
+  | "color"
+> {
+  const content = input.content;
+  const synced = syncLegacyFieldsFromContent(content);
+  const name =
+    (input.name?.trim() || synced.name || base.name || "새 캐릭터").trim();
+
+  return {
+    name,
+    content,
+    role: synced.role,
+    age: synced.age,
+    gender: synced.gender,
+    occupation: synced.occupation,
+    personality: synced.personality,
+    goal: synced.goal,
+    secret: synced.secret,
+    memo: synced.memo,
+    image: input.image,
+    color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
   };
 }
 
@@ -142,21 +219,25 @@ export function sortCharacters(
   return list;
 }
 
+/** 이름·본문 자유 검색 */
 export function filterCharactersByName(
   characters: Character[],
   query: string,
 ): Character[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return characters;
-  return characters.filter((character) =>
-    character.name.toLowerCase().includes(needle),
-  );
+  return characters.filter((character) => {
+    if (character.name.toLowerCase().includes(needle)) return true;
+    return character.content.toLowerCase().includes(needle);
+  });
 }
 
 export async function readAllCharacters(): Promise<Character[]> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const characters = await cloudListCharacters();
+    const characters = (await cloudListCharacters())
+      .map((item) => normalizeCharacter(item))
+      .filter((item): item is Character => item !== null);
     backupCharacters(characters);
     return characters;
   }
@@ -168,9 +249,11 @@ export async function readCharactersByProject(
 ): Promise<Character[]> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const list = await cloudListCharactersByProject(projectId);
+    const list = (await cloudListCharactersByProject(projectId))
+      .map((item) => normalizeCharacter(item))
+      .filter((item): item is Character => item !== null);
     try {
-      backupCharacters(await cloudListCharacters());
+      backupCharacters(await readAllCharacters());
     } catch {
       // 백업 실패 무시
     }
@@ -195,21 +278,18 @@ export async function createCharacter(
     -1,
   );
   const timestamp = nowIso();
+  const fields = applyInput(
+    { name: "새 캐릭터", image: "", color: DEFAULT_CHARACTER_COLOR },
+    {
+      ...input,
+      content: input.content || CHARACTER_CONTENT_TEMPLATE,
+    },
+  );
 
   const character: Character = {
     id: createCharacterId(),
     projectId,
-    name: input.name.trim(),
-    role: input.role.trim(),
-    age: input.age.trim(),
-    gender: input.gender.trim(),
-    occupation: input.occupation.trim(),
-    personality: input.personality.trim(),
-    goal: input.goal.trim(),
-    secret: input.secret.trim(),
-    memo: input.memo.trim(),
-    image: input.image,
-    color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
+    ...fields,
     isFavorite: false,
     sortOrder: maxSort + 1,
     createdAt: timestamp,
@@ -237,26 +317,20 @@ export async function updateCharacter(
 ): Promise<Character | null> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const all = await cloudListCharacters();
+    const all = (await cloudListCharacters())
+      .map((item) => normalizeCharacter(item))
+      .filter((item): item is Character => item !== null);
     const index = all.findIndex((character) => character.id === id);
     if (index < 0) return null;
 
+    const previous = all[index];
     const updated: Character = {
-      ...all[index],
-      name: input.name.trim(),
-      role: input.role.trim(),
-      age: input.age.trim(),
-      gender: input.gender.trim(),
-      occupation: input.occupation.trim(),
-      personality: input.personality.trim(),
-      goal: input.goal.trim(),
-      secret: input.secret.trim(),
-      memo: input.memo.trim(),
-      image: input.image,
-      color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
+      ...previous,
+      ...applyInput(previous, input),
       updatedAt: nowIso(),
     };
     await cloudUpsertCharacter(updated);
+
     try {
       backupCharacters(await cloudListCharacters());
     } catch {
@@ -268,19 +342,11 @@ export async function updateCharacter(
   const all = readLocalCharacters();
   const index = all.findIndex((character) => character.id === id);
   if (index < 0) return null;
+
+  const previous = all[index];
   const updated: Character = {
-    ...all[index],
-    name: input.name.trim(),
-    role: input.role.trim(),
-    age: input.age.trim(),
-    gender: input.gender.trim(),
-    occupation: input.occupation.trim(),
-    personality: input.personality.trim(),
-    goal: input.goal.trim(),
-    secret: input.secret.trim(),
-    memo: input.memo.trim(),
-    image: input.image,
-    color: input.color.trim() || DEFAULT_CHARACTER_COLOR,
+    ...previous,
+    ...applyInput(previous, input),
     updatedAt: nowIso(),
   };
   const next = [...all];
@@ -314,7 +380,9 @@ export async function toggleCharacterFavorite(
 ): Promise<Character | null> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const all = await cloudListCharacters();
+    const all = (await cloudListCharacters())
+      .map((item) => normalizeCharacter(item))
+      .filter((item): item is Character => item !== null);
     const index = all.findIndex((character) => character.id === id);
     if (index < 0) return null;
     const updated: Character = {

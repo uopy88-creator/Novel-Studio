@@ -10,17 +10,14 @@ import { useState } from "react";
 import type { Character } from "@/features/characters/types/character";
 import type { ProjectId } from "@/types/ids";
 import { useCharacters } from "@/features/characters/hooks/useCharacters";
+import { CHARACTER_CONTENT_TEMPLATE } from "@/features/characters/lib/character-template";
 import { CharacterList } from "@/features/characters/components/CharacterList";
-import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
+import { CharacterEditor } from "@/features/characters/components/CharacterEditor";
 import { CharacterToolbar } from "@/features/characters/components/CharacterToolbar";
 import { CharacterDeleteDialog } from "@/features/characters/components/CharacterDeleteDialog";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
-
-type ModalState =
-  | { type: "closed" }
-  | { type: "create" }
-  | { type: "edit"; character: Character };
+import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
 
 export interface CharactersPageProps {
   projectId: ProjectId;
@@ -36,19 +33,49 @@ export function CharactersPage({ projectId }: CharactersPageProps) {
     sortMode,
     setSortMode,
     create,
-    update,
     remove,
     toggleFavorite,
+    refresh,
   } = useCharacters(projectId);
 
-  const [modal, setModal] = useState<ModalState>({ type: "closed" });
+  const [editing, setEditing] = useState<Character | null>(null);
   const [deleting, setDeleting] = useState<Character | null>(null);
-
-  const openCreate = () => setModal({ type: "create" });
-  const closeModal = () => setModal({ type: "closed" });
+  const [creating, setCreating] = useState(false);
 
   const isSearchEmpty =
     searchQuery.trim().length > 0 && filtered.length === 0;
+
+  const openCreate = () => {
+    void (async () => {
+      setCreating(true);
+      try {
+        const character = await create({
+          content: CHARACTER_CONTENT_TEMPLATE,
+          image: "",
+          color: DEFAULT_CHARACTER_COLOR,
+          name: "새 캐릭터",
+        });
+        setEditing(character);
+      } finally {
+        setCreating(false);
+      }
+    })();
+  };
+
+  if (editing) {
+    return (
+      <ContentContainer width="wide">
+        <CharacterEditor
+          character={editing}
+          onBack={() => {
+            setEditing(null);
+            void refresh();
+          }}
+          onSaved={(saved) => setEditing(saved)}
+        />
+      </ContentContainer>
+    );
+  }
 
   return (
     <ContentContainer width="wide">
@@ -57,15 +84,16 @@ export function CharactersPage({ projectId }: CharactersPageProps) {
           <p className="ns-caption mb-ns-2">인물</p>
           <h2 className="ns-heading">Characters</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            작가가 계속 참고하는 인물 프로필을 모아 둡니다.
+            자유 에디터로 인물 프로필을 정리합니다.
           </p>
         </div>
         <Button
           type="button"
           onClick={openCreate}
+          disabled={creating}
           className="shrink-0 rounded-ns-full px-ns-5"
         >
-          + 캐릭터 추가
+          {creating ? "만드는 중…" : "+ 캐릭터 추가"}
         </Button>
       </header>
 
@@ -88,7 +116,7 @@ export function CharactersPage({ projectId }: CharactersPageProps) {
           <CharacterList
             characters={filtered}
             isSearchEmpty={isSearchEmpty}
-            onOpen={(character) => setModal({ type: "edit", character })}
+            onOpen={(character) => setEditing(character)}
             onDelete={(character) => setDeleting(character)}
             onToggleFavorite={(character) => {
               void toggleFavorite(character.id);
@@ -97,30 +125,15 @@ export function CharactersPage({ projectId }: CharactersPageProps) {
               <Button
                 type="button"
                 onClick={openCreate}
+                disabled={creating}
                 className="rounded-ns-full px-ns-5"
               >
-                + 캐릭터 추가
+                {creating ? "만드는 중…" : "+ 캐릭터 추가"}
               </Button>
             }
           />
         </div>
       )}
-
-      <CharacterFormModal
-        open={modal.type === "create" || modal.type === "edit"}
-        mode={modal.type === "edit" ? "edit" : "create"}
-        character={modal.type === "edit" ? modal.character : null}
-        onClose={closeModal}
-        onSubmit={(input) => {
-          void (async () => {
-            if (modal.type === "edit") {
-              await update(modal.character.id, input);
-            } else {
-              await create(input);
-            }
-          })();
-        }}
-      />
 
       <CharacterDeleteDialog
         open={Boolean(deleting)}

@@ -17,6 +17,9 @@ export interface ManuscriptEditorProps {
   value: string;
   onChange: (value: string) => void;
   documentTitle?: string;
+  /** 기본: 원고 편집 라벨 */
+  "aria-label"?: string;
+  placeholder?: string;
   disabled?: boolean;
   className?: string;
   onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
@@ -32,6 +35,8 @@ export const ManuscriptEditor = forwardRef<
     value,
     onChange,
     documentTitle,
+    "aria-label": ariaLabel,
+    placeholder = "여기에 원고를 작성하세요… (@로 인물 멘션)",
     disabled,
     className,
     onKeyDown,
@@ -51,9 +56,10 @@ export const ManuscriptEditor = forwardRef<
       onClick={onClick}
       spellCheck
       aria-label={
-        documentTitle ? `원고 편집: ${documentTitle}` : "원고 편집"
+        ariaLabel ??
+        (documentTitle ? `원고 편집: ${documentTitle}` : "원고 편집")
       }
-      placeholder="여기에 원고를 작성하세요… (@로 인물 멘션)"
+      placeholder={placeholder}
       className={cn(
         "min-h-[28rem] w-full flex-1 resize-y rounded-ns-lg border border-ns-border bg-ns-surface",
         "px-ns-5 py-ns-5 text-ns-base leading-ns-relaxed text-ns-ink",

@@ -7,6 +7,7 @@ create table if not exists public.characters (
   project_id uuid not null references public.projects (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
+  content text not null default '',
   role text not null default '',
   age text not null default '',
   gender text not null default '',

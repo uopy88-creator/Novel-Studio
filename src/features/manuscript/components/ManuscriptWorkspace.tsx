@@ -18,9 +18,8 @@ import type { ChapterId, ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
 import { useScenes } from "@/features/manuscript/hooks/useScenes";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
-import { updateCharacter } from "@/features/characters/lib/character-storage";
 import { CharacterMentionField } from "@/features/characters/components/CharacterMentionField";
-import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
+import { CharacterEditorModal } from "@/features/characters/components/CharacterEditorModal";
 import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
 import { InspirationSelectionMenu } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { InspirationGutter } from "@/features/inspiration/components/InspirationGutter";
@@ -403,19 +402,14 @@ export function ManuscriptWorkspace({
         </div>
       )}
 
-      <CharacterFormModal
+      <CharacterEditorModal
         open={Boolean(profile)}
-        mode="edit"
         character={profile}
         onClose={() => setProfile(null)}
-        onSubmit={(input) => {
-          if (!profile) return;
+        onSaved={(updated) => {
+          setProfile(updated);
           void (async () => {
-            const updated = await updateCharacter(profile.id, input);
-            if (updated) {
-              setCharacters(await readCharactersByProject(projectId));
-            }
-            setProfile(null);
+            setCharacters(await readCharactersByProject(projectId));
           })();
         }}
       />
