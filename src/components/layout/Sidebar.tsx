@@ -150,20 +150,47 @@ export function Sidebar({
           </ul>
         </nav>
 
-        {/* 하단: 작품 목록으로 돌아가기 */}
-        <div className="border-t border-ns-border p-ns-2">
+        {/* 하단: Help + 작품 목록 */}
+        <div className="shrink-0 border-t border-ns-border p-ns-2">
+          <Link
+            href={studioPath(projectId, "help")}
+            onClick={onCloseMobile}
+            title="Help"
+            className={cn(
+              "flex min-h-11 items-center rounded-ns-md text-ns-sm font-medium transition-colors",
+              collapsed ? "justify-center px-ns-2" : "gap-ns-3 px-ns-3",
+              pathname === studioPath(projectId, "help") ||
+                pathname.startsWith(`${studioPath(projectId, "help")}/`)
+                ? "bg-ns-accent-soft text-ns-accent"
+                : "text-ns-ink-secondary hover:bg-ns-surface hover:text-ns-ink",
+            )}
+            aria-current={
+              pathname.includes("/help") ? "page" : undefined
+            }
+          >
+            <span aria-hidden="true">❓</span>
+            {!collapsed ? (
+              <span className="truncate">Help</span>
+            ) : (
+              <span className="sr-only">Help</span>
+            )}
+          </Link>
           <Link
             href="/"
             onClick={onCloseMobile}
             title="작품 목록"
             className={cn(
-              "flex min-h-11 items-center rounded-ns-md text-ns-sm text-ns-ink-secondary",
+              "mt-ns-1 flex min-h-11 items-center rounded-ns-md text-ns-sm text-ns-ink-secondary",
               "hover:bg-ns-surface hover:text-ns-ink",
               collapsed ? "justify-center px-ns-2" : "gap-ns-3 px-ns-3",
             )}
           >
             <span aria-hidden="true">←</span>
-            {!collapsed ? <span>작품 목록</span> : <span className="sr-only">작품 목록</span>}
+            {!collapsed ? (
+              <span>작품 목록</span>
+            ) : (
+              <span className="sr-only">작품 목록</span>
+            )}
           </Link>
         </div>
       </aside>
