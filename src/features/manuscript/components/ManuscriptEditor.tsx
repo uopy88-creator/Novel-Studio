@@ -56,7 +56,7 @@ export const ManuscriptEditor = forwardRef<
       placeholder="여기에 원고를 작성하세요… (@로 인물 멘션)"
       className={cn(
         "min-h-[28rem] w-full flex-1 resize-y rounded-ns-lg border border-ns-border bg-ns-surface",
-        "px-ns-5 py-ns-5 text-ns-base leading-ns-relaxed text-ns-ink",
+        "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
         "placeholder:text-ns-ink-tertiary",
         "transition-[border-color,box-shadow] duration-150",
         "hover:border-ns-border-strong",
@@ -64,6 +64,7 @@ export const ManuscriptEditor = forwardRef<
         "disabled:cursor-not-allowed disabled:bg-ns-muted",
         className,
       )}
+      style={{ fontSize: "var(--ns-editor-font-size, 1rem)" }}
     />
   );
 });

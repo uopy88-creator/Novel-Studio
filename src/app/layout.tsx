@@ -31,7 +31,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
+      <head>
+        {/* 테마 FOUC 방지 — LocalStorage 설정을 첫 페인트 전에 적용 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var r=localStorage.getItem("novel-studio:user-settings");if(!r)return;var s=JSON.parse(r);if(s&&s.theme==="dark")document.documentElement.setAttribute("data-theme","dark");if(s&&s.fontSize==="sm")document.documentElement.style.setProperty("--ns-editor-font-size","0.9375rem");if(s&&s.fontSize==="lg")document.documentElement.style.setProperty("--ns-editor-font-size","1.125rem");}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

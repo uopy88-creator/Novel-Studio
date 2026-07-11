@@ -69,6 +69,11 @@ export const SEARCH_RECENT_STORAGE_KEY = "novel-studio:search-recent";
 export const TIMELINE_EVENTS_STORAGE_KEY = "novel-studio:timeline-events";
 
 /**
+ * 앱 전역 사용자 설정 (폰트·폭·자동저장·테마·Export 기본값)
+ */
+export const USER_SETTINGS_STORAGE_KEY = "novel-studio:user-settings";
+
+/**
  * 로컬 계정 목록 (이메일·비밀번호 해시).
  * Supabase Auth 전환 전까지 LocalStorage에만 둔다.
  */

@@ -116,6 +116,47 @@
   /* 하위 호환 (기존 Next 템플릿 변수) */
   --background: var(--ns-color-canvas);
   --foreground: var(--ns-color-ink);
+
+  /* 원고 에디터 글자 크기 (Settings에서 변경) */
+  --ns-editor-font-size: 1rem;
+}
+
+/*
+  다크 모드 — Settings에서 data-theme="dark" 를 켠다.
+  자동 prefers-color-scheme 는 쓰지 않는다 (사용자 명시 선택).
+*/
+html[data-theme="dark"] {
+  --ns-color-canvas: #191919;
+  --ns-color-surface: #202020;
+  --ns-color-muted: #2a2a2a;
+  --ns-color-border: #333333;
+  --ns-color-border-strong: #444444;
+
+  --ns-color-ink: #ededed;
+  --ns-color-ink-secondary: #a8a8a3;
+  --ns-color-ink-tertiary: #7a7a74;
+  --ns-color-ink-inverse: #111111;
+
+  --ns-color-accent: #3b82f6;
+  --ns-color-accent-hover: #60a5fa;
+  --ns-color-accent-soft: #1e293b;
+  --ns-color-accent-border: #1e40af;
+
+  --ns-color-danger: #f87171;
+  --ns-color-danger-hover: #ef4444;
+  --ns-color-danger-soft: #3f1d1d;
+
+  --ns-color-overlay: rgb(0 0 0 / 0.55);
+
+  --ns-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --ns-shadow-md: 0 4px 16px rgb(0 0 0 / 0.35);
+  --ns-shadow-lg: 0 12px 40px rgb(0 0 0 / 0.45);
+
+  --ns-ring-accent: 0 0 0 3px rgb(59 130 246 / 0.35);
+
+  --background: var(--ns-color-canvas);
+  --foreground: var(--ns-color-ink);
+  color-scheme: dark;
 }
 
 /*
@@ -186,8 +227,7 @@
 
 /*
   기본 문서 스타일
-  - 다크 모드 자동 전환은 사용하지 않는다.
-    (디자인 컨셉이 밝은 작업실 UI이므로 일관성을 우선한다.)
+  - 다크 모드는 Settings의 data-theme="dark" 로만 전환한다.
   - 모바일/iPad: 가로 스크롤·긴 URL/이메일 잘림 완화
 */
 html {

@@ -19,6 +19,7 @@ import type {
 } from "@/features/export/types/export-options";
 import { DEFAULT_EXPORT_OPTIONS } from "@/features/export/types/export-options";
 import { ExportOptionsForm } from "@/features/export/components/ExportOptionsForm";
+import { useUserSettings } from "@/features/settings";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 
@@ -40,6 +41,7 @@ export function ExportModal({
   liveContent,
   scenes,
 }: ExportModalProps) {
+  const { settings } = useUserSettings();
   const [format, setFormat] = useState<ExportFormat>("docx");
   const [scope, setScope] = useState<ExportScope>("manuscript");
   const [options, setOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
@@ -49,15 +51,27 @@ export function ExportModal({
 
   useEffect(() => {
     if (!open) return;
-    setFormat("docx");
-    setScope(chapterId ? "manuscript" : "project");
-    setOptions(DEFAULT_EXPORT_OPTIONS);
+    const defaults = settings.exportDefaults;
+    setFormat(defaults.format);
+    setScope(
+      chapterId
+        ? defaults.scope === "project"
+          ? "manuscript"
+          : defaults.scope
+        : "project",
+    );
+    setOptions({
+      includeSceneDelimiters: defaults.includeSceneDelimiters,
+      excludeSceneMemos: defaults.excludeSceneMemos,
+      excludeWritingVault: defaults.excludeWritingVault,
+      includeInspirationNotes: defaults.includeInspirationNotes,
+    });
     setSelectedSceneIds(scenes.map((s) => s.id));
     setError(null);
     setBusy(false);
     // scenes 는 열릴 때의 스냅샷만 사용 (매 렌더 리셋 방지)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open 전환 시에만 초기화
-  }, [open, chapterId]);
+  }, [open, chapterId, settings.exportDefaults]);
 
   const canExport = useMemo(() => {
     if (busy) return false;

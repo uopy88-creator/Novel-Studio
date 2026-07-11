@@ -42,6 +42,8 @@ import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useUserSettings } from "@/features/settings";
+import { EDITOR_WIDTH_CLASS } from "@/features/settings/types/user-settings";
 import {
   countCharsWithoutSpaces,
   countCharsWithSpaces,
@@ -67,6 +69,8 @@ export function ManuscriptWorkspace({
   initialEnd,
   initialSceneId,
 }: ManuscriptWorkspaceProps) {
+  const { settings } = useUserSettings();
+
   const {
     documents,
     isReady,
@@ -296,7 +300,10 @@ export function ManuscriptWorkspace({
   );
 
   return (
-    <ContentContainer width="full" className="max-w-7xl">
+    <ContentContainer
+      width="full"
+      className={EDITOR_WIDTH_CLASS[settings.editorWidth]}
+    >
       <header className="mb-ns-6 flex flex-col gap-ns-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="ns-caption mb-ns-2">집필</p>

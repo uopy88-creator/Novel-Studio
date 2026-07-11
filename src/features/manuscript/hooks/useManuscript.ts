@@ -17,10 +17,9 @@ import {
   saveManuscriptContent,
   touchManuscriptOpened,
 } from "@/features/manuscript/lib/manuscript-storage";
+import { useUserSettings } from "@/features/settings";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
-
-const AUTOSAVE_MS = 800;
 
 export interface UseManuscriptResult {
   documents: Chapter[];
@@ -38,6 +37,9 @@ export function useManuscript(
   projectId: ProjectId,
   initialDocumentId?: ChapterId | null,
 ): UseManuscriptResult {
+  const { settings } = useUserSettings();
+  const autosaveMs = settings.autosaveIntervalSeconds * 1000;
+
   const [documents, setDocuments] = useState<Chapter[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [selectedChapterId, setSelectedChapterId] = useState<ChapterId | null>(
@@ -158,9 +160,9 @@ export function useManuscript(
       timerRef.current = setTimeout(() => {
         if (!selectedRef.current) return;
         persist(selectedRef.current, value);
-      }, AUTOSAVE_MS);
+      }, autosaveMs);
     },
-    [persist],
+    [persist, autosaveMs],
   );
 
   useEffect(() => {
