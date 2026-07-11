@@ -4,13 +4,7 @@
  * =============================================================================
  * Header
  * -----------------------------------------------------------------------------
- * 작업실 상단 바.
- *
- * 요구사항
- * - 현재 작품 제목만 표시
- * - 화려하지 않게, 여백 있는 Notion/Linear 스타일
- *
- * 모바일/iPad 좁은 폭에서는 메뉴 버튼으로 사이드바를 연다.
+ * 작업실 상단 바 — 작품 제목 + 검색(Ctrl+K) 트리거.
  * =============================================================================
  */
 
@@ -23,6 +17,8 @@ export interface HeaderProps {
   titleLoading?: boolean;
   /** 모바일 사이드바 열기 */
   onOpenMobileMenu: () => void;
+  /** 프로젝트 전체 검색 열기 */
+  onOpenSearch?: () => void;
   className?: string;
 }
 
@@ -30,6 +26,7 @@ export function Header({
   projectTitle,
   titleLoading = false,
   onOpenMobileMenu,
+  onOpenSearch,
   className,
 }: HeaderProps) {
   return (
@@ -39,7 +36,6 @@ export function Header({
         className,
       )}
     >
-      {/* md 미만: 햄버거 — 사이드바가 오버레이로 열림 */}
       <button
         type="button"
         onClick={onOpenMobileMenu}
@@ -54,14 +50,32 @@ export function Header({
         </span>
       </button>
 
-      {/* 작품 제목만 — 다른 액션/배지는 넣지 않는다 */}
-      <h1 className="min-w-0 truncate text-ns-base font-semibold tracking-tight text-ns-ink sm:text-ns-lg">
+      <h1 className="min-w-0 flex-1 truncate text-ns-base font-semibold tracking-tight text-ns-ink sm:text-ns-lg">
         {titleLoading ? (
           <span className="text-ns-ink-tertiary">불러오는 중…</span>
         ) : (
           projectTitle || "제목 없는 작품"
         )}
       </h1>
+
+      {onOpenSearch ? (
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className={cn(
+            "inline-flex min-h-9 shrink-0 items-center gap-ns-2 rounded-ns-md border border-ns-border",
+            "bg-ns-canvas px-ns-3 text-ns-sm text-ns-ink-secondary",
+            "hover:bg-ns-muted hover:text-ns-ink",
+          )}
+          aria-label="프로젝트 검색 (Ctrl+K)"
+        >
+          <span aria-hidden>⌕</span>
+          <span className="hidden sm:inline">검색</span>
+          <kbd className="hidden rounded border border-ns-border px-1 py-px text-ns-xs text-ns-ink-tertiary md:inline">
+            Ctrl+K
+          </kbd>
+        </button>
+      ) : null}
     </header>
   );
 }

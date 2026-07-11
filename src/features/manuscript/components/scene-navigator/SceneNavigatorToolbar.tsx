@@ -4,10 +4,11 @@
  * =============================================================================
  * SceneNavigatorToolbar
  * -----------------------------------------------------------------------------
- * 「＋ 새 장면」및 접기/펼치기. 구분자 수동 입력 안내는 표시하지 않는다.
+ * 「＋ 새 장면」· 접기/펼치기 · Timeline 연동 링크
  * =============================================================================
  */
 
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
 export interface SceneNavigatorToolbarProps {
@@ -15,6 +16,8 @@ export interface SceneNavigatorToolbarProps {
   onAdd: () => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
+  /** 선택 Scene을 Timeline 사건에 연결하는 경로 */
+  timelineHref?: string | null;
 }
 
 export function SceneNavigatorToolbar({
@@ -22,6 +25,7 @@ export function SceneNavigatorToolbar({
   onAdd,
   onCollapseAll,
   onExpandAll,
+  timelineHref,
 }: SceneNavigatorToolbarProps) {
   return (
     <div className="flex flex-col gap-ns-2 border-b border-ns-border px-ns-3 py-ns-3">
@@ -57,6 +61,17 @@ export function SceneNavigatorToolbar({
         >
           모두 펼치기
         </button>
+        {timelineHref ? (
+          <>
+            <span className="text-ns-xs text-ns-ink-tertiary">·</span>
+            <Link
+              href={timelineHref}
+              className="text-ns-xs font-medium text-ns-ink-secondary hover:text-ns-ink"
+            >
+              Timeline에 추가
+            </Link>
+          </>
+        ) : null}
       </div>
       <p className="text-ns-xs leading-ns-normal text-ns-ink-tertiary">
         장면을 끌어 순서를 바꿀 수 있습니다. 번호는 자동으로 다시 매겨집니다.

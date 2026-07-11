@@ -181,6 +181,21 @@ export interface DbManuscriptVersionRow {
   updated_at: string;
 }
 
+/** timeline_events — 사건 시간순 정리 */
+export interface DbTimelineEventRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  sort_order: number;
+  document_id: string | null;
+  scene_stable_id: string | null;
+  character_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** 테이블 이름 — SQL / 리포지토리에서 동일하게 사용 */
 export const DB_TABLES = {
   projects: "projects",
@@ -196,4 +211,5 @@ export const DB_TABLES = {
   foreshadowings: "foreshadowings",
   /** Scene 메타 (구 scene_metas) */
   scene_metas: "scenes",
+  timeline_events: "timeline_events",
 } as const;

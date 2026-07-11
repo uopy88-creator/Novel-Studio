@@ -60,6 +60,15 @@ export const MANUSCRIPT_RECOVERY_STORAGE_KEY =
 export const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";
 
 /**
+ * 프로젝트 전체 검색 — 최근 검색어
+ * 값: { projectId, entries: [{ query, searchedAt }] }[]
+ */
+export const SEARCH_RECENT_STORAGE_KEY = "novel-studio:search-recent";
+
+/** Timeline 사건 (시간순 정리) */
+export const TIMELINE_EVENTS_STORAGE_KEY = "novel-studio:timeline-events";
+
+/**
  * 로컬 계정 목록 (이메일·비밀번호 해시).
  * Supabase Auth 전환 전까지 LocalStorage에만 둔다.
  */

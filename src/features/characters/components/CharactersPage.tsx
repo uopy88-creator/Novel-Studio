@@ -6,7 +6,7 @@
  * =============================================================================
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Character } from "@/features/characters/types/character";
 import type { ProjectId } from "@/types/ids";
 import { useCharacters } from "@/features/characters/hooks/useCharacters";
@@ -24,9 +24,14 @@ type ModalState =
 
 export interface CharactersPageProps {
   projectId: ProjectId;
+  /** 전역 검색에서 전달 — 해당 캐릭터 편집 모달 오픈 */
+  initialCharacterId?: string;
 }
 
-export function CharactersPage({ projectId }: CharactersPageProps) {
+export function CharactersPage({
+  projectId,
+  initialCharacterId,
+}: CharactersPageProps) {
   const {
     characters,
     filtered,
@@ -43,6 +48,13 @@ export function CharactersPage({ projectId }: CharactersPageProps) {
 
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<Character | null>(null);
+
+  // 전역 검색 딥링크 — 준비되면 해당 캐릭터 편집 모달
+  useEffect(() => {
+    if (!isReady || !initialCharacterId) return;
+    const hit = characters.find((c) => c.id === initialCharacterId);
+    if (hit) setModal({ type: "edit", character: hit });
+  }, [isReady, initialCharacterId, characters]);
 
   const openCreate = () => setModal({ type: "create" });
   const closeModal = () => setModal({ type: "closed" });

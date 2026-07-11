@@ -6,7 +6,7 @@
  * =============================================================================
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { ProjectId } from "@/types/ids";
@@ -20,9 +20,14 @@ import { studioPath } from "@/components/layout/nav-items";
 
 export interface InspirationPageProps {
   projectId: ProjectId;
+  /** 전역 검색 — 해당 Inspiration 편집 모달 오픈 */
+  initialInspirationId?: string;
 }
 
-export function InspirationPage({ projectId }: InspirationPageProps) {
+export function InspirationPage({
+  projectId,
+  initialInspirationId,
+}: InspirationPageProps) {
   const {
     inspirations,
     filtered,
@@ -37,6 +42,12 @@ export function InspirationPage({ projectId }: InspirationPageProps) {
 
   const [editing, setEditing] = useState<Inspiration | null>(null);
   const [deleting, setDeleting] = useState<Inspiration | null>(null);
+
+  useEffect(() => {
+    if (!isReady || !initialInspirationId) return;
+    const hit = inspirations.find((i) => i.id === initialInspirationId);
+    if (hit) setEditing(hit);
+  }, [isReady, initialInspirationId, inspirations]);
 
   const isSearchEmpty =
     searchQuery.trim().length > 0 && filtered.length === 0;

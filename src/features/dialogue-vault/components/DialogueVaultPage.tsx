@@ -11,7 +11,7 @@
  * =============================================================================
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
 import type { ProjectId } from "@/types/ids";
 import { useDialogues } from "@/features/dialogue-vault/hooks/useDialogues";
@@ -30,10 +30,15 @@ type ModalState =
 
 export interface DialogueVaultPageProps {
   projectId: ProjectId;
+  /** 전역 검색 — 해당 항목 수정 모달 오픈 */
+  initialEntryId?: string;
 }
 
 /** Writing Vault 페이지 (파일명·export 는 하위 호환 유지) */
-export function DialogueVaultPage({ projectId }: DialogueVaultPageProps) {
+export function DialogueVaultPage({
+  projectId,
+  initialEntryId,
+}: DialogueVaultPageProps) {
   const {
     dialogues,
     filtered,
@@ -51,6 +56,12 @@ export function DialogueVaultPage({ projectId }: DialogueVaultPageProps) {
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<WritingVaultEntry | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isReady || !initialEntryId) return;
+    const hit = dialogues.find((d) => d.id === initialEntryId);
+    if (hit) setModal({ type: "edit", dialogue: hit });
+  }, [isReady, initialEntryId, dialogues]);
 
   const openCreate = () => setModal({ type: "create" });
   const closeModal = () => setModal({ type: "closed" });

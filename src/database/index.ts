@@ -19,6 +19,7 @@ export {
   type DbManuscriptVersionRow,
   type DbMemoRow,
   type DbProjectRow,
+  type DbTimelineEventRow,
   type DbWordTreasuryRow,
 } from "./supabase/types";
 

@@ -39,6 +39,7 @@ import { ExportModal } from "@/features/export/components/ExportModal";
 import { DOCUMENT_KIND_LABELS } from "@/features/manuscript/types/chapter";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import { ContentContainer } from "@/components/layout";
+import { studioPath } from "@/components/layout/nav-items";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -52,11 +53,19 @@ import { cn } from "@/lib/utils/cn";
 export interface ManuscriptWorkspaceProps {
   projectId: ProjectId;
   initialDocumentId?: string;
+  /** 전역 검색 등에서 전달 — 본문 오프셋으로 스크롤 */
+  initialOffset?: number;
+  initialEnd?: number;
+  /** 전역 검색 — Scene 안정 ID로 선택 */
+  initialSceneId?: string;
 }
 
 export function ManuscriptWorkspace({
   projectId,
   initialDocumentId,
+  initialOffset,
+  initialEnd,
+  initialSceneId,
 }: ManuscriptWorkspaceProps) {
   const {
     documents,
@@ -181,6 +190,16 @@ export function ManuscriptWorkspace({
     };
   }, [content]);
 
+  /** Scene Navigator → Timeline 연동 (선택 Scene 기준) */
+  const timelineHref = useMemo(() => {
+    if (!selectedChapterId || !activeSceneId) return null;
+    const params = new URLSearchParams({
+      documentId: selectedChapterId,
+      sceneId: activeSceneId,
+    });
+    return `${studioPath(projectId, "timeline")}?${params.toString()}`;
+  }, [projectId, selectedChapterId, activeSceneId]);
+
   const scrollToOffset = useCallback(
     (
       start: number,
@@ -220,6 +239,49 @@ export function ManuscriptWorkspace({
     },
     [scrollToOffset],
   );
+
+  // 전역 검색 딥링크: sceneId / offset
+  const deepLinkAppliedRef = useRef(false);
+  useEffect(() => {
+    deepLinkAppliedRef.current = false;
+  }, [initialDocumentId, initialSceneId, initialOffset]);
+
+  useEffect(() => {
+    if (!isReady || !selectedChapterId || scenes.length === 0) return;
+    if (deepLinkAppliedRef.current) return;
+
+    if (initialSceneId) {
+      const scene = scenes.find((s) => s.id === initialSceneId);
+      if (scene) {
+        deepLinkAppliedRef.current = true;
+        selectScene(scene);
+        return;
+      }
+    }
+
+    if (typeof initialOffset === "number" && Number.isFinite(initialOffset)) {
+      deepLinkAppliedRef.current = true;
+      const end =
+        typeof initialEnd === "number" && Number.isFinite(initialEnd)
+          ? initialEnd
+          : initialOffset;
+      scrollToOffset(initialOffset, end, { focus: true });
+      // 오프셋이 속한 Scene 활성화
+      const hit = scenes.find(
+        (s) => initialOffset >= s.startOffset && initialOffset < s.endOffset,
+      );
+      if (hit) setActiveSceneId(hit.id);
+    }
+  }, [
+    isReady,
+    selectedChapterId,
+    scenes,
+    initialSceneId,
+    initialOffset,
+    initialEnd,
+    selectScene,
+    scrollToOffset,
+  ]);
 
   const handleSaveVersion = useCallback(() => {
     void saveVersion(content);
@@ -345,6 +407,7 @@ export function ManuscriptWorkspace({
                   onToggleCollapse={toggleCollapsed}
                   onCollapseAll={() => setAllCollapsed(true)}
                   onExpandAll={() => setAllCollapsed(false)}
+                  timelineHref={timelineHref}
                 />
 
                 <div className="flex min-w-0 flex-1 flex-col gap-ns-4">

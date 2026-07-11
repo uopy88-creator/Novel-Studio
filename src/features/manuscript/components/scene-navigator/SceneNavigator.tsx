@@ -48,6 +48,8 @@ export interface SceneNavigatorProps {
   onToggleCollapse: (sceneId: string) => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
+  /** 선택 Scene → Timeline 사건 추가 링크 */
+  timelineHref?: string | null;
   className?: string;
 }
 
@@ -65,6 +67,7 @@ export function SceneNavigator({
   onToggleCollapse,
   onCollapseAll,
   onExpandAll,
+  timelineHref = null,
   className,
 }: SceneNavigatorProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -103,6 +106,7 @@ export function SceneNavigator({
         onAdd={onAdd}
         onCollapseAll={onCollapseAll}
         onExpandAll={onExpandAll}
+        timelineHref={timelineHref}
       />
 
       <DndContext

@@ -15,14 +15,15 @@
  * └──────────┴─────────────────────┘
  *
  * - Project 목록(/)에는 쓰지 않는다. 작품 선택 후 경로에만 적용.
- * - Dashboard 등 기능 구현은 하지 않고, 레이아웃만 제공한다.
+ * - Ctrl+K / ⌘K 로 프로젝트 전체 검색 팔레트를 연다.
  * - 사이드바 접힘 상태는 LocalStorage에 기억한다 (PC/iPad).
  * =============================================================================
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { GlobalSearchModal } from "@/features/global-search";
 import { getProjectById } from "@/features/projects/lib/project-storage";
 import { SIDEBAR_COLLAPSED_KEY } from "@/lib/storage/keys";
 import {
@@ -42,6 +43,7 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
   const [titleLoading, setTitleLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // 작품 제목 — Cloud/LocalStorage에서 읽기 (SSR 이후)
   useEffect(() => {
@@ -65,6 +67,23 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
     }
   }, []);
 
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+  // Ctrl+K / Cmd+K — 전역 검색 토글
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isMod = event.metaKey || event.ctrlKey;
+      if (!isMod) return;
+      if (event.key.toLowerCase() !== "k") return;
+      // 브라우저 주소창 검색 등 기본 동작 방지
+      event.preventDefault();
+      setSearchOpen((prev) => !prev);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -83,21 +102,24 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
         onToggleCollapsed={toggleCollapsed}
       />
 
-      {/*
-        메인 컬럼.
-        모바일에서 fixed 사이드바가 공간을 안 차지하므로 flex-1만으로 충분하다.
-      */}
       <div className={cn("flex min-w-0 flex-1 flex-col")}>
         <Header
           projectTitle={projectTitle}
           titleLoading={titleLoading}
           onOpenMobileMenu={() => setMobileOpen(true)}
+          onOpenSearch={openSearch}
         />
 
         <main className="min-h-0 flex-1 overflow-y-auto bg-ns-canvas">
           {children}
         </main>
       </div>
+
+      <GlobalSearchModal
+        open={searchOpen}
+        onClose={closeSearch}
+        projectId={projectId}
+      />
     </div>
   );
 }

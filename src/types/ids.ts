@@ -42,6 +42,9 @@ export type InspirationId = EntityId;
 /** 어휘 금고(Word Treasury) 항목 ID */
 export type WordTreasuryId = EntityId;
 
+/** Timeline 사건 ID */
+export type TimelineEventId = EntityId;
+
 /** 집필 세션 ID */
 export type WritingSessionId = EntityId;
 

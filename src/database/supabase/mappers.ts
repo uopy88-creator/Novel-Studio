@@ -21,6 +21,7 @@ import type {
   ForeshadowingStatus,
 } from "@/features/foreshadowing/types/foreshadowing";
 import type { WordTreasuryEntry } from "@/features/word-treasury/types/word-treasury";
+import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type {
   DbCharacterRow,
   DbDialogueRow,
@@ -31,6 +32,7 @@ import type {
   DbManuscriptVersionRow,
   DbMemoRow,
   DbProjectRow,
+  DbTimelineEventRow,
   DbWordTreasuryRow,
 } from "@/database/supabase/types";
 import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
@@ -398,6 +400,40 @@ export function rowToForeshadowing(row: DbForeshadowingRow): Foreshadowing {
     payoffChapterId: (row.payoff_document_id as ChapterId | null) ?? undefined,
     relatedCharacterIds: (row.related_character_ids ?? []) as CharacterId[],
     importance: clampImportance(row.importance ?? 3),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function timelineEventToRow(
+  event: TimelineEvent,
+  userId: string,
+): DbTimelineEventRow {
+  return {
+    id: event.id,
+    project_id: event.projectId,
+    user_id: userId,
+    title: event.title,
+    description: event.description,
+    sort_order: event.sortOrder,
+    document_id: event.documentId ?? null,
+    scene_stable_id: event.sceneStableId ?? null,
+    character_id: event.characterId ?? null,
+    created_at: event.createdAt,
+    updated_at: event.updatedAt,
+  };
+}
+
+export function rowToTimelineEvent(row: DbTimelineEventRow): TimelineEvent {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    title: row.title ?? "",
+    description: row.description ?? "",
+    sortOrder: row.sort_order ?? 0,
+    documentId: (row.document_id as ChapterId | null) ?? undefined,
+    sceneStableId: row.scene_stable_id ?? undefined,
+    characterId: (row.character_id as CharacterId | null) ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

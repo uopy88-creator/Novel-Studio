@@ -23,6 +23,7 @@ import {
   MEMOS_STORAGE_KEY,
   PROJECTS_STORAGE_KEY,
   SCENE_METAS_STORAGE_KEY,
+  TIMELINE_EVENTS_STORAGE_KEY,
   WORD_TREASURY_STORAGE_KEY,
 } from "@/lib/storage/keys";
 import {
@@ -44,6 +45,7 @@ export const WORK_DATA_BACKUP_KEYS = [
   WORD_TREASURY_STORAGE_KEY,
   FORESHADOWINGS_STORAGE_KEY,
   SCENE_METAS_STORAGE_KEY,
+  TIMELINE_EVENTS_STORAGE_KEY,
 ] as const;
 
 export type WorkDataBackupSnapshot = Record<string, string | null>;
