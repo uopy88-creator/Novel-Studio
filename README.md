@@ -87,6 +87,67 @@ npm run build
 
 ---
 
+## 자동 배포 (lint → backup tag → commit → push → Vercel)
+
+기능 개발이 끝난 뒤, **명령 하나**로 품질 검사부터 Git Push까지 진행합니다.  
+GitHub가 Vercel에 연결되어 있으면 push 후 **Vercel 자동 배포**가 이어집니다.
+
+### 실행
+
+프로젝트 루트에서:
+
+```bash
+npm run deploy
+```
+
+PowerShell에서 직접 실행:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
+```
+
+### 흐름
+
+```
+npm run deploy
+    ↓
+① npm run lint          (실패 시 중단)
+    ↓
+② npm run build         (실패 시 중단)
+    ↓
+③ Backup Tag 생성
+   예) backup-2026-07-11-2130
+   → git tag → git push origin --tags
+    ↓
+④ git add .
+    ↓
+⑤ Commit Message 입력
+   예) feat(scene): improve navigator
+    ↓
+⑥ git commit
+    ↓
+⑦ git push
+    ↓
+⑧ 완료 메시지
+   ✔ Lint / Build / Backup Tag / Commit / Push
+   Vercel에서 자동 배포가 시작됩니다.
+```
+
+### 실패 처리
+
+lint · build · Backup Tag · commit · push 가 실패하면 **단계와 이유**를 출력하고 즉시 종료합니다.  
+이후 단계(커밋·푸시 등)는 실행되지 않습니다.
+
+### 참고
+
+- Windows PowerShell 기준입니다. (`scripts/deploy.ps1`)
+- Backup Tag는 **새 커밋 직전 HEAD**를 남겨 롤백 지점으로 씁니다.
+- Commit Message를 비우면 커밋하지 않고 중단합니다.
+- 스테이징할 변경이 없으면 lint/build/tag만 수행하고 commit/push는 건너뜁니다.
+- Vercel 자동 배포는 GitHub ↔ Vercel 연동이 되어 있어야 합니다.
+
+---
+
 ## Vercel 배포 방법
 
 PC·iPad·iPhone 어디서나 **같은 주소**로 쓰려면 Vercel에 올립니다.

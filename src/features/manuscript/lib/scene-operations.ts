@@ -3,6 +3,8 @@
  * Scene 조작 (추가 · 삭제 · 제목 · 순서)
  * -----------------------------------------------------------------------------
  * 모두 Scene[] → serialize → Manuscript content 갱신으로 이어진다.
+ * 번호는 항상 배열 순서로 자동 재계산한다. 사용자는 번호를 수정하지 않는다.
+ * 안정 ID(id)는 순서 변경·제목 변경 시에도 유지한다.
  * =============================================================================
  */
 
@@ -12,19 +14,19 @@ import {
   parseScenes,
   serializeScenes,
 } from "@/features/manuscript/lib/scene-parser";
+import { createStableSceneId } from "@/features/manuscript/lib/scene-ids";
+import { countCharsWithoutSpaces } from "@/lib/stats";
 
+/** 표시 번호만 다시 매긴다. 안정 ID(id)는 보존. */
 function remumber(scenes: Scene[]): Scene[] {
   return scenes.map((scene, index) => ({
     ...scene,
     number: index + 1,
-    id: `scene-${index + 1}-${scene.title}-${scene.body.slice(0, 16)}`.slice(
-      0,
-      80,
-    ),
+    charCount: countCharsWithoutSpaces(scene.body),
   }));
 }
 
-/** 드래그로 순서 변경 */
+/** 드래그로 순서 변경 → Manuscript 본문도 같은 순서로 재배열 */
 export function reorderScenes(
   scenes: Scene[],
   activeId: string,
@@ -40,13 +42,16 @@ export function reorderScenes(
   return remumber(next);
 }
 
-/** 맨 끝(또는 afterIndex 다음)에 빈 Scene 추가 */
+/**
+ * 맨 끝(또는 afterIndex 다음)에 빈 Scene 추가.
+ * 제목 입력란(빈 title) + 빈 본문. 상태는 초안.
+ */
 export function addScene(
   scenes: Scene[],
   afterIndex?: number,
 ): Scene[] {
   const blank: Scene = {
-    id: `scene-new-${Date.now()}`,
+    id: createStableSceneId(scenes),
     number: 0,
     title: "",
     body: "",
@@ -76,7 +81,7 @@ export type SceneDeleteMode = "full" | "delimiter-only";
 /**
  * Scene 삭제
  * - full: Scene 전체(구분자+본문) 제거
- * - delimiter-only: 구분자만 제거하고 본문은 인접 Scene에 병합
+ * - delimiter-only: Scene 구분만 제거하고 본문은 인접 Scene에 병합
  * 최소 1개 Scene은 유지한다.
  */
 export function deleteScene(
@@ -93,34 +98,40 @@ export function deleteScene(
     return remumber(scenes.filter((s) => s.id !== sceneId));
   }
 
-  // 구분자만 삭제 → 본문을 이전(없으면 다음) Scene에 붙인다
+  // 구분만 삭제 → 본문을 이전(없으면 다음) Scene에 붙인다
   const target = scenes[index];
   const body = target.body.replace(/^\n+/, "").replace(/\n+$/, "");
   const next = scenes.filter((_, i) => i !== index);
 
   if (body) {
     if (index > 0) {
-      // 이전 Scene 끝에 병합
       const prevIndex = index - 1;
       const prev = next[prevIndex];
       const merged = [prev.body.replace(/\n+$/, ""), body]
         .filter(Boolean)
         .join("\n\n");
-      next[prevIndex] = { ...prev, body: merged };
+      next[prevIndex] = {
+        ...prev,
+        body: merged,
+        charCount: countCharsWithoutSpaces(merged),
+      };
     } else if (next.length > 0) {
-      // 첫 Scene이면 다음 Scene 앞에 병합
       const first = next[0];
       const merged = [body, first.body.replace(/^\n+/, "")]
         .filter(Boolean)
         .join("\n\n");
-      next[0] = { ...first, body: merged };
+      next[0] = {
+        ...first,
+        body: merged,
+        charCount: countCharsWithoutSpaces(merged),
+      };
     }
   }
 
   return remumber(next);
 }
 
-/** 제목만 수정 */
+/** 제목만 수정 (번호·본문·안정 ID 유지) */
 export function renameScene(
   scenes: Scene[],
   sceneId: string,

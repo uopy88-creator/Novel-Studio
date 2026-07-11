@@ -3,6 +3,8 @@
 /**
  * =============================================================================
  * SceneNavigatorToolbar
+ * -----------------------------------------------------------------------------
+ * 「＋ 새 장면」및 접기/펼치기. 구분자 수동 입력 안내는 표시하지 않는다.
  * =============================================================================
  */
 
@@ -25,7 +27,7 @@ export function SceneNavigatorToolbar({
     <div className="flex flex-col gap-ns-2 border-b border-ns-border px-ns-3 py-ns-3">
       <div className="flex items-center justify-between gap-ns-2">
         <div>
-          <p className="text-ns-xs font-medium text-ns-ink-tertiary">Scenes</p>
+          <p className="text-ns-xs font-medium text-ns-ink-tertiary">장면</p>
           <p className="text-ns-sm font-semibold text-ns-ink">
             {sceneCount}개
           </p>
@@ -35,9 +37,8 @@ export function SceneNavigatorToolbar({
           size="sm"
           variant="secondary"
           onClick={onAdd}
-          className="rounded-ns-full"
         >
-          + Scene
+          ＋ 새 장면
         </Button>
       </div>
       <div className="flex flex-wrap gap-ns-2">
@@ -58,9 +59,7 @@ export function SceneNavigatorToolbar({
         </button>
       </div>
       <p className="text-ns-xs leading-ns-normal text-ns-ink-tertiary">
-        구분자 <code className="text-ns-ink-secondary">#1</code>{" "}
-        <code className="text-ns-ink-secondary">#2</code> … 로 Scene이
-        나뉩니다. 끌어 순서를 바꿀 수 있습니다.
+        장면을 끌어 순서를 바꿀 수 있습니다. 번호는 자동으로 다시 매겨집니다.
       </p>
     </div>
   );

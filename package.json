@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

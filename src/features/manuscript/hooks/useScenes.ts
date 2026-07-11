@@ -4,9 +4,10 @@
  * =============================================================================
  * useScenes
  * -----------------------------------------------------------------------------
- * - 원고 content → Scene 파싱 (#1 #2 …)
+ * - 원고 content → Scene 파싱 (프로그램이 관리하는 내부 마커)
  * - status / memo / 접힘 → scene_metas (클라우드 단일 소스, LocalStorage 백업)
  * - 순서·제목·추가·삭제는 content 재직렬화 → Manuscript autosave
+ * - 상태·메모·접힘 변경도 즉시(디바운스) Supabase 동기화
  * =============================================================================
  */
 
@@ -42,7 +43,8 @@ export interface UseScenesResult {
   toggleCollapsed: (sceneId: string) => void;
   setAllCollapsed: (collapsed: boolean) => void;
   reorder: (activeId: string, overId: string) => void;
-  add: (afterIndex?: number) => void;
+  /** 선택한 Scene 아래(또는 맨 끝)에 추가. 새 Scene 안정 ID 반환 */
+  add: (afterIndex?: number) => string | null;
   remove: (sceneId: string, mode?: SceneDeleteMode) => void;
   rename: (sceneId: string, title: string) => void;
   setStatus: (sceneId: string, status: SceneStatus) => void;
@@ -50,11 +52,6 @@ export interface UseScenesResult {
 }
 
 const META_SAVE_MS = 500;
-
-/** remumber 후에도 접힘을 유지하기 위한 지문 */
-function sceneFingerprint(scene: Scene): string {
-  return `${scene.title}::${scene.body.slice(0, 48)}`;
-}
 
 export function useScenes(
   projectId: ProjectId,
@@ -70,10 +67,13 @@ export function useScenes(
   const [metaByNumber, setMetaByNumber] = useState<
     Map<number, { status: SceneStatus; memo: string }>
   >(() => new Map());
-  const [collapsedNumbers, setCollapsedNumbers] = useState<Set<number>>(
+  /** 접힘은 안정 ID 기준으로 세션 유지 (번호 재계산과 무관) */
+  const [collapsedStableIds, setCollapsedStableIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [metaReady, setMetaReady] = useState(false);
+  /** 문서 로드 직후 번호→접힘 매핑을 안정 ID로 옮기기 위한 플래그 */
+  const pendingCollapseNumbersRef = useRef<Set<number> | null>(null);
 
   // 문서 전환 시 메타 로드
   useEffect(() => {
@@ -82,7 +82,8 @@ export function useScenes(
 
     if (!documentId) {
       setMetaByNumber(new Map());
-      setCollapsedNumbers(new Set());
+      setCollapsedStableIds(new Set());
+      pendingCollapseNumbersRef.current = null;
       setMetaReady(true);
       return;
     }
@@ -99,13 +100,15 @@ export function useScenes(
             ]),
           ),
         );
-        setCollapsedNumbers(collapsedIdsFromMetas(metas));
+        pendingCollapseNumbersRef.current = collapsedIdsFromMetas(metas);
+        setCollapsedStableIds(new Set());
         setMetaReady(true);
       } catch (error) {
         console.error("[useScenes] scene meta load failed", error);
         if (cancelled) return;
         setMetaByNumber(new Map());
-        setCollapsedNumbers(new Set());
+        setCollapsedStableIds(new Set());
+        pendingCollapseNumbersRef.current = null;
         setMetaReady(true);
       }
     })();
@@ -133,30 +136,42 @@ export function useScenes(
     [parsed, metaByNumber],
   );
 
-  const collapsedIds = useMemo(() => {
-    const ids = new Set<string>();
+  // 메타 로드 직후: scene_number 접힘 → 안정 ID 접힘으로 변환
+  useEffect(() => {
+    const pending = pendingCollapseNumbersRef.current;
+    if (!pending || scenes.length === 0) return;
+    const next = new Set<string>();
     for (const scene of scenes) {
-      if (collapsedNumbers.has(scene.number)) ids.add(scene.id);
+      if (pending.has(scene.number)) next.add(scene.id);
     }
-    return ids;
-  }, [scenes, collapsedNumbers]);
+    setCollapsedStableIds(next);
+    pendingCollapseNumbersRef.current = null;
+  }, [scenes]);
+
+  const collapsedIds = collapsedStableIds;
 
   const scenesRef = useRef(scenes);
   scenesRef.current = scenes;
-  const collapsedRef = useRef(collapsedNumbers);
-  collapsedRef.current = collapsedNumbers;
+  const collapsedRef = useRef(collapsedStableIds);
+  collapsedRef.current = collapsedStableIds;
   const metaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistMetas = useCallback(
-    (nextScenes: Scene[], nextCollapsed: Set<number>) => {
+    (nextScenes: Scene[], nextCollapsed: Set<string>) => {
       if (!documentId) return;
       if (metaTimerRef.current) clearTimeout(metaTimerRef.current);
       metaTimerRef.current = setTimeout(() => {
+        const collapsedNumbers = new Set<number>();
+        for (const scene of nextScenes) {
+          if (nextCollapsed.has(scene.id)) {
+            collapsedNumbers.add(scene.number);
+          }
+        }
         void saveSceneMetasForDocument({
           projectId,
           documentId,
           scenes: nextScenes,
-          collapsedNumbers: nextCollapsed,
+          collapsedNumbers,
         }).catch((error) => {
           console.error("[useScenes] scene meta save failed", error);
         });
@@ -173,25 +188,20 @@ export function useScenes(
 
   /**
    * content 를 바꾸는 작업(순서/제목/추가/삭제).
-   * remumber 후 id 가 바뀌므로 접힘은 fingerprint 로 이어 받는다.
+   * 안정 ID 접힘은 그대로 이어 받는다.
    */
   const commitContent = useCallback(
     (next: Scene[]) => {
-      const oldCollapsedFingerprints = new Set(
-        scenesRef.current
-          .filter((s) => collapsedRef.current.has(s.number))
-          .map(sceneFingerprint),
-      );
-      const nextCollapsed = new Set<number>();
+      const nextCollapsed = new Set<string>();
       for (const scene of next) {
-        if (oldCollapsedFingerprints.has(sceneFingerprint(scene))) {
-          nextCollapsed.add(scene.number);
+        if (collapsedRef.current.has(scene.id)) {
+          nextCollapsed.add(scene.id);
         }
       }
 
       setContent(applyScenesToContent(next, config));
       syncMetaStateFromScenes(next);
-      setCollapsedNumbers(nextCollapsed);
+      setCollapsedStableIds(nextCollapsed);
       persistMetas(next, nextCollapsed);
     },
     [config, persistMetas, setContent, syncMetaStateFromScenes],
@@ -199,12 +209,10 @@ export function useScenes(
 
   const toggleCollapsed = useCallback(
     (sceneId: string) => {
-      const scene = scenesRef.current.find((s) => s.id === sceneId);
-      if (!scene) return;
-      setCollapsedNumbers((prev) => {
+      setCollapsedStableIds((prev) => {
         const next = new Set(prev);
-        if (next.has(scene.number)) next.delete(scene.number);
-        else next.add(scene.number);
+        if (next.has(sceneId)) next.delete(sceneId);
+        else next.add(sceneId);
         persistMetas(scenesRef.current, next);
         return next;
       });
@@ -215,9 +223,9 @@ export function useScenes(
   const setAllCollapsed = useCallback(
     (collapsed: boolean) => {
       const next = collapsed
-        ? new Set(scenesRef.current.map((s) => s.number))
-        : new Set<number>();
-      setCollapsedNumbers(next);
+        ? new Set(scenesRef.current.map((s) => s.id))
+        : new Set<string>();
+      setCollapsedStableIds(next);
       persistMetas(scenesRef.current, next);
     },
     [persistMetas],
@@ -232,7 +240,11 @@ export function useScenes(
 
   const add = useCallback(
     (afterIndex?: number) => {
-      commitContent(addScene(scenesRef.current, afterIndex));
+      const prevIds = new Set(scenesRef.current.map((s) => s.id));
+      const next = addScene(scenesRef.current, afterIndex);
+      commitContent(next);
+      const created = next.find((s) => !prevIds.has(s.id));
+      return created?.id ?? null;
     },
     [commitContent],
   );

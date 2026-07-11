@@ -2,14 +2,18 @@
  * =============================================================================
  * Scene (원고 내 장면)
  * -----------------------------------------------------------------------------
- * 본문 구조는 Manuscript content 의 #1 #2 … 구분자로 파싱합니다.
- * status / memo / 접힘은 scene_metas 테이블에 따로 저장합니다 (export 제외).
+ * Manuscript 는 항상 하나의 긴 문서다. Scene 은 별도 문서가 아니다.
+ *
+ * - 사용자에게 Scene 번호·구분자를 직접 입력하게 하지 않는다.
+ * - 프로그램이 Navigator / 「＋ 새 장면」으로만 Scene 을 관리한다.
+ * - 내부 저장은 원고 content 의 자동 마커 + scene_metas(상태·메모·접힘).
+ * - id 는 안정 키(scene_001 …). number 는 표시용 1, 2, 3… (순서에 따라 재계산).
  * =============================================================================
  */
 
-/** Scene 구분자 설정 — Settings 에서 확장 가능 */
+/** Scene 구분자 설정 — Settings 에서 확장 가능 (내부 직렬화 전용) */
 export interface SceneDelimiterConfig {
-  /** 숫자 앞 접두사. 기본 "#" → `#1`, `#2` */
+  /** 숫자 앞 접두사. 기본 "#" → 내부 `#1`, `#2` (사용자 UI에는 노출하지 않음) */
   prefix: string;
 }
 
@@ -28,10 +32,14 @@ export const SCENE_STATUS_LABELS: Record<SceneStatus, string> = {
 
 /**
  * 파싱된 Scene + 메타.
- * id 는 UI용이며, 영속 키는 documentId + scene_number 입니다.
+ * - id: 안정 키 `scene_001` (UI·DnD·선택 유지용, 사용자에게 미표시)
+ * - number: 표시용 순번 1, 2, 3…
+ * - 영속 메타 키는 documentId + scene_number (순서 저장 후 동기화)
  */
 export interface Scene {
+  /** 안정 ID — 예: scene_001 */
   id: string;
+  /** 화면 표시 번호 (1부터, 순서 변경 시 자동 재계산) */
   number: number;
   title: string;
   body: string;
