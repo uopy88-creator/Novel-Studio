@@ -37,6 +37,7 @@ import { useManuscriptVersions } from "@/features/manuscript/hooks/useManuscript
 import { useAutoRecovery } from "@/features/manuscript/hooks/useAutoRecovery";
 import { AutoRecoveryDialog } from "@/features/manuscript/components/AutoRecoveryDialog";
 import { ExportModal } from "@/features/export/components/ExportModal";
+import { SentenceAssistantHost } from "@/features/sentence-assistant";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import {
   chapterLocalToGlobalOffset,
@@ -513,6 +514,10 @@ export function ManuscriptWorkspace({
                   onAddInspiration={(selection) =>
                     setPendingSelection(selection)
                   }
+                />
+                <SentenceAssistantHost
+                  textareaRef={editorRef}
+                  enabled={documents.length > 0}
                 />
               </div>
             </div>

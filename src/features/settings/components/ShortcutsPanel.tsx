@@ -8,7 +8,11 @@
 
 const SHORTCUTS: { keys: string; action: string }[] = [
   { keys: "Ctrl / ⌘ + K", action: "프로젝트 전체 검색" },
-  { keys: "Esc", action: "모달 · 검색 닫기" },
+  {
+    keys: "Ctrl / ⌘ + Shift + Space",
+    action: "Sentence Assistant (선택 문장 참고)",
+  },
+  { keys: "Esc", action: "모달 · 검색 · 패널 닫기" },
   { keys: "↑ / ↓", action: "검색 결과 이동" },
   { keys: "Enter", action: "검색 결과 열기" },
   { keys: "@", action: "원고에서 캐릭터 멘션" },
