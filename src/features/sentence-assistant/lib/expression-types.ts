@@ -7,7 +7,13 @@
  */
 
 export interface ExpressionLookupResult {
+  /** 작가가 선택한 원문(정규화) */
   query: string;
+  /**
+   * 검색에 사용한 기본형.
+   * 활용형이면 lemma 로 해석된 값 (원문과 같을 수 있음).
+   */
+  lemma: string;
   /** 가나다순 · 최대 5개 */
   synonyms: string[];
 }
