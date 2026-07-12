@@ -59,6 +59,7 @@ export const ManuscriptEditor = forwardRef<
   return (
     <textarea
       ref={ref}
+      data-manuscript-editor=""
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}

@@ -18,6 +18,7 @@ import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { Section } from "@/features/manuscript/types/section";
 import type { CharacterId, ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
+import { useManuscriptHistory } from "@/features/manuscript/hooks/useManuscriptHistory";
 import { useSections } from "@/features/manuscript/hooks/useSections";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { updateCharacter } from "@/features/characters/lib/character-storage";
@@ -85,10 +86,20 @@ export function ManuscriptWorkspace({
     primaryDocumentId,
     selectedChapterId,
     content,
-    setContent,
+    setContent: baseSetContent,
     saveStatus,
     lastSavedAt,
   } = useManuscript(projectId, initialDocumentId);
+
+  const {
+    setContent,
+    setContentTransactional,
+    replaceContent,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useManuscriptHistory(projectId, content, baseSetContent, isReady);
 
   // Export · 딥링크 스크롤용 — 구조 편집 UI는 Section 페이지에 있다
   const { sections } = useSections(
@@ -117,7 +128,7 @@ export function ManuscriptWorkspace({
     projectId,
     chapterId: selectedChapterId,
     content,
-    setContent,
+    setContent: replaceContent,
     saveStatus,
   });
 
@@ -269,11 +280,50 @@ export function ManuscriptWorkspace({
 
   const handleRestoreVersion = useCallback(
     (version: ManuscriptVersion) => {
-      setContent(version.content);
+      replaceContent(version.content);
       setVersionModalOpen(false);
     },
-    [setContent],
+    [replaceContent],
   );
+
+  // Undo / Redo 단축키 (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z)
+  useEffect(() => {
+    if (!isReady) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      // 다른 입력란(검색 등)에서는 브라우저 기본 Undo 유지
+      const inEditor =
+        target === editorRef.current ||
+        (tag === "textarea" && target?.closest("[data-manuscript-editor]"));
+      if (!inEditor) return;
+
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod) return;
+      if (event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (key === "z") {
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (key === "y" && !event.metaKey) {
+        // Windows Ctrl+Y = Redo
+        event.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isReady, undo, redo]);
 
   return (
     <ContentContainer
@@ -292,6 +342,35 @@ export function ManuscriptWorkspace({
         {isReady ? (
           <div className="flex flex-col items-stretch gap-ns-2 sm:items-end">
             <div className="flex flex-wrap items-center justify-end gap-ns-2">
+              {/* Undo / Redo — 툴바 왼쪽 */}
+              <div
+                className="mr-ns-1 flex items-center gap-ns-1"
+                role="group"
+                aria-label="실행 취소"
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={!canUndo}
+                  onClick={undo}
+                  title="실행 취소 (Ctrl+Z)"
+                  aria-label="Undo"
+                >
+                  ↶ Undo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={!canRedo}
+                  onClick={redo}
+                  title="다시 실행 (Ctrl+Shift+Z)"
+                  aria-label="Redo"
+                >
+                  ↷ Redo
+                </Button>
+              </div>
               <ContextHelp topic="manuscript" projectId={projectId} />
               {primaryDocumentId ? (
                 <>
@@ -413,7 +492,9 @@ export function ManuscriptWorkspace({
             const oldName = profileCharacter.name;
             const newName = input.name.trim();
             if (oldName !== newName) {
-              setContent(replaceMentionNameInText(content, oldName, newName));
+              setContentTransactional(
+                replaceMentionNameInText(content, oldName, newName),
+              );
             }
             const updated = await updateCharacter(profileCharacter.id, input);
             if (updated) {

@@ -11,16 +11,18 @@
  * =============================================================================
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Section } from "@/features/manuscript/types/section";
 import type { ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
+import { useManuscriptHistory } from "@/features/manuscript/hooks/useManuscriptHistory";
 import { useSections } from "@/features/manuscript/hooks/useSections";
 import { SectionNavigator } from "@/features/manuscript/components/section-navigator";
 import { manuscriptSearchHref } from "@/features/global-search/lib/search-href";
 import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
+import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
 
 export interface SectionsPageProps {
@@ -29,8 +31,16 @@ export interface SectionsPageProps {
 
 export function SectionsPage({ projectId }: SectionsPageProps) {
   const router = useRouter();
-  const { isReady, primaryDocumentId, content, setContent } =
+  const { isReady, primaryDocumentId, content, setContent: baseSetContent } =
     useManuscript(projectId);
+
+  const {
+    setContentTransactional,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useManuscriptHistory(projectId, content, baseSetContent, isReady);
 
   const {
     sections,
@@ -44,7 +54,12 @@ export function SectionsPage({ projectId }: SectionsPageProps) {
     setStatus,
     setMemo,
     toggleIcon,
-  } = useSections(projectId, primaryDocumentId, content, setContent);
+  } = useSections(
+    projectId,
+    primaryDocumentId,
+    content,
+    setContentTransactional,
+  );
 
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
@@ -68,6 +83,30 @@ export function SectionsPage({ projectId }: SectionsPageProps) {
     );
   }
 
+  // Section 구조 편집 Undo/Redo 단축키 (이름 입력란에서는 브라우저 기본 동작 유지)
+  useEffect(() => {
+    if (!isReady) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement | null)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (key === "z") {
+        event.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isReady, undo, redo]);
+
   return (
     <ContentContainer width="wide">
       <header className="mb-ns-8 flex flex-col gap-ns-4 sm:flex-row sm:items-end sm:justify-between">
@@ -80,6 +119,34 @@ export function SectionsPage({ projectId }: SectionsPageProps) {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
+          <div
+            className="flex items-center gap-ns-1"
+            role="group"
+            aria-label="실행 취소"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!canUndo}
+              onClick={undo}
+              title="실행 취소 (Ctrl+Z)"
+              aria-label="Undo"
+            >
+              ↶ Undo
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!canRedo}
+              onClick={redo}
+              title="다시 실행 (Ctrl+Shift+Z)"
+              aria-label="Redo"
+            >
+              ↷ Redo
+            </Button>
+          </div>
           <ContextHelp topic="sections" projectId={projectId} />
         </div>
       </header>

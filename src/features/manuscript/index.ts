@@ -23,6 +23,7 @@ export { SectionNavigator } from "./components/section-navigator";
 export { SceneNavigator } from "./components/scene-navigator";
 export { ManuscriptVersionModal } from "./components/version-history";
 export { useManuscript } from "./hooks/useManuscript";
+export { useManuscriptHistory } from "./hooks/useManuscriptHistory";
 export { useSections } from "./hooks/useSections";
 /** @deprecated Use useSections */
 export { useScenes } from "./hooks/useScenes";
