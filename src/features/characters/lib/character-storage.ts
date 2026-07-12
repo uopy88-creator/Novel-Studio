@@ -27,6 +27,9 @@ export type CharacterSortMode = "favorite" | "name" | "updated";
 
 export interface CharacterInput {
   name: string;
+  nickname: string;
+  status: string;
+  intro: string;
   role: string;
   age: string;
   gender: string;
@@ -62,6 +65,9 @@ function normalizeCharacter(raw: unknown): Character | null {
     id: item.id,
     projectId: item.projectId,
     name: item.name.trim(),
+    nickname: typeof item.nickname === "string" ? item.nickname : "",
+    status: typeof item.status === "string" ? item.status : "",
+    intro: typeof item.intro === "string" ? item.intro : "",
     role: typeof item.role === "string" ? item.role : "",
     age: typeof item.age === "string" ? item.age : "",
     gender: typeof item.gender === "string" ? item.gender : "",
@@ -200,6 +206,9 @@ export async function createCharacter(
     id: createCharacterId(),
     projectId,
     name: input.name.trim(),
+    nickname: input.nickname.trim(),
+    status: input.status.trim(),
+    intro: input.intro.trim(),
     role: input.role.trim(),
     age: input.age.trim(),
     gender: input.gender.trim(),
@@ -244,6 +253,9 @@ export async function updateCharacter(
     const updated: Character = {
       ...all[index],
       name: input.name.trim(),
+      nickname: input.nickname.trim(),
+      status: input.status.trim(),
+      intro: input.intro.trim(),
       role: input.role.trim(),
       age: input.age.trim(),
       gender: input.gender.trim(),
@@ -271,6 +283,9 @@ export async function updateCharacter(
   const updated: Character = {
     ...all[index],
     name: input.name.trim(),
+    nickname: input.nickname.trim(),
+    status: input.status.trim(),
+    intro: input.intro.trim(),
     role: input.role.trim(),
     age: input.age.trim(),
     gender: input.gender.trim(),

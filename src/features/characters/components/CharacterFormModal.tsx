@@ -34,6 +34,9 @@ export interface CharacterFormModalProps {
 
 const emptyInput = (): CharacterInput => ({
   name: "",
+  nickname: "",
+  status: "",
+  intro: "",
   role: "",
   age: "",
   gender: "",
@@ -63,6 +66,9 @@ export function CharacterFormModal({
     if (mode === "edit" && character) {
       setForm({
         name: character.name,
+        nickname: character.nickname,
+        status: character.status,
+        intro: character.intro,
         role: character.role,
         age: character.age,
         gender: character.gender,
@@ -235,6 +241,27 @@ export function CharacterFormModal({
           error={nameError ?? undefined}
           autoFocus
           required
+        />
+
+        <Input
+          label="별명"
+          value={form.nickname}
+          onChange={(event) => setField("nickname", event.target.value)}
+          placeholder="민준이"
+        />
+
+        <Input
+          label="현재 상태"
+          value={form.status}
+          onChange={(event) => setField("status", event.target.value)}
+          placeholder="여행 중 / 실종 / 부상"
+        />
+
+        <Input
+          label="한 줄 소개"
+          value={form.intro}
+          onChange={(event) => setField("intro", event.target.value)}
+          placeholder="진실을 쫓는 기자"
         />
 
         <div className="flex flex-col gap-ns-2">

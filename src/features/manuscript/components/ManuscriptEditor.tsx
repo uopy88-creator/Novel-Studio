@@ -6,11 +6,17 @@
  * -----------------------------------------------------------------------------
  * 큰 plain-text 원고 에디터.
  * - 검색 점프를 위해 ref + setSelectionRange 지원
- * - @멘션 자동완성을 위해 키보드/클릭 핸들러 전달 가능
+ * - @멘션 자동완성을 위해 키보드/클릭/선택/IME 핸들러 전달 가능
  * =============================================================================
  */
 
-import { forwardRef, type KeyboardEventHandler, type MouseEventHandler } from "react";
+import {
+  forwardRef,
+  type CompositionEventHandler,
+  type KeyboardEventHandler,
+  type MouseEventHandler,
+  type ReactEventHandler,
+} from "react";
 import { cn } from "@/lib/utils/cn";
 
 export interface ManuscriptEditorProps {
@@ -22,6 +28,11 @@ export interface ManuscriptEditorProps {
   onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
   onKeyUp?: KeyboardEventHandler<HTMLTextAreaElement>;
   onClick?: MouseEventHandler<HTMLTextAreaElement>;
+  onSelect?: ReactEventHandler<HTMLTextAreaElement>;
+  onCompositionStart?: CompositionEventHandler<HTMLTextAreaElement>;
+  onCompositionEnd?: CompositionEventHandler<HTMLTextAreaElement>;
+  onMouseUp?: MouseEventHandler<HTMLTextAreaElement>;
+  onScroll?: ReactEventHandler<HTMLTextAreaElement>;
 }
 
 export const ManuscriptEditor = forwardRef<
@@ -37,6 +48,11 @@ export const ManuscriptEditor = forwardRef<
     onKeyDown,
     onKeyUp,
     onClick,
+    onSelect,
+    onCompositionStart,
+    onCompositionEnd,
+    onMouseUp,
+    onScroll,
   },
   ref,
 ) {
@@ -49,6 +65,11 @@ export const ManuscriptEditor = forwardRef<
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
       onClick={onClick}
+      onSelect={onSelect}
+      onCompositionStart={onCompositionStart}
+      onCompositionEnd={onCompositionEnd}
+      onMouseUp={onMouseUp}
+      onScroll={onScroll}
       spellCheck
       aria-label={
         documentTitle ? `원고 편집: ${documentTitle}` : "원고 편집"

@@ -73,6 +73,10 @@ export interface DbCharacterRow {
   project_id: string;
   user_id: string;
   name: string;
+  /** 마이그레이션 전 행 호환 — 없으면 "" */
+  nickname?: string | null;
+  status?: string | null;
+  intro?: string | null;
   role: string;
   age: string;
   gender: string;

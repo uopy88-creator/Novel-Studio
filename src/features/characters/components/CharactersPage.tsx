@@ -6,14 +6,19 @@
  * =============================================================================
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Character } from "@/features/characters/types/character";
-import type { ProjectId } from "@/types/ids";
+import type { CharacterId, ProjectId } from "@/types/ids";
 import { useCharacters } from "@/features/characters/hooks/useCharacters";
 import { CharacterList } from "@/features/characters/components/CharacterList";
 import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
 import { CharacterToolbar } from "@/features/characters/components/CharacterToolbar";
 import { CharacterDeleteDialog } from "@/features/characters/components/CharacterDeleteDialog";
+import { replaceMentionNameInText } from "@/features/characters/lib/mention";
+import {
+  loadProjectManuscript,
+  saveProjectManuscript,
+} from "@/features/manuscript/lib/project-manuscript";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -21,12 +26,32 @@ import { ContextHelp } from "@/features/help";
 type ModalState =
   | { type: "closed" }
   | { type: "create" }
-  | { type: "edit"; character: Character };
+  | { type: "edit"; characterId: CharacterId };
 
 export interface CharactersPageProps {
   projectId: ProjectId;
   /** 전역 검색에서 전달 — 해당 캐릭터 편집 모달 오픈 */
   initialCharacterId?: string;
+}
+
+async function syncMentionNamesInManuscript(
+  projectId: ProjectId,
+  oldName: string,
+  newName: string,
+): Promise<void> {
+  if (!oldName.trim() || oldName.trim() === newName.trim()) return;
+
+  const { chapters, content, primaryDocumentId } =
+    await loadProjectManuscript(projectId);
+  const next = replaceMentionNameInText(content, oldName, newName);
+  if (next === content) return;
+
+  await saveProjectManuscript({
+    projectId,
+    chapters,
+    content: next,
+    primaryDocumentId,
+  });
 }
 
 export function CharactersPage({
@@ -54,8 +79,13 @@ export function CharactersPage({
   useEffect(() => {
     if (!isReady || !initialCharacterId) return;
     const hit = characters.find((c) => c.id === initialCharacterId);
-    if (hit) setModal({ type: "edit", character: hit });
+    if (hit) setModal({ type: "edit", characterId: hit.id });
   }, [isReady, initialCharacterId, characters]);
+
+  const editingCharacter = useMemo(() => {
+    if (modal.type !== "edit") return null;
+    return characters.find((c) => c.id === modal.characterId) ?? null;
+  }, [characters, modal]);
 
   const openCreate = () => setModal({ type: "create" });
   const closeModal = () => setModal({ type: "closed" });
@@ -104,7 +134,9 @@ export function CharactersPage({
           <CharacterList
             characters={filtered}
             isSearchEmpty={isSearchEmpty}
-            onOpen={(character) => setModal({ type: "edit", character })}
+            onOpen={(character) =>
+              setModal({ type: "edit", characterId: character.id })
+            }
             onDelete={(character) => setDeleting(character)}
             onToggleFavorite={(character) => {
               void toggleFavorite(character.id);
@@ -125,12 +157,18 @@ export function CharactersPage({
       <CharacterFormModal
         open={modal.type === "create" || modal.type === "edit"}
         mode={modal.type === "edit" ? "edit" : "create"}
-        character={modal.type === "edit" ? modal.character : null}
+        character={editingCharacter}
         onClose={closeModal}
         onSubmit={(input) => {
           void (async () => {
-            if (modal.type === "edit") {
-              await update(modal.character.id, input);
+            if (modal.type === "edit" && editingCharacter) {
+              const oldName = editingCharacter.name;
+              await update(editingCharacter.id, input);
+              await syncMentionNamesInManuscript(
+                projectId,
+                oldName,
+                input.name,
+              );
             } else {
               await create(input);
             }

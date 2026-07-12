@@ -54,6 +54,15 @@ export interface Character extends Timestamps {
   /** 이름 (필수) */
   name: string;
 
+  /** 별명 */
+  nickname: string;
+
+  /** 현재 상태 */
+  status: string;
+
+  /** 한 줄 소개 */
+  intro: string;
+
   /** 역할 (주인공/조연 등 — 자유 텍스트) */
   role: string;
 

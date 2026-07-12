@@ -16,11 +16,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { Section } from "@/features/manuscript/types/section";
-import type { ProjectId } from "@/types/ids";
+import type { CharacterId, ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
 import { useSections } from "@/features/manuscript/hooks/useSections";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { updateCharacter } from "@/features/characters/lib/character-storage";
+import { replaceMentionNameInText } from "@/features/characters/lib/mention";
 import { CharacterMentionField } from "@/features/characters/components/CharacterMentionField";
 import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
 import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
@@ -134,7 +135,8 @@ export function ManuscriptWorkspace({
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [profile, setProfile] = useState<Character | null>(null);
+  const [profileId, setProfileId] = useState<CharacterId | null>(null);
+  const [mentionActive, setMentionActive] = useState(false);
   const [projectInspirations, setProjectInspirations] = useState<Inspiration[]>(
     [],
   );
@@ -158,6 +160,15 @@ export function ManuscriptWorkspace({
       cancelled = true;
     };
   }, [projectId]);
+
+  // 열린 프로필은 스냅샷이 아니라 live characters 에서 id 로 해석
+  const profileCharacter = useMemo(
+    () =>
+      profileId
+        ? (characters.find((character) => character.id === profileId) ?? null)
+        : null,
+    [characters, profileId],
+  );
 
   const refreshInspirations = useCallback(async () => {
     setProjectInspirations(await readInspirationsByProject(projectId));
@@ -411,11 +422,12 @@ export function ManuscriptWorkspace({
                   documentTitle="Manuscript"
                   editorRef={editorRef}
                   editorClassName="pl-10 font-mono text-[length:var(--ns-editor-font-size,1rem)]"
-                  onOpenCharacter={(character) => setProfile(character)}
+                  onOpenCharacter={(character) => setProfileId(character.id)}
+                  onMentionActiveChange={setMentionActive}
                 />
                 <InspirationSelectionMenu
                   textareaRef={editorRef}
-                  enabled={Boolean(primaryDocumentId)}
+                  enabled={Boolean(primaryDocumentId) && !mentionActive}
                   onAddInspiration={(selection) =>
                     setPendingSelection(selection)
                   }
@@ -439,18 +451,23 @@ export function ManuscriptWorkspace({
       )}
 
       <CharacterFormModal
-        open={Boolean(profile)}
+        open={Boolean(profileCharacter)}
         mode="edit"
-        character={profile}
-        onClose={() => setProfile(null)}
+        character={profileCharacter}
+        onClose={() => setProfileId(null)}
         onSubmit={(input) => {
-          if (!profile) return;
+          if (!profileCharacter) return;
           void (async () => {
-            const updated = await updateCharacter(profile.id, input);
+            const oldName = profileCharacter.name;
+            const newName = input.name.trim();
+            if (oldName !== newName) {
+              setContent(replaceMentionNameInText(content, oldName, newName));
+            }
+            const updated = await updateCharacter(profileCharacter.id, input);
             if (updated) {
               setCharacters(await readCharactersByProject(projectId));
             }
-            setProfile(null);
+            setProfileId(null);
           })();
         }}
       />

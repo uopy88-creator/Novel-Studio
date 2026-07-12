@@ -5,12 +5,14 @@
  * CharacterMentionField
  * -----------------------------------------------------------------------------
  * Manuscript textarea + @자동완성 + 클릭 가능한 멘션 태그.
+ * PC: IME composition / caret 위치 / z-index / onSelect 동기화.
  * =============================================================================
  */
 
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -19,6 +21,7 @@ import {
 import type { Character } from "@/features/characters/types/character";
 import {
   filterMentionCandidates,
+  findCharacterAtCursor,
   findMentionedCharacters,
   getMentionQueryAtCursor,
   insertMentionAtCursor,
@@ -36,6 +39,41 @@ export interface CharacterMentionFieldProps {
   editorClassName?: string;
   editorRef?: React.RefObject<HTMLTextAreaElement | null>;
   onOpenCharacter?: (character: Character) => void;
+  /** @멘션 메뉴가 열려 있을 때 (영감 메뉴 등과 충돌 방지) */
+  onMentionActiveChange?: (active: boolean) => void;
+}
+
+interface CaretMenuPosition {
+  top: number;
+  left: number;
+}
+
+function estimateCaretMenuPosition(
+  el: HTMLTextAreaElement,
+  mentionStart: number,
+): CaretMenuPosition {
+  const style = window.getComputedStyle(el);
+  const lineHeight = Number.parseFloat(style.lineHeight) || 28;
+  const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+  const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+  const rect = el.getBoundingClientRect();
+
+  const before = el.value.slice(0, mentionStart);
+  const lines = before.split("\n");
+  const lineIndex = lines.length - 1;
+  const col = lines[lines.length - 1]?.length ?? 0;
+
+  const top =
+    paddingTop + lineIndex * lineHeight - el.scrollTop + lineHeight + 4;
+  const left = Math.min(
+    paddingLeft + Math.min(col, 28) * 8 - el.scrollLeft,
+    rect.width - 288,
+  );
+
+  return {
+    top: Math.max(8, Math.min(top, el.clientHeight - 8)),
+    left: Math.max(8, left),
+  };
 }
 
 export function CharacterMentionField({
@@ -47,15 +85,22 @@ export function CharacterMentionField({
   editorClassName,
   editorRef,
   onOpenCharacter,
+  onMentionActiveChange,
 }: CharacterMentionFieldProps) {
   const localRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = editorRef ?? localRef;
+  const composingRef = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [mention, setMention] = useState<{
     start: number;
     query: string;
     index: number;
   } | null>(null);
+  const [menuPos, setMenuPos] = useState<CaretMenuPosition>({
+    top: 16,
+    left: 16,
+  });
 
   const candidates = useMemo(() => {
     if (!mention) return [];
@@ -67,12 +112,27 @@ export function CharacterMentionField({
     [value, characters],
   );
 
+  const mentionMenuOpen = Boolean(mention && candidates.length > 0);
+
+  useEffect(() => {
+    onMentionActiveChange?.(mentionMenuOpen);
+  }, [mentionMenuOpen, onMentionActiveChange]);
+
+  const updateMenuPosition = useCallback((mentionStart: number) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    setMenuPos(estimateCaretMenuPosition(el, mentionStart));
+  }, [textareaRef]);
+
   const syncMentionFromCursor = useCallback(() => {
     const el = textareaRef.current;
     if (!el) {
       setMention(null);
       return;
     }
+    // IME 조합 중에는 쿼리 동기화를 미룬다 (조합 문자가 아직 확정 전)
+    if (composingRef.current) return;
+
     const found = getMentionQueryAtCursor(el.value, el.selectionStart);
     if (!found) {
       setMention(null);
@@ -83,7 +143,8 @@ export function CharacterMentionField({
       query: found.query,
       index: prev?.query === found.query ? prev.index : 0,
     }));
-  }, [textareaRef]);
+    updateMenuPosition(found.start);
+  }, [textareaRef, updateMenuPosition]);
 
   const applyMention = useCallback(
     (character: Character) => {
@@ -109,6 +170,11 @@ export function CharacterMentionField({
   );
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME 조합 중(한글 등) Arrow/Enter 는 브라우저/IME 가 처리하도록 둔다
+    if (event.nativeEvent.isComposing || event.keyCode === 229) {
+      return;
+    }
+
     if (!mention || candidates.length === 0) return;
 
     if (event.key === "ArrowDown") {
@@ -151,15 +217,44 @@ export function CharacterMentionField({
     }
   };
 
+  /** 클릭/mouseup: 완성된 `@이름` 위면 프로필 오픈, 아니면 멘션 동기화 */
+  const handlePointerOpenOrSync = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // 선택 구간이 있으면 멘션/프로필 클릭으로 보지 않음
+    if (el.selectionStart !== el.selectionEnd) {
+      syncMentionFromCursor();
+      return;
+    }
+
+    const hit = findCharacterAtCursor(
+      el.value,
+      el.selectionStart,
+      characters,
+    );
+    if (hit) {
+      setMention(null);
+      onOpenCharacter?.(hit);
+      return;
+    }
+
+    syncMentionFromCursor();
+  }, [characters, onOpenCharacter, syncMentionFromCursor, textareaRef]);
+
   useEffect(() => {
     if (mention && mention.index >= candidates.length) {
       setMention((prev) => (prev ? { ...prev, index: 0 } : prev));
     }
   }, [candidates.length, mention]);
 
+  useLayoutEffect(() => {
+    if (mention) updateMenuPosition(mention.start);
+  }, [mention, updateMenuPosition, value]);
+
   return (
     <div className={cn("relative flex flex-col gap-ns-3", className)}>
-      <div className="relative">
+      <div ref={wrapperRef} className="relative">
         <ManuscriptEditor
           ref={textareaRef}
           value={value}
@@ -170,13 +265,26 @@ export function CharacterMentionField({
           documentTitle={documentTitle}
           className={cn("min-h-[32rem]", editorClassName)}
           onKeyDown={handleKeyDown}
-          onClick={syncMentionFromCursor}
+          onClick={handlePointerOpenOrSync}
+          onMouseUp={handlePointerOpenOrSync}
           onKeyUp={syncMentionFromCursor}
+          onSelect={syncMentionFromCursor}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+            requestAnimationFrame(syncMentionFromCursor);
+          }}
+          onScroll={() => {
+            if (mention) updateMenuPosition(mention.start);
+          }}
         />
 
-        {mention && candidates.length > 0 ? (
+        {mentionMenuOpen ? (
           <ul
-            className="absolute left-ns-4 top-ns-4 z-20 max-h-56 w-64 overflow-auto rounded-ns-lg border border-ns-border bg-ns-surface py-ns-1 shadow-ns-md"
+            className="absolute z-[60] max-h-72 w-[19rem] overflow-auto rounded-ns-lg border border-ns-border bg-ns-surface py-ns-1 shadow-ns-md"
+            style={{ top: menuPos.top, left: menuPos.left }}
             role="listbox"
             aria-label="캐릭터 자동완성"
           >
@@ -185,29 +293,44 @@ export function CharacterMentionField({
                 <button
                   type="button"
                   role="option"
-                  aria-selected={index === mention.index}
+                  aria-selected={index === mention!.index}
                   className={cn(
-                    "flex w-full items-center gap-ns-3 px-ns-3 py-ns-2 text-left text-ns-sm",
-                    index === mention.index
+                    "flex w-full items-start gap-ns-3 px-ns-3 py-ns-2 text-left text-ns-sm",
+                    index === mention!.index
                       ? "bg-ns-accent-soft text-ns-ink"
                       : "text-ns-ink-secondary hover:bg-ns-muted",
                   )}
                   onMouseDown={(event) => {
+                    // textarea 포커스 유지 — 클릭으로 blur 되면 메뉴가 사라짐
                     event.preventDefault();
                     applyMention(character);
                   }}
                 >
                   <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: character.color }}
                     aria-hidden
                   />
-                  <span className="truncate font-medium">{character.name}</span>
-                  {character.role ? (
-                    <span className="truncate text-ns-xs text-ns-ink-tertiary">
-                      {character.role}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-ns-ink">
+                      {character.name}
                     </span>
-                  ) : null}
+                    {character.nickname ? (
+                      <span className="mt-0.5 block truncate text-ns-xs text-ns-ink-tertiary">
+                        별명 · {character.nickname}
+                      </span>
+                    ) : null}
+                    {character.status ? (
+                      <span className="mt-0.5 block truncate text-ns-xs text-ns-ink-tertiary">
+                        {character.status}
+                      </span>
+                    ) : null}
+                    {character.intro ? (
+                      <span className="mt-0.5 block line-clamp-2 text-ns-xs text-ns-ink-tertiary">
+                        {character.intro}
+                      </span>
+                    ) : null}
+                  </span>
                 </button>
               </li>
             ))}

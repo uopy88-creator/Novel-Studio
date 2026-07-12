@@ -80,6 +80,21 @@ export function CharacterCard({
               {character.occupation}
             </p>
           ) : null}
+          {character.nickname ? (
+            <p className="text-ns-xs text-ns-ink-tertiary">
+              별명 · {character.nickname}
+            </p>
+          ) : null}
+          {character.status ? (
+            <p className="text-ns-xs text-ns-ink-tertiary">
+              {character.status}
+            </p>
+          ) : null}
+          {character.intro ? (
+            <p className="line-clamp-2 text-ns-xs text-ns-ink-tertiary">
+              {character.intro}
+            </p>
+          ) : null}
         </div>
       </button>
 
