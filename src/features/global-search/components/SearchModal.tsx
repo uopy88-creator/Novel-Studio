@@ -275,7 +275,7 @@ function RecentList({
   if (recent.length === 0) {
     return (
       <p className="px-ns-4 py-ns-6 text-center text-ns-sm text-ns-ink-tertiary">
-        작품 전체를 검색합니다. Manuscript · Scene · Character · Writing Vault ·
+        작품 전체를 검색합니다. Manuscript · Section · Character · Writing Vault ·
         Memo · Foreshadowing
       </p>
     );

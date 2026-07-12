@@ -1,16 +1,16 @@
 /**
  * =============================================================================
- * Timeline ↔ Scene 옵션
+ * Timeline ↔ Section 옵션
  * -----------------------------------------------------------------------------
- * 프로젝트의 모든 Document에서 Scene 을 모아 선택 목록으로 만든다.
- * Scene Navigator 와 같은 parseScenes / 안정 ID 를 사용한다.
+ * 프로젝트의 모든 Document에서 Section 을 모아 선택 목록으로 만든다.
+ * Scene Navigator 와 같은 parseSections / 안정 ID 를 사용한다.
  * =============================================================================
  */
 
 import type { ProjectId } from "@/types/ids";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
-import { parseScenes } from "@/features/manuscript/lib/scene-parser";
+import { parseSections } from "@/features/manuscript/lib/section-parser";
 
 export interface TimelineSceneOption {
   /** select value — `${documentId}::${sceneStableId}` */
@@ -41,7 +41,7 @@ export function decodeSceneOptionValue(
   return { documentId, sceneStableId };
 }
 
-/** 프로젝트 내 Scene 선택지 (Document · 번호 · 제목) */
+/** 프로젝트 내 Section 선택지 (Document · 번호 · 제목) */
 export async function loadTimelineSceneOptions(
   projectId: ProjectId,
 ): Promise<TimelineSceneOption[]> {
@@ -59,17 +59,17 @@ export async function loadTimelineSceneOptions(
     if (manuscript.projectId !== projectId) continue;
     const documentTitle =
       titleById.get(manuscript.chapterId) ?? "Document";
-    const scenes = parseScenes(manuscript.content ?? "");
-    for (const scene of scenes) {
-      const sceneTitle = scene.title.trim() || "제목 없음";
+    const sections = parseSections(manuscript.content ?? "");
+    for (const section of sections) {
+      const sectionTitle = section.title.trim() || "제목 없음";
       options.push({
-        value: encodeSceneOptionValue(manuscript.chapterId, scene.id),
+        value: encodeSceneOptionValue(manuscript.chapterId, section.id),
         documentId: manuscript.chapterId,
         documentTitle,
-        sceneStableId: scene.id,
-        sceneNumber: scene.number,
-        sceneTitle,
-        label: `${documentTitle} · ${scene.number}. ${sceneTitle}`,
+        sceneStableId: section.id,
+        sceneNumber: section.number,
+        sceneTitle: sectionTitle,
+        label: `${documentTitle} · ${section.number}. ${sectionTitle}`,
       });
     }
   }

@@ -1,0 +1,298 @@
+"use client";
+
+/**
+ * =============================================================================
+ * useSections
+ * -----------------------------------------------------------------------------
+ * Architecture: Project → Manuscript → Sections
+ *
+ * - 원고 content → Section 파싱 (프로그램이 관리하는 내부 마커)
+ * - status / memo / 접힘 → section metas
+ * - 순서·제목·추가·삭제는 content 재직렬화 → Manuscript autosave
+ * =============================================================================
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  Section,
+  SectionStatus,
+} from "@/features/manuscript/types/section";
+import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
+import type { ChapterId, ProjectId } from "@/types/ids";
+import { parseSections } from "@/features/manuscript/lib/section-parser";
+import {
+  addSection,
+  applySectionsToContent,
+  deleteSection,
+  renameSection,
+  reorderSections,
+  type SectionDeleteMode,
+} from "@/features/manuscript/lib/section-operations";
+import { readSectionDelimiterConfig } from "@/features/manuscript/lib/section-delimiter-settings";
+import {
+  collapsedIdsFromMetas,
+  readSectionMetasByDocument,
+  saveSectionMetasForDocument,
+  withSectionMemo,
+  withSectionStatus,
+} from "@/features/manuscript/lib/section-meta-storage";
+
+export interface UseSectionsResult {
+  sections: Section[];
+  collapsedIds: Set<string>;
+  metaReady: boolean;
+  toggleCollapsed: (sectionId: string) => void;
+  setAllCollapsed: (collapsed: boolean) => void;
+  reorder: (activeId: string, overId: string) => void;
+  /** 선택한 Section 아래(또는 맨 끝)에 추가. 새 Section 안정 ID 반환 */
+  add: (afterIndex?: number) => string | null;
+  remove: (sectionId: string, mode?: SectionDeleteMode) => void;
+  rename: (sectionId: string, title: string) => void;
+  setStatus: (sectionId: string, status: SectionStatus) => void;
+  setMemo: (sectionId: string, memo: string) => void;
+}
+
+const META_SAVE_MS = 500;
+
+export function useSections(
+  projectId: ProjectId,
+  documentId: ChapterId | null,
+  content: string,
+  setContent: (value: string) => void,
+): UseSectionsResult {
+  const config = useMemo(() => {
+    if (typeof window === "undefined") return DEFAULT_SECTION_DELIMITER;
+    return readSectionDelimiterConfig();
+  }, []);
+
+  const [metaByNumber, setMetaByNumber] = useState<
+    Map<number, { status: SectionStatus; memo: string }>
+  >(() => new Map());
+  const [collapsedStableIds, setCollapsedStableIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [metaReady, setMetaReady] = useState(false);
+  const pendingCollapseNumbersRef = useRef<Set<number> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMetaReady(false);
+
+    if (!documentId) {
+      setMetaByNumber(new Map());
+      setCollapsedStableIds(new Set());
+      pendingCollapseNumbersRef.current = null;
+      setMetaReady(true);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const metas = await readSectionMetasByDocument(documentId);
+        if (cancelled) return;
+        setMetaByNumber(
+          new Map(
+            metas.map((m) => [
+              m.sectionNumber,
+              { status: m.status, memo: m.memo },
+            ]),
+          ),
+        );
+        pendingCollapseNumbersRef.current = collapsedIdsFromMetas(metas);
+        setCollapsedStableIds(new Set());
+        setMetaReady(true);
+      } catch (error) {
+        console.error("[useSections] section meta load failed", error);
+        if (cancelled) return;
+        setMetaByNumber(new Map());
+        setCollapsedStableIds(new Set());
+        pendingCollapseNumbersRef.current = null;
+        setMetaReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
+
+  const parsed = useMemo(
+    () => parseSections(content, config),
+    [content, config],
+  );
+
+  const sections = useMemo(
+    () =>
+      parsed.map((section) => {
+        const meta = metaByNumber.get(section.number);
+        return {
+          ...section,
+          status: meta?.status ?? section.status,
+          memo: meta?.memo ?? section.memo,
+        };
+      }),
+    [parsed, metaByNumber],
+  );
+
+  useEffect(() => {
+    const pending = pendingCollapseNumbersRef.current;
+    if (!pending || sections.length === 0) return;
+    const next = new Set<string>();
+    for (const section of sections) {
+      if (pending.has(section.number)) next.add(section.id);
+    }
+    setCollapsedStableIds(next);
+    pendingCollapseNumbersRef.current = null;
+  }, [sections]);
+
+  const collapsedIds = collapsedStableIds;
+
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+  const collapsedRef = useRef(collapsedStableIds);
+  collapsedRef.current = collapsedStableIds;
+  const metaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistMetas = useCallback(
+    (nextSections: Section[], nextCollapsed: Set<string>) => {
+      if (!documentId) return;
+      if (metaTimerRef.current) clearTimeout(metaTimerRef.current);
+      metaTimerRef.current = setTimeout(() => {
+        const collapsedNumbers = new Set<number>();
+        for (const section of nextSections) {
+          if (nextCollapsed.has(section.id)) {
+            collapsedNumbers.add(section.number);
+          }
+        }
+        void saveSectionMetasForDocument({
+          projectId,
+          documentId,
+          sections: nextSections,
+          collapsedNumbers,
+        }).catch((error) => {
+          console.error("[useSections] section meta save failed", error);
+        });
+      }, META_SAVE_MS);
+    },
+    [documentId, projectId],
+  );
+
+  const syncMetaStateFromSections = useCallback((next: Section[]) => {
+    setMetaByNumber(
+      new Map(
+        next.map((s) => [s.number, { status: s.status, memo: s.memo }]),
+      ),
+    );
+  }, []);
+
+  const commitContent = useCallback(
+    (next: Section[]) => {
+      const nextCollapsed = new Set<string>();
+      for (const section of next) {
+        if (collapsedRef.current.has(section.id)) {
+          nextCollapsed.add(section.id);
+        }
+      }
+
+      setContent(applySectionsToContent(next, config));
+      syncMetaStateFromSections(next);
+      setCollapsedStableIds(nextCollapsed);
+      persistMetas(next, nextCollapsed);
+    },
+    [config, persistMetas, setContent, syncMetaStateFromSections],
+  );
+
+  const toggleCollapsed = useCallback(
+    (sectionId: string) => {
+      setCollapsedStableIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(sectionId)) next.delete(sectionId);
+        else next.add(sectionId);
+        persistMetas(sectionsRef.current, next);
+        return next;
+      });
+    },
+    [persistMetas],
+  );
+
+  const setAllCollapsed = useCallback(
+    (collapsed: boolean) => {
+      const next = collapsed
+        ? new Set(sectionsRef.current.map((s) => s.id))
+        : new Set<string>();
+      setCollapsedStableIds(next);
+      persistMetas(sectionsRef.current, next);
+    },
+    [persistMetas],
+  );
+
+  const reorder = useCallback(
+    (activeId: string, overId: string) => {
+      commitContent(reorderSections(sectionsRef.current, activeId, overId));
+    },
+    [commitContent],
+  );
+
+  const add = useCallback(
+    (afterIndex?: number) => {
+      const prevIds = new Set(sectionsRef.current.map((s) => s.id));
+      const next = addSection(sectionsRef.current, afterIndex);
+      commitContent(next);
+      const created = next.find((s) => !prevIds.has(s.id));
+      return created?.id ?? null;
+    },
+    [commitContent],
+  );
+
+  const remove = useCallback(
+    (sectionId: string, mode: SectionDeleteMode = "full") => {
+      commitContent(deleteSection(sectionsRef.current, sectionId, mode));
+    },
+    [commitContent],
+  );
+
+  const rename = useCallback(
+    (sectionId: string, title: string) => {
+      commitContent(renameSection(sectionsRef.current, sectionId, title));
+    },
+    [commitContent],
+  );
+
+  const setStatus = useCallback(
+    (sectionId: string, status: SectionStatus) => {
+      const next = withSectionStatus(sectionsRef.current, sectionId, status);
+      syncMetaStateFromSections(next);
+      persistMetas(next, collapsedRef.current);
+    },
+    [persistMetas, syncMetaStateFromSections],
+  );
+
+  const setMemo = useCallback(
+    (sectionId: string, memo: string) => {
+      const next = withSectionMemo(sectionsRef.current, sectionId, memo);
+      syncMetaStateFromSections(next);
+      persistMetas(next, collapsedRef.current);
+    },
+    [persistMetas, syncMetaStateFromSections],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (metaTimerRef.current) clearTimeout(metaTimerRef.current);
+    };
+  }, []);
+
+  return {
+    sections,
+    collapsedIds,
+    metaReady,
+    toggleCollapsed,
+    setAllCollapsed,
+    reorder,
+    add,
+    remove,
+    rename,
+    setStatus,
+    setMemo,
+  };
+}

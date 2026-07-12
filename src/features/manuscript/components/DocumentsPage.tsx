@@ -51,7 +51,7 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
-          <ContextHelp topic="chapters" projectId={projectId} />
+          <ContextHelp topic="manuscript" projectId={projectId} />
           <Button
             type="button"
             onClick={openCreate}

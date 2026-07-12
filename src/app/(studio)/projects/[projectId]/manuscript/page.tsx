@@ -1,6 +1,6 @@
 /**
  * Manuscript — Document 선택 후 원고 편집.
- * ?documentId= & offset= & end= & sceneId= 로 딥링크 (전역 검색).
+ * ?documentId= & offset= & end= & sectionId= (& sceneId= 레거시) 로 딥링크.
  */
 
 import { ManuscriptWorkspace } from "@/features/manuscript/components/ManuscriptWorkspace";
@@ -13,6 +13,7 @@ interface ManuscriptRoutePageProps {
     documentId?: string;
     offset?: string;
     end?: string;
+    sectionId?: string;
     sceneId?: string;
   }>;
 }
@@ -28,14 +29,14 @@ export default async function ManuscriptRoutePage({
   searchParams,
 }: ManuscriptRoutePageProps) {
   const { projectId } = await params;
-  const { documentId, offset, end, sceneId } = await searchParams;
+  const { documentId, offset, end, sectionId, sceneId } = await searchParams;
   return (
     <ManuscriptWorkspace
       projectId={projectId}
       initialDocumentId={documentId}
       initialOffset={parseOptionalInt(offset)}
       initialEnd={parseOptionalInt(end)}
-      initialSceneId={sceneId}
+      initialSectionId={sectionId ?? sceneId}
     />
   );
 }

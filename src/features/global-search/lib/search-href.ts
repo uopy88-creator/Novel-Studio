@@ -12,11 +12,20 @@ import type { ProjectId } from "@/types/ids";
 export function manuscriptSearchHref(
   projectId: ProjectId,
   documentId: string,
-  options?: { offset?: number; end?: number; sceneId?: string },
+  options?: {
+    offset?: number;
+    end?: number;
+    sectionId?: string;
+    sceneId?: string;
+  },
 ): string {
   const params = new URLSearchParams();
   params.set("documentId", documentId);
-  if (options?.sceneId) params.set("sceneId", options.sceneId);
+  const sectionId = options?.sectionId ?? options?.sceneId;
+  if (sectionId) {
+    params.set("sectionId", sectionId);
+    params.set("sceneId", sectionId);
+  }
   if (typeof options?.offset === "number") {
     params.set("offset", String(options.offset));
   }

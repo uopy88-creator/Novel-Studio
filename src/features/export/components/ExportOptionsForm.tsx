@@ -2,7 +2,7 @@
 
 /**
  * =============================================================================
- * ExportOptionsForm — 형식 · 범위 · 옵션 · Scene 선택
+ * ExportOptionsForm — 형식 · 범위 · 옵션 · Section 선택
  * =============================================================================
  */
 
@@ -125,7 +125,7 @@ export function ExportOptionsForm({
       {scope === "scenes" ? (
         <div className="rounded-ns-lg border border-ns-border bg-ns-muted/30 px-ns-3 py-ns-3">
           <div className="mb-ns-2 flex items-center justify-between gap-ns-2">
-            <p className="text-ns-sm font-medium text-ns-ink">Scene 선택</p>
+            <p className="text-ns-sm font-medium text-ns-ink">Section 선택</p>
             <div className="flex gap-ns-1">
               <Button
                 type="button"
@@ -147,7 +147,7 @@ export function ExportOptionsForm({
           </div>
           {scenes.length === 0 ? (
             <p className="text-ns-xs text-ns-ink-tertiary">
-              이 원고에 Scene이 없습니다.
+              이 원고에 Section이 없습니다.
             </p>
           ) : (
             <ul className="max-h-40 space-y-ns-1 overflow-y-auto">
@@ -176,7 +176,7 @@ export function ExportOptionsForm({
         </legend>
         <div className="flex flex-col gap-ns-1">
           <Checkbox
-            label="장면 구분 포함"
+            label="Section 구분 포함"
             description="#1 #2 … 구분자를 본문에 남깁니다."
             checked={options.includeSceneDelimiters}
             onChange={(e) =>
@@ -187,8 +187,8 @@ export function ExportOptionsForm({
             }
           />
           <Checkbox
-            label="장면 메모 제외"
-            description="작가 전용 Scene 메모를 내보내지 않습니다."
+            label="Section 메모 제외"
+            description="작가 전용 Section 메모를보내지 않습니다."
             checked={options.excludeSceneMemos}
             onChange={(e) =>
               onOptionsChange({

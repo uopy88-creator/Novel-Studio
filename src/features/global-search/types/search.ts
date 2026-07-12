@@ -10,6 +10,7 @@
 /** 검색 결과 종류 (그룹 키) */
 export type SearchResultKind =
   | "manuscript"
+  | "section"
   | "scene"
   | "character"
   | "memo"
@@ -23,7 +24,8 @@ export const SEARCH_GROUP_META: Record<
   { label: string; icon: string; order: number }
 > = {
   manuscript: { label: "Manuscript", icon: "📄", order: 1 },
-  scene: { label: "Scene", icon: "🎬", order: 2 },
+  section: { label: "Section", icon: "🎬", order: 2 },
+  scene: { label: "Section", icon: "🎬", order: 2 },
   character: { label: "Character", icon: "👤", order: 3 },
   "writing-vault": { label: "Writing Vault", icon: "💎", order: 4 },
   memo: { label: "Memo", icon: "📝", order: 5 },

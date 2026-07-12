@@ -29,10 +29,15 @@ export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
 /** 메모 (Dashboard 읽기 · CRUD 준비 — LocalStorage 백업 전용 키) */
 export const MEMOS_STORAGE_KEY = "novel-studio:memos";
 
-/** Scene 구분자 설정 (#1, #2 …) — Settings 연동용 */
-export const SCENE_DELIMITER_SETTINGS_KEY =
+/**
+ * Section 구분자 설정 (#1, #2 …) — Settings 연동용.
+ * 키 문자열은 하위 호환을 위해 scene-delimiter-settings 유지.
+ */
+export const SECTION_DELIMITER_SETTINGS_KEY =
   "novel-studio:scene-delimiter-settings";
 
+/** @deprecated Use SECTION_DELIMITER_SETTINGS_KEY */
+export const SCENE_DELIMITER_SETTINGS_KEY = SECTION_DELIMITER_SETTINGS_KEY;
 
 /** 캐릭터 프로필 */
 export const CHARACTERS_STORAGE_KEY = "novel-studio:characters";
@@ -46,8 +51,21 @@ export const WORD_TREASURY_STORAGE_KEY = "novel-studio:word-treasury";
 /** 복선 (Foreshadowing) — LocalStorage 백업 전용 */
 export const FORESHADOWINGS_STORAGE_KEY = "novel-studio:foreshadowings";
 
-/** Scene 상태·메모·접힘 (원고와 분리, export 제외) */
+/**
+ * Section 상태·메모·접힘 (원고와 분리, export 제외).
+ * 새 키. 읽기 시 `SCENE_METAS_STORAGE_KEY`(레거시)에서 마이그레이션한다.
+ */
+export const SECTION_METAS_STORAGE_KEY = "novel-studio:section-metas";
+
+/** @deprecated Use SECTION_METAS_STORAGE_KEY — 마이그레이션 소스 */
 export const SCENE_METAS_STORAGE_KEY = "novel-studio:scene-metas";
+
+/**
+ * Chapter→Section 통합 마이그레이션 완료 플래그 (프로젝트별).
+ * 값: JSON string[] of projectId
+ */
+export const SECTIONS_MIGRATION_FLAG_KEY =
+  "novel-studio:sections-migration-done";
 
 /**
  * 원고 Auto Recovery 임시 초안 (LocalStorage ONLY).

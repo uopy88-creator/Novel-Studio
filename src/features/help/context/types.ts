@@ -11,7 +11,6 @@
 export type ContextHelpTopicId =
   | "dashboard"
   | "project"
-  | "chapters"
   | "manuscript"
   | "character"
   | "vault"

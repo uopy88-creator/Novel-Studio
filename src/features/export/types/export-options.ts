@@ -12,7 +12,7 @@ export type ExportFormat = "txt" | "docx" | "pdf";
 /**
  * Export 대상 범위
  * - manuscript: 현재 Document 전체 원고
- * - scenes: 선택한 Scene만
+ * - scenes: 선택한 Section만 (저장 키는 하위 호환)
  * - project: 프로젝트의 모든 Document
  */
 export type ExportScope = "manuscript" | "scenes" | "project";
@@ -20,8 +20,8 @@ export type ExportScope = "manuscript" | "scenes" | "project";
 /**
  * Export 옵션 체크박스
  *
- * - includeSceneDelimiters: 장면 구분(#1 …) 포함
- * - excludeSceneMemos: 장면 메모 제외 (기본 true — 작가만 보는 메모)
+ * - includeSceneDelimiters: Section 구분(#1 …) 포함 (별칭: includeSectionDelimiters)
+ * - excludeSceneMemos: Section 메모 제외 (기본 true — 작가만 보는 메모)
  * - excludeWritingVault: Writing Vault 부록 제외
  * - includeInspirationNotes: Inspiration 주석 부록 포함
  */
@@ -47,7 +47,7 @@ export const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
 
 export const EXPORT_SCOPE_LABELS: Record<ExportScope, string> = {
   manuscript: "전체 원고",
-  scenes: "선택한 Scene만",
+  scenes: "선택한 Section만",
   project: "프로젝트 전체",
 };
 

@@ -2,47 +2,47 @@
 
 /**
  * =============================================================================
- * SceneStatusSelect — 초안 / 수정중 / 완료
+ * SectionStatusSelect — 초안 / 수정중 / 완료
  * -----------------------------------------------------------------------------
  * 색은 회색·파랑·초록만 사용 (Notion 스타일 미니멀)
  * =============================================================================
  */
 
-import type { SceneStatus } from "@/features/manuscript/types/scene";
-import { SCENE_STATUS_LABELS } from "@/features/manuscript/types/scene";
+import type { SectionStatus } from "@/features/manuscript/types/section";
+import { SECTION_STATUS_LABELS } from "@/features/manuscript/types/section";
 import { cn } from "@/lib/utils/cn";
 
-const STATUS_ORDER: SceneStatus[] = ["draft", "editing", "done"];
+const STATUS_ORDER: SectionStatus[] = ["draft", "editing", "done"];
 
 /** 상태별 점·칩 색 (최소한) */
-const STATUS_DOT: Record<SceneStatus, string> = {
+const STATUS_DOT: Record<SectionStatus, string> = {
   draft: "bg-neutral-400",
   editing: "bg-blue-500",
   done: "bg-emerald-500",
 };
 
-const STATUS_CHIP: Record<SceneStatus, string> = {
+const STATUS_CHIP: Record<SectionStatus, string> = {
   draft: "text-neutral-600",
   editing: "text-blue-600",
   done: "text-emerald-600",
 };
 
-export interface SceneStatusSelectProps {
-  value: SceneStatus;
-  onChange: (status: SceneStatus) => void;
+export interface SectionStatusSelectProps {
+  value: SectionStatus;
+  onChange: (status: SectionStatus) => void;
   className?: string;
 }
 
-export function SceneStatusSelect({
+export function SectionStatusSelect({
   value,
   onChange,
   className,
-}: SceneStatusSelectProps) {
+}: SectionStatusSelectProps) {
   return (
     <div
       className={cn("flex flex-wrap gap-ns-1", className)}
       role="group"
-      aria-label="Scene 상태"
+      aria-label="Section 상태"
     >
       {STATUS_ORDER.map((status) => {
         const active = value === status;
@@ -71,7 +71,7 @@ export function SceneStatusSelect({
                 !active && "opacity-40",
               )}
             />
-            {SCENE_STATUS_LABELS[status]}
+            {SECTION_STATUS_LABELS[status]}
           </button>
         );
       })}
@@ -80,17 +80,17 @@ export function SceneStatusSelect({
 }
 
 /** Navigator 행 왼쪽 상태 점 */
-export function SceneStatusDot({
+export function SectionStatusDot({
   status,
   className,
 }: {
-  status: SceneStatus;
+  status: SectionStatus;
   className?: string;
 }) {
   return (
     <span
       aria-hidden
-      title={SCENE_STATUS_LABELS[status]}
+      title={SECTION_STATUS_LABELS[status]}
       className={cn(
         "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
         STATUS_DOT[status],

@@ -4,7 +4,7 @@
  * =============================================================================
  * TimelineEventModal — 사건 추가/수정
  * -----------------------------------------------------------------------------
- * 제목 · 설명 · 관련 Scene · 관련 Character (단순 폼)
+ * 제목 · 설명 · 관련 Section · 관련 Character (단순 폼)
  * =============================================================================
  */
 
@@ -28,7 +28,7 @@ export interface TimelineEventModalProps {
   event?: TimelineEvent | null;
   sceneOptions: TimelineSceneOption[];
   characters: Character[];
-  /** Scene Navigator에서 넘어온 기본 Scene */
+  /** Section Navigator에서 넘어온 기본 Section */
   defaultDocumentId?: string;
   defaultSceneStableId?: string;
   onClose: () => void;
@@ -149,7 +149,7 @@ export function TimelineEventModal({
 
         <label className="flex flex-col gap-ns-1">
           <span className="text-ns-sm font-medium text-ns-ink">
-            관련 Scene
+            관련 Section
           </span>
           <select
             value={sceneValue}
@@ -167,7 +167,7 @@ export function TimelineEventModal({
             ))}
           </select>
           <span className="text-ns-xs text-ns-ink-tertiary">
-            Scene Navigator의 장면과 연결합니다.
+            Section Navigator의 구간과 연결합니다.
           </span>
         </label>
 

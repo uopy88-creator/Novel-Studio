@@ -4,7 +4,7 @@
  * =============================================================================
  * TimelinePage
  * -----------------------------------------------------------------------------
- * 사건을 시간순으로 정리. 드래그로 순서 변경. Scene Navigator 연동.
+ * 사건을 시간순으로 정리. 드래그로 순서 변경. Section Navigator 연동.
  * =============================================================================
  */
 
@@ -48,7 +48,7 @@ type ModalState =
 
 export interface TimelinePageProps {
   projectId: ProjectId;
-  /** Scene Navigator에서 넘어온 Document / Scene */
+  /** Section Navigator에서 넘어온 Document / Section */
   initialDocumentId?: string;
   initialSceneId?: string;
 }
@@ -83,7 +83,7 @@ export function TimelinePage({
     };
   }, [projectId]);
 
-  // Scene Navigator에서 넘어오면 추가 모달을 바로 연다
+  // Section Navigator에서 넘어오면 추가 모달을 바로 연다
   useEffect(() => {
     if (!isReady) return;
     if (!initialDocumentId || !initialSceneId) return;
@@ -131,7 +131,7 @@ export function TimelinePage({
           <p className="ns-caption mb-ns-2">이야기</p>
           <h2 className="ns-heading">Timeline</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            사건을 시간순으로 정리합니다. Scene Navigator와 연결할 수 있습니다.
+            사건을 시간순으로 정리합니다. Section Navigator와 연결할 수 있습니다.
           </p>
         </div>
         <Button
@@ -159,7 +159,7 @@ export function TimelinePage({
             아직 사건이 없습니다.
           </p>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-tertiary">
-            첫 사건을 추가하거나, Scene Navigator에서 Timeline으로 연결하세요.
+            첫 사건을 추가하거나, Section Navigator에서 Timeline으로 연결하세요.
           </p>
           <Button
             type="button"
@@ -201,7 +201,7 @@ export function TimelinePage({
                       if (!e.documentId || !e.sceneStableId) return;
                       router.push(
                         manuscriptSearchHref(projectId, e.documentId, {
-                          sceneId: e.sceneStableId,
+                          sectionId: e.sceneStableId,
                         }),
                       );
                     }}

@@ -1,5 +1,5 @@
 /**
- * Chapter / Document / Manuscript 도메인 타입 진입점.
+ * Chapter / Document / Manuscript / Section 도메인 타입 진입점.
  */
 export type {
   Chapter,
@@ -13,3 +13,11 @@ export {
   DOCUMENT_KIND_OPTIONS,
 } from "./chapter";
 export type { Manuscript } from "./manuscript";
+export type {
+  Section,
+  SectionStatus,
+  SectionMeta,
+  SectionDelimiterConfig,
+} from "./section";
+/** @deprecated Use Section types */
+export type { Scene, SceneStatus, SceneMeta, SceneDelimiterConfig } from "./scene";

@@ -2,7 +2,7 @@
 
 /**
  * =============================================================================
- * SceneNavigatorItem
+ * SectionNavigatorItem
  * -----------------------------------------------------------------------------
  * 드래그 핸들 · 접기 · 번호/제목 · 상태 · 메모 · 삭제
  * =============================================================================
@@ -11,30 +11,30 @@
 import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Scene, SceneStatus } from "@/features/manuscript/types/scene";
+import type { Section, SectionStatus } from "@/features/manuscript/types/section";
 import {
-  SceneStatusDot,
-  SceneStatusSelect,
-} from "@/features/manuscript/components/scene-navigator/SceneStatusSelect";
-import { SceneMemoField } from "@/features/manuscript/components/scene-navigator/SceneMemoField";
+  SectionStatusDot,
+  SectionStatusSelect,
+} from "@/features/manuscript/components/section-navigator/SectionStatusSelect";
+import { SectionMemoField } from "@/features/manuscript/components/section-navigator/SectionMemoField";
 import { cn } from "@/lib/utils/cn";
 
-export interface SceneNavigatorItemProps {
-  scene: Scene;
+export interface SectionNavigatorItemProps {
+  section: Section;
   active: boolean;
   collapsed: boolean;
-  onSelect: (scene: Scene) => void;
-  onToggleCollapse: (sceneId: string) => void;
-  onRename: (sceneId: string, title: string) => void;
+  onSelect: (section: Section) => void;
+  onToggleCollapse: (sectionId: string) => void;
+  onRename: (sectionId: string, title: string) => void;
   /** 삭제 확인 다이얼로그를 열도록 요청 */
-  onDeleteRequest: (scene: Scene) => void;
-  onStatusChange: (sceneId: string, status: SceneStatus) => void;
-  onMemoChange: (sceneId: string, memo: string) => void;
+  onDeleteRequest: (section: Section) => void;
+  onStatusChange: (sectionId: string, status: SectionStatus) => void;
+  onMemoChange: (sectionId: string, memo: string) => void;
   canDelete: boolean;
 }
 
-export function SceneNavigatorItem({
-  scene,
+export function SectionNavigatorItem({
+  section,
   active,
   collapsed,
   onSelect,
@@ -44,7 +44,7 @@ export function SceneNavigatorItem({
   onStatusChange,
   onMemoChange,
   canDelete,
-}: SceneNavigatorItemProps) {
+}: SectionNavigatorItemProps) {
   const {
     attributes,
     listeners,
@@ -52,14 +52,14 @@ export function SceneNavigatorItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: scene.id });
+  } = useSortable({ id: section.id });
 
   const [editing, setEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(scene.title);
+  const [draftTitle, setDraftTitle] = useState(section.title);
 
   useEffect(() => {
-    setDraftTitle(scene.title);
-  }, [scene.title]);
+    setDraftTitle(section.title);
+  }, [section.title]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -68,8 +68,8 @@ export function SceneNavigatorItem({
 
   function commitTitle() {
     setEditing(false);
-    if (draftTitle.trim() !== scene.title) {
-      onRename(scene.id, draftTitle);
+    if (draftTitle.trim() !== section.title) {
+      onRename(section.id, draftTitle);
     }
   }
 
@@ -92,7 +92,7 @@ export function SceneNavigatorItem({
             "cursor-grab rounded-ns-md text-ns-ink-tertiary",
             "hover:bg-ns-muted hover:text-ns-ink active:cursor-grabbing",
           )}
-          aria-label={`${scene.number}번 Scene 끌기`}
+          aria-label={`${section.number}번 Section 끌기`}
           {...attributes}
           {...listeners}
         >
@@ -104,8 +104,8 @@ export function SceneNavigatorItem({
         <button
           type="button"
           className="mt-0.5 flex h-9 w-7 shrink-0 items-center justify-center rounded-ns-md text-ns-ink-tertiary hover:bg-ns-muted hover:text-ns-ink"
-          aria-label={collapsed ? "Scene 펼치기" : "Scene 접기"}
-          onClick={() => onToggleCollapse(scene.id)}
+          aria-label={collapsed ? "Section 펼치기" : "Section 접기"}
+          onClick={() => onToggleCollapse(section.id)}
         >
           <span aria-hidden className="text-ns-xs">
             {collapsed ? "▸" : "▾"}
@@ -116,17 +116,17 @@ export function SceneNavigatorItem({
           <button
             type="button"
             className="flex w-full min-w-0 flex-col items-start text-left"
-            onClick={() => onSelect(scene)}
+            onClick={() => onSelect(section)}
           >
             <span className="flex items-center gap-1.5 text-ns-xs font-medium text-ns-ink-tertiary">
-              <SceneStatusDot status={scene.status} />
-              #{scene.number}
+              <SectionStatusDot status={section.status} />
+              #{section.number}
             </span>
             {!editing ? (
               <span
                 className={cn(
                   "w-full truncate text-ns-sm font-medium text-ns-ink",
-                  !scene.title && "text-ns-ink-tertiary",
+                  !section.title && "text-ns-ink-tertiary",
                 )}
                 onDoubleClick={(event) => {
                   event.preventDefault();
@@ -134,7 +134,7 @@ export function SceneNavigatorItem({
                   setEditing(true);
                 }}
               >
-                {scene.title || "제목 없음"}
+                {section.title || "제목 없음"}
               </span>
             ) : null}
           </button>
@@ -148,7 +148,7 @@ export function SceneNavigatorItem({
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitTitle();
                 if (e.key === "Escape") {
-                  setDraftTitle(scene.title);
+                  setDraftTitle(section.title);
                   setEditing(false);
                 }
               }}
@@ -157,27 +157,27 @@ export function SceneNavigatorItem({
                 "mt-ns-1 w-full rounded-ns-md border border-ns-border bg-ns-surface px-ns-2 py-ns-1",
                 "text-ns-sm text-ns-ink outline-none focus-visible:border-ns-accent",
               )}
-              placeholder="Scene 제목"
-              aria-label="Scene 제목 수정"
+              placeholder="Section 제목"
+              aria-label="Section 제목"
             />
           ) : null}
 
           {/* 접혀도 상태 칩은 보이게 — 빠른 전환 */}
           <div className="mt-ns-2" onClick={(e) => e.stopPropagation()}>
-            <SceneStatusSelect
-              value={scene.status}
-              onChange={(status) => onStatusChange(scene.id, status)}
+            <SectionStatusSelect
+              value={section.status}
+              onChange={(status) => onStatusChange(section.id, status)}
             />
           </div>
 
           {!collapsed ? (
             <>
               <p className="mt-ns-2 text-ns-xs text-ns-ink-tertiary">
-                {scene.charCount.toLocaleString()}자
-                {scene.body.trim() ? (
+                {section.charCount.toLocaleString()}자
+                {section.body.trim() ? (
                   <span className="mt-ns-1 block line-clamp-2 break-words text-ns-ink-secondary">
-                    {scene.body.trim().slice(0, 80)}
-                    {scene.body.trim().length > 80 ? "…" : ""}
+                    {section.body.trim().slice(0, 80)}
+                    {section.body.trim().length > 80 ? "…" : ""}
                   </span>
                 ) : (
                   <span className="mt-ns-1 block text-ns-ink-tertiary">
@@ -185,15 +185,15 @@ export function SceneNavigatorItem({
                   </span>
                 )}
               </p>
-              <SceneMemoField
-                value={scene.memo}
-                onChange={(memo) => onMemoChange(scene.id, memo)}
+              <SectionMemoField
+                value={section.memo}
+                onChange={(memo) => onMemoChange(section.id, memo)}
               />
             </>
           ) : (
             <p className="mt-ns-1 text-ns-xs text-ns-ink-tertiary">
-              {scene.charCount.toLocaleString()}자
-              {scene.memo.trim() ? " · 메모 있음" : ""}
+              {section.charCount.toLocaleString()}자
+              {section.memo.trim() ? " · 메모 있음" : ""}
             </p>
           )}
         </div>
@@ -212,8 +212,8 @@ export function SceneNavigatorItem({
             <button
               type="button"
               className="flex h-8 w-8 items-center justify-center rounded-ns-md text-ns-xs text-ns-ink-tertiary hover:bg-ns-danger-soft hover:text-ns-danger"
-              onClick={() => onDeleteRequest(scene)}
-              aria-label="Scene 삭제"
+              onClick={() => onDeleteRequest(section)}
+              aria-label="Section 삭제"
               title="삭제"
             >
               ×

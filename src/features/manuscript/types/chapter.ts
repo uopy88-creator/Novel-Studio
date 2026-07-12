@@ -1,13 +1,13 @@
 /**
  * =============================================================================
- * Document (문서) — 코드 타입명 Chapter
+ * Document (문서) — 코드 타입명 Chapter (레거시)
  * -----------------------------------------------------------------------------
- * 제품/문서에서는 Document, 코드에서는 기존 Chapter 엔티티를 사용한다.
+ * Architecture: Project → Manuscript (hidden Document 1개) → Sections
  *
- * Project → Document[] → Manuscript (1:1)
+ * Chapter UI는 제거되었다. Document 행은 Manuscript 컨테이너 FK 호환용으로만 남는다.
+ * (inspirations / section metas / versions 가 document_id 를 참조)
  *
- * Document = 목록·메타 (제목, 종류, 순서)
- * Manuscript = 실제 본문
+ * 제품 용어: Manuscript. 코드 타입명 Chapter 는 하위 호환을 위해 유지.
  * =============================================================================
  */
 

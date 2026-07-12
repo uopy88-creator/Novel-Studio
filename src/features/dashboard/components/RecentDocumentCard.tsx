@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils/cn";
 
 export interface RecentDocumentCardProps {
   document: RecentDocumentItem;
-  /** Chapters 목록으로 이동할 때 사용 */
+  /** Manuscript로 이동할 때 사용 */
   projectId: string;
   className?: string;
 }
@@ -33,7 +33,7 @@ export function RecentDocumentCard({
       className={cn("transition-colors hover:bg-ns-muted/50", className)}
     >
       <Link
-        href={`/projects/${projectId}/chapters`}
+        href={`/projects/${projectId}/manuscript`}
         className="block min-w-0 rounded-ns-md outline-none focus-visible:shadow-[var(--ns-ring-accent)]"
       >
         <div className="flex flex-wrap items-baseline gap-ns-2">

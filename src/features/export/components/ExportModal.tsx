@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import type { Scene } from "@/features/manuscript/types/scene";
+import type { Section } from "@/features/manuscript/types/section";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import type {
   ExportFormat,
@@ -30,7 +30,8 @@ export interface ExportModalProps {
   chapterId: ChapterId | null;
   /** 에디터 최신 본문 (dirty 반영) */
   liveContent: string;
-  scenes: Scene[];
+  /** Section 목록 (scope=scenes 선택 UI용 — 값 키는 하위 호환) */
+  scenes: Section[];
 }
 
 export function ExportModal({

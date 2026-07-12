@@ -116,6 +116,7 @@ export const keywordSearchProvider: SearchProvider = {
 function groupHits(hits: SearchResultItem[]): SearchResultGroup[] {
   const buckets: Record<SearchResultKind, SearchResultItem[]> = {
     manuscript: [],
+    section: [],
     scene: [],
     character: [],
     memo: [],
@@ -125,7 +126,8 @@ function groupHits(hits: SearchResultItem[]): SearchResultGroup[] {
   };
 
   for (const hit of hits) {
-    buckets[hit.kind].push(hit);
+    const kind = hit.kind === "scene" ? "section" : hit.kind;
+    buckets[kind].push({ ...hit, kind });
   }
 
   return SEARCH_KIND_ORDER.map((kind) => ({

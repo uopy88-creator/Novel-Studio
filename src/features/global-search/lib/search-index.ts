@@ -19,7 +19,7 @@ import {
 } from "@/features/global-search/lib/search-href";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
-import { parseScenes } from "@/features/manuscript/lib/scene-parser";
+import { parseSections } from "@/features/manuscript/lib/section-parser";
 import { findManuscriptMatches } from "@/features/manuscript/lib/search-manuscript";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { readMemosByProject } from "@/features/memo/lib/memo-storage";
@@ -106,21 +106,21 @@ export async function buildSearchIndex(
       }
     }
 
-    const scenes = parseScenes(content);
-    for (const scene of scenes) {
-      const title = scene.title.trim()
-        ? `#${scene.number} ${scene.title.trim()}`
-        : `#${scene.number}`;
+    const sections = parseSections(content);
+    for (const section of sections) {
+      const title = section.title.trim()
+        ? `#${section.number} ${section.title.trim()}`
+        : `#${section.number}`;
       docs.push({
-        id: `sc-${manuscript.chapterId}-${scene.id}`,
-        kind: "scene",
+        id: `sc-${manuscript.chapterId}-${section.id}`,
+        kind: "section",
         title,
-        body: joinFields(docTitle, scene.body?.slice(0, 200)),
+        body: joinFields(docTitle, section.body?.slice(0, 200)),
         projectId,
         projectName,
         href: manuscriptSearchHref(projectId, manuscript.chapterId, {
-          sceneId: scene.id,
-          offset: scene.startOffset,
+          sectionId: section.id,
+          offset: section.startOffset,
         }),
       });
     }

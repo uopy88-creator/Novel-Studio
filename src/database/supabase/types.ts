@@ -153,19 +153,23 @@ export interface DbForeshadowingRow {
   updated_at: string;
 }
 
-/** scene_metas 행 타입 — DB 테이블명은 `scenes` */
-export type DbSceneMetaRow = {
+/** Section 메타 행 타입 — DB 테이블명은 `scenes` */
+export type DbSectionMetaRow = {
   id: string;
   user_id: string;
   project_id: string;
   document_id: string;
   scene_number: number;
+  section_number?: number | null;
   status: string;
   memo: string;
   is_collapsed: boolean;
   created_at: string;
   updated_at: string;
 };
+
+/** @deprecated Use DbSectionMetaRow */
+export type DbSceneMetaRow = DbSectionMetaRow;
 
 /** manuscript_versions — 명시적 스냅샷 (자동 저장과 별개) */
 export interface DbManuscriptVersionRow {
@@ -211,7 +215,8 @@ export const DB_TABLES = {
   memos: "memos",
   word_treasury: "word_treasury",
   foreshadowings: "foreshadowings",
-  /** Scene 메타 (구 scene_metas) */
+  /** Section 메타 (구 scene_metas) */
   scene_metas: "scenes",
+  section_metas: "scenes",
   timeline_events: "timeline_events",
 } as const;

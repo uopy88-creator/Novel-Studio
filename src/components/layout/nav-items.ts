@@ -3,7 +3,6 @@
  * Studio 사이드바 메뉴 정의
  * -----------------------------------------------------------------------------
  * 각 항목은 /projects/[projectId]/[segment] 로 이동한다.
- * Chapters 세그먼트는 Document 목록 화면이다.
  * =============================================================================
  */
 
@@ -24,7 +23,6 @@ export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { segment: "dashboard", label: "Dashboard", icon: "🏠" },
   { segment: "manuscript", label: "Manuscript", icon: "✍" },
   { segment: "timeline", label: "Timeline", icon: "⏱" },
-  { segment: "chapters", label: "Chapters", icon: "📖" },
   { segment: "characters", label: "Characters", icon: "👤" },
   { segment: "writing-vault", label: "Writing Vault", icon: "💬" },
   { segment: "inspiration", label: "Inspiration", icon: "💡" },

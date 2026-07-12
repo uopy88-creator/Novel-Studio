@@ -2,22 +2,22 @@
  * =============================================================================
  * Export 본문 조립
  * -----------------------------------------------------------------------------
- * Manuscript / Scene / Project 범위와 옵션에 따라 텍스트 페이로드를 만든다.
+ * Manuscript / Section / Project 범위와 옵션에 따라 텍스트 페이로드를 만든다.
  * 포맷(TXT·DOCX·PDF) 생성기는 이 페이로드만 소비한다.
  * =============================================================================
  */
 
 import type { Chapter } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
-import type { Scene } from "@/features/manuscript/types/scene";
-import { DEFAULT_SCENE_DELIMITER } from "@/features/manuscript/types/scene";
+import type { Section } from "@/features/manuscript/types/section";
+import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
 import {
-  parseScenes,
-} from "@/features/manuscript/lib/scene-parser";
+  parseSections,
+} from "@/features/manuscript/lib/section-parser";
 import {
-  mergeScenesWithMetas,
-  readSceneMetasByDocument,
-} from "@/features/manuscript/lib/scene-meta-storage";
+  mergeSectionsWithMetas,
+  readSectionMetasByDocument,
+} from "@/features/manuscript/lib/section-meta-storage";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import { getManuscriptByChapterId } from "@/features/manuscript/lib/manuscript-storage";
 import { readManuscriptsByProject } from "@/features/dashboard/lib/dashboard-data";
@@ -45,41 +45,40 @@ export interface BuildExportInput {
   /** manuscript / scenes 범위일 때 현재 Document */
   chapterId: ChapterId | null;
   scope: ExportScope;
-  /** scope === "scenes" 일 때 선택된 Scene id */
+  /** scope === "scenes" 일 때 선택된 Section id */
   selectedSceneIds: string[];
   /** 에디터에 열린 최신 원고 (저장 전 dirty 반영) */
   liveContent?: string;
   options: ExportOptions;
 }
 
-function sceneHeader(scene: Scene, includeDelimiter: boolean): string {
+function sectionHeader(section: Section, includeDelimiter: boolean): string {
   if (!includeDelimiter) return "";
-  const title = scene.title.trim();
+  const title = section.title.trim();
   return title
-    ? `${DEFAULT_SCENE_DELIMITER.prefix}${scene.number} ${title}`
-    : `${DEFAULT_SCENE_DELIMITER.prefix}${scene.number}`;
+    ? `${DEFAULT_SECTION_DELIMITER.prefix}${section.number} ${title}`
+    : `${DEFAULT_SECTION_DELIMITER.prefix}${section.number}`;
 }
 
 /**
- * Scene[] → 옵션이 반영된 본문 문자열
+ * Section[] → 옵션이 반영된 본문 문자열
  */
-function renderScenesText(
-  scenes: Scene[],
+function renderSectionsText(
+  sections: Section[],
   options: ExportOptions,
 ): string {
   const parts: string[] = [];
 
-  for (const scene of scenes) {
+  for (const section of sections) {
     const chunks: string[] = [];
-    const header = sceneHeader(scene, options.includeSceneDelimiters);
+    const header = sectionHeader(section, options.includeSceneDelimiters);
     if (header) chunks.push(header);
 
-    const body = scene.body.replace(/^\n+/, "").replace(/\n+$/, "");
+    const body = section.body.replace(/^\n+/, "").replace(/\n+$/, "");
     if (body) chunks.push(body);
 
-    // 장면 메모: "제외"가 꺼져 있을 때만 포함
-    if (!options.excludeSceneMemos && scene.memo.trim()) {
-      chunks.push(`[장면 메모] ${scene.memo.trim()}`);
+    if (!options.excludeSceneMemos && section.memo.trim()) {
+      chunks.push(`[Section 메모] ${section.memo.trim()}`);
     }
 
     if (chunks.length > 0) {
@@ -90,18 +89,17 @@ function renderScenesText(
   return parts.join("\n\n");
 }
 
-async function loadScenesForDocument(
+async function loadSectionsForDocument(
   chapterId: ChapterId,
   content: string,
   options: ExportOptions,
-): Promise<Scene[]> {
-  const parsed = parseScenes(content);
-  // 메모를 쓸 때만 메타 로드 (불필요한 네트워크 절약)
+): Promise<Section[]> {
+  const parsed = parseSections(content);
   if (options.excludeSceneMemos) {
     return parsed;
   }
-  const metas = await readSceneMetasByDocument(chapterId);
-  return mergeScenesWithMetas(parsed, metas);
+  const metas = await readSectionMetasByDocument(chapterId);
+  return mergeSectionsWithMetas(parsed, metas);
 }
 
 function formatInspirations(
@@ -218,14 +216,14 @@ export async function buildExportPayload(
     for (const doc of allDocuments) {
       const manuscript = byChapter.get(doc.id);
       const content = manuscript?.content ?? "";
-      const scenes = await loadScenesForDocument(
+      const sections = await loadSectionsForDocument(
         doc.id,
         content,
         options,
       );
       documents.push({
         title: doc.title,
-        body: renderScenesText(scenes, options),
+        body: renderSectionsText(sections, options),
       });
     }
 
@@ -260,7 +258,7 @@ export async function buildExportPayload(
     content = manuscript?.content ?? "";
   }
 
-  let scenes = await loadScenesForDocument(
+  let sections = await loadSectionsForDocument(
     chapterId,
     content,
     options,
@@ -268,16 +266,16 @@ export async function buildExportPayload(
 
   if (scope === "scenes") {
     if (selectedSceneIds.length === 0) {
-      throw new Error("내보낼 Scene을 하나 이상 선택하세요.");
+      throw new Error("내보낼 Section을 하나 이상 선택하세요.");
     }
     const selected = new Set(selectedSceneIds);
-    scenes = scenes.filter((s) => selected.has(s.id));
-    if (scenes.length === 0) {
-      throw new Error("선택한 Scene을 찾을 수 없습니다.");
+    sections = sections.filter((s) => selected.has(s.id));
+    if (sections.length === 0) {
+      throw new Error("선택한 Section을 찾을 수 없습니다.");
     }
   }
 
-  const body = renderScenesText(scenes, options);
+  const body = renderSectionsText(sections, options);
   const appendix = await buildAppendix(
     projectId,
     [chapterId],
@@ -286,7 +284,7 @@ export async function buildExportPayload(
   );
 
   return {
-    title: scope === "scenes" ? `${docTitle} (Scenes)` : docTitle,
+    title: scope === "scenes" ? `${docTitle} (Sections)` : docTitle,
     projectTitle,
     documents: [{ title: docTitle, body }],
     appendix,

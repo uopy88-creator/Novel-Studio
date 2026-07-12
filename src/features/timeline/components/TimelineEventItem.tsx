@@ -92,7 +92,7 @@ export function TimelineEventItem({
               type="button"
               className="rounded-ns-md bg-ns-muted px-ns-2 py-0.5 text-ns-xs text-ns-ink-secondary hover:text-ns-ink"
               onClick={() => onOpenScene?.(event)}
-              title="Scene Navigator로 이동"
+              title="Section Navigator로 이동"
             >
               🎬 {sceneLabel}
             </button>

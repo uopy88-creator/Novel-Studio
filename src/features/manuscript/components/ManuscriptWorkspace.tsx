@@ -4,19 +4,21 @@
  * =============================================================================
  * ManuscriptWorkspace
  * -----------------------------------------------------------------------------
- * Document 선택 → 하나의 긴 Manuscript 편집
- * + Scene Navigator (#1 #2 … 구분자 기반)
- * + 캐릭터 @멘션, Inspiration
+ * Architecture: Project → Manuscript → Sections
+ *
+ * 프로젝트당 하나의 원고를 편집한다.
+ * Section Navigator (#1 #2 …) 로 구간을 관리한다.
+ * Chapter Outline / Chapter 생성 UI 는 없다.
  * =============================================================================
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
-import type { Scene } from "@/features/manuscript/types/scene";
-import type { ChapterId, ProjectId } from "@/types/ids";
+import type { Section } from "@/features/manuscript/types/section";
+import type { ProjectId } from "@/types/ids";
 import { useManuscript } from "@/features/manuscript/hooks/useManuscript";
-import { useScenes } from "@/features/manuscript/hooks/useScenes";
+import { useSections } from "@/features/manuscript/hooks/useSections";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { updateCharacter } from "@/features/characters/lib/character-storage";
 import { CharacterMentionField } from "@/features/characters/components/CharacterMentionField";
@@ -27,8 +29,7 @@ import { InspirationGutter } from "@/features/inspiration/components/Inspiration
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
-import { SceneNavigator } from "@/features/manuscript/components/scene-navigator";
-import { ChapterOutline } from "@/features/manuscript/components/ChapterOutline";
+import { SectionNavigator } from "@/features/manuscript/components/section-navigator";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
@@ -39,13 +40,8 @@ import { AutoRecoveryDialog } from "@/features/manuscript/components/AutoRecover
 import { ExportModal } from "@/features/export/components/ExportModal";
 import { SentenceAssistantHost } from "@/features/sentence-assistant";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
-import {
-  chapterLocalToGlobalOffset,
-  globalOffsetToChapterLocal,
-} from "@/features/manuscript/lib/chapter-blocks";
 import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
 import { useUserSettings } from "@/features/settings";
@@ -64,7 +60,12 @@ export interface ManuscriptWorkspaceProps {
   /** 전역 검색 등에서 전달 — 본문 오프셋으로 스크롤 */
   initialOffset?: number;
   initialEnd?: number;
-  /** 전역 검색 — Scene 안정 ID로 선택 */
+  /**
+   * Section 안정 ID 딥링크.
+   * 레거시 `?sceneId=` 와 신규 `?sectionId=` 모두 이 prop 으로 전달된다.
+   */
+  initialSectionId?: string;
+  /** @deprecated Use initialSectionId */
   initialSceneId?: string;
 }
 
@@ -73,39 +74,24 @@ export function ManuscriptWorkspace({
   initialDocumentId,
   initialOffset,
   initialEnd,
+  initialSectionId,
   initialSceneId,
 }: ManuscriptWorkspaceProps) {
+  const sectionDeepLink = initialSectionId ?? initialSceneId;
   const { settings } = useUserSettings();
 
   const {
-    documents,
     isReady,
+    primaryDocumentId,
     selectedChapterId,
-    selectDocument,
     content,
     setContent,
-    setChapterBody,
-    chapterBlocks,
-    reorderDocuments,
     saveStatus,
     lastSavedAt,
-  } = useManuscript(projectId, initialDocumentId as ChapterId | undefined);
-
-  const activeChapterBody = useMemo(() => {
-    const block = chapterBlocks.find((b) => b.chapterId === selectedChapterId);
-    return block?.body ?? "";
-  }, [chapterBlocks, selectedChapterId]);
-
-  const setActiveChapterBody = useCallback(
-    (body: string) => {
-      if (!selectedChapterId) return;
-      setChapterBody(selectedChapterId, body);
-    },
-    [selectedChapterId, setChapterBody],
-  );
+  } = useManuscript(projectId, initialDocumentId);
 
   const {
-    scenes,
+    sections,
     collapsedIds,
     toggleCollapsed,
     setAllCollapsed,
@@ -115,12 +101,7 @@ export function ManuscriptWorkspace({
     rename,
     setStatus,
     setMemo,
-  } = useScenes(
-    projectId,
-    selectedChapterId,
-    activeChapterBody,
-    setActiveChapterBody,
-  );
+  } = useSections(projectId, primaryDocumentId, content, setContent);
 
   const {
     versions,
@@ -163,7 +144,7 @@ export function ManuscriptWorkspace({
     useState<Inspiration | null>(null);
   const [deletingInspiration, setDeletingInspiration] =
     useState<Inspiration | null>(null);
-  const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
@@ -186,45 +167,22 @@ export function ManuscriptWorkspace({
     void refreshInspirations();
   }, [refreshInspirations, content]);
 
-  /** 통합 원고 좌표로 변환한 Inspiration (거터 표시용) */
-  const gutterInspirations = useMemo(() => {
-    return projectInspirations.map((item) => ({
-      ...item,
-      startOffset: chapterLocalToGlobalOffset(
-        content,
-        documents,
-        item.documentId,
-        item.startOffset,
-      ),
-      endOffset: chapterLocalToGlobalOffset(
-        content,
-        documents,
-        item.documentId,
-        item.endOffset,
-      ),
-    }));
-  }, [projectInspirations, content, documents]);
-
-  // Document 바꾸면 Scene 선택 초기화 후 첫 Scene 선택
-  useEffect(() => {
-    setActiveSceneId(null);
-  }, [selectedChapterId]);
+  /** Inspiration 오프셋은 이미 프로젝트 원고 좌표로 저장 (마이그레이션 후) */
+  const gutterInspirations = useMemo(
+    () => projectInspirations,
+    [projectInspirations],
+  );
 
   useEffect(() => {
-    if (scenes.length === 0) {
-      setActiveSceneId(null);
+    if (sections.length === 0) {
+      setActiveSectionId(null);
       return;
     }
-    setActiveSceneId((current) => {
-      if (current && scenes.some((s) => s.id === current)) return current;
-      return scenes[0].id;
+    setActiveSectionId((current) => {
+      if (current && sections.some((s) => s.id === current)) return current;
+      return sections[0].id;
     });
-  }, [scenes]);
-
-  const selectedDocument = useMemo(
-    () => documents.find((document) => document.id === selectedChapterId) ?? null,
-    [documents, selectedChapterId],
-  );
+  }, [sections]);
 
   const stats = useMemo(() => {
     const totalChars = countCharsWithSpaces(content);
@@ -237,15 +195,16 @@ export function ManuscriptWorkspace({
     };
   }, [content]);
 
-  /** Scene Navigator → Timeline 연동 (선택 Scene 기준) */
   const timelineHref = useMemo(() => {
-    if (!selectedChapterId || !activeSceneId) return null;
+    if (!primaryDocumentId || !activeSectionId) return null;
     const params = new URLSearchParams({
-      documentId: selectedChapterId,
-      sceneId: activeSceneId,
+      documentId: primaryDocumentId,
+      sectionId: activeSectionId,
+      // 레거시 호환
+      sceneId: activeSectionId,
     });
     return `${studioPath(projectId, "timeline")}?${params.toString()}`;
-  }, [projectId, selectedChapterId, activeSceneId]);
+  }, [projectId, primaryDocumentId, activeSectionId]);
 
   const scrollToOffset = useCallback(
     (
@@ -256,7 +215,6 @@ export function ManuscriptWorkspace({
       const el = editorRef.current;
       if (!el) return;
 
-      // 검색 중에는 포커스를 유지해 입력이 끊기지 않게 함
       if (options?.focus !== false) {
         el.focus();
       }
@@ -278,100 +236,61 @@ export function ManuscriptWorkspace({
     [scrollToOffset],
   );
 
-  const selectScene = useCallback(
-    (scene: Scene) => {
-      setActiveSceneId(scene.id);
-      const block = chapterBlocks.find(
-        (b) => b.chapterId === selectedChapterId,
-      );
-      const globalStart =
-        (block?.bodyStartOffset ?? 0) + scene.startOffset;
-      scrollToOffset(globalStart, globalStart);
+  const selectSection = useCallback(
+    (section: Section) => {
+      setActiveSectionId(section.id);
+      scrollToOffset(section.startOffset, section.startOffset);
     },
-    [scrollToOffset, chapterBlocks, selectedChapterId],
+    [scrollToOffset],
   );
 
-  // 전역 검색 딥링크: sceneId / offset
   const deepLinkAppliedRef = useRef(false);
   useEffect(() => {
     deepLinkAppliedRef.current = false;
-  }, [initialDocumentId, initialSceneId, initialOffset]);
+  }, [initialDocumentId, sectionDeepLink, initialOffset]);
 
   useEffect(() => {
-    if (!isReady || documents.length === 0) return;
+    if (!isReady || !primaryDocumentId) return;
     if (deepLinkAppliedRef.current) return;
 
-    if (initialDocumentId) {
-      selectDocument(initialDocumentId as ChapterId);
-    }
-
-    if (initialSceneId && selectedChapterId) {
-      const scene = scenes.find((s) => s.id === initialSceneId);
-      if (scene) {
+    if (sectionDeepLink) {
+      const section = sections.find((s) => s.id === sectionDeepLink);
+      if (section) {
         deepLinkAppliedRef.current = true;
-        selectScene(scene);
+        selectSection(section);
         return;
       }
     }
 
     if (typeof initialOffset === "number" && Number.isFinite(initialOffset)) {
       deepLinkAppliedRef.current = true;
-      // initialOffset 은 Document 로컬 오프셋 (검색 딥링크)
-      const docId = (initialDocumentId as ChapterId) || selectedChapterId;
-      if (docId) {
-        const global = chapterLocalToGlobalOffset(
-          content,
-          documents,
-          docId,
-          initialOffset,
-        );
-        const endLocal =
-          typeof initialEnd === "number" && Number.isFinite(initialEnd)
-            ? initialEnd
-            : initialOffset;
-        const globalEnd = chapterLocalToGlobalOffset(
-          content,
-          documents,
-          docId,
-          endLocal,
-        );
-        scrollToOffset(global, globalEnd, { focus: true });
-      }
+      const end =
+        typeof initialEnd === "number" && Number.isFinite(initialEnd)
+          ? initialEnd
+          : initialOffset;
+      scrollToOffset(initialOffset, end, { focus: true });
     }
   }, [
     isReady,
-    documents,
-    selectedChapterId,
-    scenes,
-    content,
-    initialDocumentId,
-    initialSceneId,
+    primaryDocumentId,
+    sections,
+    sectionDeepLink,
     initialOffset,
     initialEnd,
-    selectDocument,
-    selectScene,
+    selectSection,
     scrollToOffset,
   ]);
 
   const handleSaveVersion = useCallback(() => {
-    void saveVersion(activeChapterBody);
-  }, [saveVersion, activeChapterBody]);
+    void saveVersion(content);
+  }, [saveVersion, content]);
 
   const handleRestoreVersion = useCallback(
     (version: ManuscriptVersion) => {
-      if (!selectedChapterId) return;
-      setChapterBody(selectedChapterId, version.content);
+      setContent(version.content);
       setVersionModalOpen(false);
     },
-    [selectedChapterId, setChapterBody],
-  );
-
-  const selectChapterFromOutline = useCallback(
-    (chapterId: string, startOffset: number) => {
-      selectDocument(chapterId as ChapterId);
-      scrollToOffset(startOffset, startOffset);
-    },
-    [selectDocument, scrollToOffset],
+    [setContent],
   );
 
   return (
@@ -384,7 +303,7 @@ export function ManuscriptWorkspace({
           <p className="ns-caption mb-ns-2">집필</p>
           <h2 className="ns-heading">Manuscript</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            프로젝트 전체 원고입니다. Chapter는 구분선으로만 나뉘며, ☰ 로
+            프로젝트 전체 원고입니다. Section Navigator로 구간을 나누고
             순서를 바꿀 수 있습니다.
           </p>
         </div>
@@ -392,7 +311,7 @@ export function ManuscriptWorkspace({
           <div className="flex flex-col items-stretch gap-ns-2 sm:items-end">
             <div className="flex flex-wrap items-center justify-end gap-ns-2">
               <ContextHelp topic="manuscript" projectId={projectId} />
-              {selectedDocument ? (
+              {primaryDocumentId ? (
                 <>
                   <Button
                     type="button"
@@ -443,26 +362,14 @@ export function ManuscriptWorkspace({
         <div className="rounded-ns-xl border border-ns-border px-ns-6 py-ns-12 text-center text-ns-sm text-ns-ink-tertiary">
           불러오는 중…
         </div>
-      ) : documents.length === 0 ? (
-        <EmptyDocumentsHint />
       ) : (
         <div className="grid grid-cols-1 gap-ns-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
           <div className="flex min-w-0 flex-col gap-ns-4 lg:flex-row lg:items-start lg:gap-ns-4">
-            <ChapterOutline
-              chapters={documents}
-              blocks={chapterBlocks}
-              activeChapterId={selectedChapterId}
-              onSelect={selectChapterFromOutline}
-              onReorder={(a, b) => {
-                void reorderDocuments(a, b);
-              }}
-            />
-
-            <SceneNavigator
-              scenes={scenes}
-              activeSceneId={activeSceneId}
+            <SectionNavigator
+              sections={sections}
+              activeSectionId={activeSectionId}
               collapsedIds={collapsedIds}
-              onSelect={selectScene}
+              onSelect={selectSection}
               onReorder={reorder}
               onAdd={() => add()}
               onDelete={remove}
@@ -481,12 +388,10 @@ export function ManuscriptWorkspace({
                   프로젝트 전체 원고
                 </p>
                 <h3 className="text-ns-lg font-semibold text-ns-ink">
-                  {selectedDocument
-                    ? `포커스 · ${selectedDocument.title}`
-                    : "Manuscript"}
+                  Manuscript
                 </h3>
                 <p className="text-ns-sm text-ns-ink-secondary">
-                  Chapter 구분선과 Scene(`#1`…)은 자동으로 관리됩니다.
+                  Section(`#1`…)은 Navigator에서 자동으로 관리됩니다.
                 </p>
               </div>
 
@@ -510,14 +415,14 @@ export function ManuscriptWorkspace({
                 />
                 <InspirationSelectionMenu
                   textareaRef={editorRef}
-                  enabled={documents.length > 0}
+                  enabled={Boolean(primaryDocumentId)}
                   onAddInspiration={(selection) =>
                     setPendingSelection(selection)
                   }
                 />
                 <SentenceAssistantHost
                   textareaRef={editorRef}
-                  enabled={documents.length > 0}
+                  enabled={Boolean(primaryDocumentId)}
                 />
               </div>
             </div>
@@ -556,24 +461,13 @@ export function ManuscriptWorkspace({
         selectedText={pendingSelection?.text}
         onClose={() => setPendingSelection(null)}
         onSubmit={(input) => {
-          if (!pendingSelection) return;
+          if (!pendingSelection || !primaryDocumentId) return;
           void (async () => {
-            const mapped = globalOffsetToChapterLocal(
-              content,
-              documents,
-              pendingSelection.start,
-            );
-            if (!mapped) return;
-            const endMapped = globalOffsetToChapterLocal(
-              content,
-              documents,
-              pendingSelection.end,
-            );
             await createInspiration({
-              documentId: mapped.chapterId,
+              documentId: primaryDocumentId,
               selectedText: pendingSelection.text,
-              startOffset: mapped.localOffset,
-              endOffset: endMapped?.localOffset ?? mapped.localOffset,
+              startOffset: pendingSelection.start,
+              endOffset: pendingSelection.end,
               workTitle: input.workTitle,
               author: input.author,
               memo: input.memo,
@@ -623,7 +517,7 @@ export function ManuscriptWorkspace({
         isLoading={versionsLoading}
         isSaving={versionSaving}
         error={versionError}
-        currentContent={activeChapterBody}
+        currentContent={content}
         onSaveCurrent={handleSaveVersion}
         onRename={(id, name) => {
           void renameVersion(id, name);
@@ -635,9 +529,9 @@ export function ManuscriptWorkspace({
         open={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
         projectId={projectId}
-        chapterId={selectedChapterId}
-        liveContent={activeChapterBody}
-        scenes={scenes}
+        chapterId={primaryDocumentId}
+        liveContent={content}
+        scenes={sections}
       />
 
       <AutoRecoveryDialog
@@ -648,23 +542,5 @@ export function ManuscriptWorkspace({
         onDiscard={discardRecovery}
       />
     </ContentContainer>
-  );
-}
-
-function EmptyDocumentsHint() {
-  return (
-    <Card
-      variant="outlined"
-      padding="lg"
-      className="border-dashed bg-ns-muted/40 text-center"
-    >
-      <p className="text-ns-lg font-medium text-ns-ink">
-        먼저 Chapter가 필요합니다
-      </p>
-      <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-        Chapters 메뉴에서 Chapter를 만들면, Manuscript에 전체 원고로
-        이어집니다.
-      </p>
-    </Card>
   );
 }

@@ -2,24 +2,24 @@
 
 /**
  * =============================================================================
- * SceneMemoField — 작가 전용 메모 (원고/export 미포함)
+ * SectionMemoField — 작가 전용 메모 (원고/export 미포함)
  * =============================================================================
  */
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
-export interface SceneMemoFieldProps {
+export interface SectionMemoFieldProps {
   value: string;
   onChange: (memo: string) => void;
   className?: string;
 }
 
-export function SceneMemoField({
+export function SectionMemoField({
   value,
   onChange,
   className,
-}: SceneMemoFieldProps) {
+}: SectionMemoFieldProps) {
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function SceneMemoField({
       <textarea
         value={draft}
         rows={2}
-        placeholder="이 Scene에 대한 메모…"
+        placeholder="이 Section에 대한 메모…"
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (draft !== value) onChange(draft);

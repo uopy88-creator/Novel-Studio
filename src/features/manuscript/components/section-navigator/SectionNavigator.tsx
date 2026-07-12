@@ -2,12 +2,12 @@
 
 /**
  * =============================================================================
- * SceneNavigator
+ * SectionNavigator
  * -----------------------------------------------------------------------------
- * 원고 왼쪽(데스크톱) / 상단 드로어(모바일·iPad) Scene 목록.
+ * 원고 왼쪽(데스크톱) / 상단 드로어(모바일·iPad) Section 목록.
  * @dnd-kit 으로 PC·터치 드래그를 지원한다.
  *
- * Manuscript 는 하나의 긴 문서이며, Scene 은 #1 #2 … 구분자로만 나뉜다.
+ * Manuscript 는 하나의 긴 문서이며, Section 은 #1 #2 … 구분자로만 나뉜다.
  * =============================================================================
  */
 
@@ -27,35 +27,35 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { Scene, SceneStatus } from "@/features/manuscript/types/scene";
-import type { SceneDeleteMode } from "@/features/manuscript/lib/scene-operations";
-import { SceneNavigatorItem } from "@/features/manuscript/components/scene-navigator/SceneNavigatorItem";
-import { SceneNavigatorToolbar } from "@/features/manuscript/components/scene-navigator/SceneNavigatorToolbar";
-import { SceneDeleteDialog } from "@/features/manuscript/components/scene-navigator/SceneDeleteDialog";
+import type { Section, SectionStatus } from "@/features/manuscript/types/section";
+import type { SectionDeleteMode } from "@/features/manuscript/lib/section-operations";
+import { SectionNavigatorItem } from "@/features/manuscript/components/section-navigator/SectionNavigatorItem";
+import { SectionNavigatorToolbar } from "@/features/manuscript/components/section-navigator/SectionNavigatorToolbar";
+import { SectionDeleteDialog } from "@/features/manuscript/components/section-navigator/SectionDeleteDialog";
 import { cn } from "@/lib/utils/cn";
 
-export interface SceneNavigatorProps {
-  scenes: Scene[];
-  activeSceneId: string | null;
+export interface SectionNavigatorProps {
+  sections: Section[];
+  activeSectionId: string | null;
   collapsedIds: Set<string>;
-  onSelect: (scene: Scene) => void;
+  onSelect: (section: Section) => void;
   onReorder: (activeId: string, overId: string) => void;
   onAdd: () => void;
-  onDelete: (sceneId: string, mode: SceneDeleteMode) => void;
-  onRename: (sceneId: string, title: string) => void;
-  onStatusChange: (sceneId: string, status: SceneStatus) => void;
-  onMemoChange: (sceneId: string, memo: string) => void;
-  onToggleCollapse: (sceneId: string) => void;
+  onDelete: (sectionId: string, mode: SectionDeleteMode) => void;
+  onRename: (sectionId: string, title: string) => void;
+  onStatusChange: (sectionId: string, status: SectionStatus) => void;
+  onMemoChange: (sectionId: string, memo: string) => void;
+  onToggleCollapse: (sectionId: string) => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
-  /** 선택 Scene → Timeline 사건 추가 링크 */
+  /** 선택 Section → Timeline 사건 추가 링크 */
   timelineHref?: string | null;
   className?: string;
 }
 
-export function SceneNavigator({
-  scenes,
-  activeSceneId,
+export function SectionNavigator({
+  sections,
+  activeSectionId,
   collapsedIds,
   onSelect,
   onReorder,
@@ -69,9 +69,9 @@ export function SceneNavigator({
   onExpandAll,
   timelineHref = null,
   className,
-}: SceneNavigatorProps) {
+}: SectionNavigatorProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [deleting, setDeleting] = useState<Scene | null>(null);
+  const [deleting, setDeleting] = useState<Section | null>(null);
 
   // 터치·마우스·키보드 모두 지원 (activationConstraint 로 스크롤과 구분)
   const sensors = useSensors(
@@ -86,7 +86,7 @@ export function SceneNavigator({
     }),
   );
 
-  const ids = useMemo(() => scenes.map((s) => s.id), [scenes]);
+  const ids = useMemo(() => sections.map((s) => s.id), [sections]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -101,8 +101,8 @@ export function SceneNavigator({
         className,
       )}
     >
-      <SceneNavigatorToolbar
-        sceneCount={scenes.length}
+      <SectionNavigatorToolbar
+        sectionCount={sections.length}
         onAdd={onAdd}
         onCollapseAll={onCollapseAll}
         onExpandAll={onExpandAll}
@@ -116,12 +116,12 @@ export function SceneNavigator({
       >
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <ul className="min-h-0 flex-1 space-y-ns-1 overflow-y-auto px-ns-2 py-ns-2 overscroll-contain">
-            {scenes.map((scene) => (
-              <SceneNavigatorItem
-                key={scene.id}
-                scene={scene}
-                active={scene.id === activeSceneId}
-                collapsed={collapsedIds.has(scene.id)}
+            {sections.map((section) => (
+              <SectionNavigatorItem
+                key={section.id}
+                section={section}
+                active={section.id === activeSectionId}
+                collapsed={collapsedIds.has(section.id)}
                 onSelect={(s) => {
                   onSelect(s);
                   setMobileOpen(false);
@@ -131,7 +131,7 @@ export function SceneNavigator({
                 onDeleteRequest={(s) => setDeleting(s)}
                 onStatusChange={onStatusChange}
                 onMemoChange={onMemoChange}
-                canDelete={scenes.length > 1}
+                canDelete={sections.length > 1}
               />
             ))}
           </ul>
@@ -153,7 +153,7 @@ export function SceneNavigator({
             "text-ns-sm font-medium text-ns-ink",
           )}
         >
-          <span>Scene Navigator ({scenes.length})</span>
+          <span>Section Navigator ({sections.length})</span>
           <span aria-hidden>{mobileOpen ? "▴" : "▾"}</span>
         </button>
         {mobileOpen ? (
@@ -166,12 +166,12 @@ export function SceneNavigator({
         <div className="sticky top-ns-6 max-h-[calc(100vh-6rem)]">{panel}</div>
       </aside>
 
-      <SceneDeleteDialog
+      <SectionDeleteDialog
         open={Boolean(deleting)}
-        scene={deleting}
+        section={deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={(scene, mode) => {
-          onDelete(scene.id, mode);
+        onConfirm={(section, mode) => {
+          onDelete(section.id, mode);
           setDeleting(null);
         }}
       />

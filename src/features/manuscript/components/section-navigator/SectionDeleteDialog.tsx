@@ -2,51 +2,51 @@
 
 /**
  * =============================================================================
- * SceneDeleteDialog
+ * SectionDeleteDialog
  * -----------------------------------------------------------------------------
- * Scene 삭제 확인 — 두 가지 방식 중 선택
+ * Section 삭제 확인 — 두 가지 방식 중 선택
  * 1) full: 구분자 + 본문 전체 삭제
- * 2) delimiter-only: 구분자만 삭제, 본문은 인접 Scene에 병합
+ * 2) delimiter-only: 구분자만 삭제, 본문은 인접 Section에 병합
  * =============================================================================
  */
 
 import { useEffect, useState } from "react";
-import type { Scene } from "@/features/manuscript/types/scene";
-import type { SceneDeleteMode } from "@/features/manuscript/lib/scene-operations";
+import type { Section } from "@/features/manuscript/types/section";
+import type { SectionDeleteMode } from "@/features/manuscript/lib/section-operations";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils/cn";
 
-export interface SceneDeleteDialogProps {
+export interface SectionDeleteDialogProps {
   open: boolean;
-  scene: Scene | null;
+  section: Section | null;
   onClose: () => void;
-  onConfirm: (scene: Scene, mode: SceneDeleteMode) => void;
+  onConfirm: (section: Section, mode: SectionDeleteMode) => void;
 }
 
-export function SceneDeleteDialog({
+export function SectionDeleteDialog({
   open,
-  scene,
+  section,
   onClose,
   onConfirm,
-}: SceneDeleteDialogProps) {
-  const [mode, setMode] = useState<SceneDeleteMode>("full");
+}: SectionDeleteDialogProps) {
+  const [mode, setMode] = useState<SectionDeleteMode>("full");
 
   useEffect(() => {
     if (open) setMode("full");
-  }, [open, scene?.id]);
+  }, [open, section?.id]);
 
-  const label = scene
-    ? `#${scene.number}${scene.title.trim() ? ` ${scene.title.trim()}` : ""}`
+  const label = section
+    ? `#${section.number}${section.title.trim() ? ` ${section.title.trim()}` : ""}`
     : "";
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Scene 삭제"
+      title="Section 삭제"
       description={
-        scene
+        section
           ? `「${label}」을(를) 어떻게 삭제할까요?`
           : undefined
       }
@@ -59,10 +59,10 @@ export function SceneDeleteDialog({
           <Button
             type="button"
             variant="danger"
-            disabled={!scene}
+            disabled={!section}
             onClick={() => {
-              if (!scene) return;
-              onConfirm(scene, mode);
+              if (!section) return;
+              onConfirm(section, mode);
               onClose();
               setMode("full");
             }}
@@ -76,14 +76,14 @@ export function SceneDeleteDialog({
         <ModeOption
           active={mode === "full"}
           onSelect={() => setMode("full")}
-          title="Scene 전체 삭제"
+          title="Section 전체 삭제"
           description="구분자와 본문을 모두 원고에서 제거합니다."
         />
         <ModeOption
           active={mode === "delimiter-only"}
           onSelect={() => setMode("delimiter-only")}
           title="구분자만 삭제"
-          description="본문은 남기고 #N 줄만 제거합니다. 내용은 인접 Scene에 합쳐집니다."
+          description="본문은 남기고 #N 줄만 제거합니다. 내용은 인접 Section에 합쳐집니다."
         />
       </div>
     </Modal>

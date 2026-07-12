@@ -19,7 +19,7 @@ export const HELP_DOCUMENT: HelpDocument = {
       blocks: [
         {
           type: "paragraph",
-          text: "Novel Studio는 소설 집필에 집중한 작업실입니다. 작품(Project) 안에서 Chapters · Manuscript · Characters · Writing Vault 등을 한곳에서 이어 씁니다.",
+          text: "Novel Studio는 소설 집필에 집중한 작업실입니다. 작품(Project) 안에서 Manuscript · Characters · Writing Vault 등을 한곳에서 이어 씁니다.",
         },
         {
           type: "paragraph",
@@ -114,36 +114,36 @@ export const HELP_DOCUMENT: HelpDocument = {
       ],
     },
     {
-      id: "chapters",
-      title: "3. Chapters",
+      id: "manuscript-sections",
+      title: "3. Manuscript · Sections",
       children: [
         {
-          id: "chapters-create",
-          title: "Chapter 생성",
+          id: "sections-navigator",
+          title: "Section Navigator",
           blocks: [
             {
               type: "paragraph",
-              text: "Chapters 메뉴에서 새 Chapter를 만듭니다. Chapter는 원고를 나누는 구분이며, Manuscript에서는 순서대로 이어진 하나의 긴 글로 보입니다.",
+              text: "Manuscript 오른쪽 Section Navigator에서 원고 구간을 보고, 상태를 바꾸거나 접을 수 있습니다. 구간을 선택하면 해당 위치로 스크롤됩니다.",
             },
           ],
         },
         {
-          id: "chapters-reorder",
+          id: "sections-add",
+          title: "새 Section",
+          blocks: [
+            {
+              type: "paragraph",
+              text: "Section Navigator에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
+            },
+          ],
+        },
+        {
+          id: "sections-reorder",
           title: "순서 변경",
           blocks: [
             {
               type: "paragraph",
-              text: "각 Chapter 왼쪽의 ☰ 핸들로 Drag & Drop 하면 순서가 바뀝니다. Manuscript 쪽 Chapter 목록과도 양방향으로 동기화됩니다.",
-            },
-          ],
-        },
-        {
-          id: "chapters-delete",
-          title: "삭제",
-          blocks: [
-            {
-              type: "paragraph",
-              text: "Chapter를 삭제하면 해당 구분과 연결된 본문도 함께 정리됩니다. 삭제 전 확인 창이 표시됩니다.",
+              text: "Section을 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
             },
           ],
         },
@@ -159,7 +159,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Manuscript는 프로젝트 전체 원고를 한 화면에서 보여 줍니다. Chapter는 ================= 구분선으로만 나뉘며, 이어 쓰기에 집중할 수 있습니다.",
+              text: "Manuscript는 프로젝트 전체 원고를 한 화면에서 보여 줍니다. Section Navigator로 구간을 나누며, 이어 쓰기에 집중할 수 있습니다.",
             },
           ],
         },
@@ -175,21 +175,21 @@ export const HELP_DOCUMENT: HelpDocument = {
         },
         {
           id: "manuscript-scenes",
-          title: "Scene 관리",
+          title: "Section 관리",
           blocks: [
             {
               type: "paragraph",
-              text: "Scene Navigator에서 장면을 보고, 상태를 바꾸거나 접을 수 있습니다. 장면을 선택하면 해당 원고 위치로 스크롤됩니다.",
+              text: "Section Navigator에서 구간을 보고, 상태를 바꾸거나 접을 수 있습니다. 구간을 선택하면 해당 원고 위치로 스크롤됩니다.",
             },
           ],
         },
         {
           id: "manuscript-new-scene",
-          title: "새 장면",
+          title: "새 Section",
           blocks: [
             {
               type: "paragraph",
-              text: "Scene Navigator에서 새 장면을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
+              text: "Section Navigator에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
             },
           ],
         },
@@ -199,7 +199,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Scene과 Chapter 모두 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
+              text: "Section을 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
             },
           ],
         },
