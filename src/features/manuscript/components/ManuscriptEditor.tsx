@@ -152,8 +152,9 @@ export const ManuscriptEditor = forwardRef<
           "hover:border-ns-border-strong",
           "focus-visible:border-ns-accent focus-visible:shadow-[var(--ns-ring-accent)]",
           "disabled:cursor-not-allowed disabled:bg-ns-muted",
+          // 글자만 투명 — 플레이스홀더는 빈 원고에서 보이도록 유지
           showColorOverlay &&
-            "relative z-10 bg-transparent text-transparent caret-ns-ink placeholder:text-transparent",
+            "relative z-10 bg-transparent text-transparent caret-ns-ink",
           className,
         )}
         style={{ fontSize: "var(--ns-editor-font-size, 1rem)" }}
