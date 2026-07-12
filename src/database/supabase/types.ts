@@ -12,6 +12,8 @@ export interface DbProjectRow {
   user_id: string;
   title: string;
   premise: string | null;
+  /** 작품 종류 — novel | poem | essay | other (마이그레이션 전 null 가능) */
+  type?: string | null;
   status: string;
   sort_order: number;
   created_at: string;

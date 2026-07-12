@@ -29,6 +29,35 @@ export type ProjectStatus =
   | "archived"; // 보관 (목록에서 숨기거나 뒤로)
 
 /**
+ * 작품 종류.
+ * Chapter가 아니라 Project의 속성이다.
+ */
+export type ProjectType = "novel" | "poem" | "essay" | "other";
+
+export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
+  novel: "소설",
+  poem: "시",
+  essay: "에세이",
+  other: "기타",
+};
+
+export const PROJECT_TYPE_OPTIONS: ProjectType[] = [
+  "novel",
+  "poem",
+  "essay",
+  "other",
+];
+
+export const DEFAULT_PROJECT_TYPE: ProjectType = "novel";
+
+export function isProjectType(value: unknown): value is ProjectType {
+  return (
+    typeof value === "string" &&
+    (PROJECT_TYPE_OPTIONS as string[]).includes(value)
+  );
+}
+
+/**
  * 작품(프로젝트) 엔티티.
  *
  * 관계
@@ -51,6 +80,9 @@ export interface Project extends Timestamps {
    * 긴 시놉시스는 Memo나 별도 문서로 두고, 여기서는 짧게 유지한다.
    */
   premise?: string;
+
+  /** 작품 종류 (소설 / 시 / 에세이 / 기타) */
+  type: ProjectType;
 
   /** 집필 단계 */
   status: ProjectStatus;

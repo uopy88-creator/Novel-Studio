@@ -12,6 +12,10 @@
 
 import Link from "next/link";
 import type { Project } from "@/features/projects/types/project";
+import {
+  DEFAULT_PROJECT_TYPE,
+  PROJECT_TYPE_LABELS,
+} from "@/features/projects/types/project";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
@@ -32,6 +36,8 @@ export function ProjectCard({
   className,
 }: ProjectCardProps) {
   const href = `/projects/${project.id}/dashboard`;
+  const typeLabel =
+    PROJECT_TYPE_LABELS[project.type ?? DEFAULT_PROJECT_TYPE] ?? "소설";
 
   return (
     <Card
@@ -54,6 +60,14 @@ export function ProjectCard({
         <h2 className="text-ns-xl font-semibold leading-ns-snug tracking-tight text-ns-ink">
           {project.title}
         </h2>
+        <span
+          className={cn(
+            "mt-ns-2 inline-flex items-center rounded-ns-md border border-ns-border",
+            "bg-ns-muted/70 px-ns-2 py-0.5 text-ns-xs text-ns-ink-secondary",
+          )}
+        >
+          {typeLabel}
+        </span>
         {project.premise ? (
           <p className="mt-ns-2 line-clamp-2 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
             {project.premise}

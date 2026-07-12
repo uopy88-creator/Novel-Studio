@@ -6,13 +6,18 @@
  * -----------------------------------------------------------------------------
  * 작품 생성 / 수정 모달.
  *
- * create: 제목(필수) + 설명(선택 → Project.premise)
- * edit:   제목만 수정 (기존 설명은 유지)
+ * create: 제목(필수) + 작품 종류 + 설명(선택 → Project.premise)
+ * edit:   제목 · 작품 종류 (기존 설명은 유지)
  * =============================================================================
  */
 
 import { useEffect, useState, type FormEvent } from "react";
-import type { Project } from "@/features/projects/types/project";
+import type { Project, ProjectType } from "@/features/projects/types/project";
+import {
+  DEFAULT_PROJECT_TYPE,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPE_OPTIONS,
+} from "@/features/projects/types/project";
 import type { ProjectInput } from "@/features/projects/lib/project-storage";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -41,6 +46,7 @@ export function ProjectModal({
   onSubmit,
 }: ProjectModalProps) {
   const [title, setTitle] = useState("");
+  const [type, setType] = useState<ProjectType>(DEFAULT_PROJECT_TYPE);
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
 
@@ -50,9 +56,11 @@ export function ProjectModal({
 
     if (mode === "edit" && project) {
       setTitle(project.title);
+      setType(project.type ?? DEFAULT_PROJECT_TYPE);
       setDescription(project.premise ?? "");
     } else {
       setTitle("");
+      setType(DEFAULT_PROJECT_TYPE);
       setDescription("");
     }
     setTitleError(null);
@@ -69,7 +77,8 @@ export function ProjectModal({
 
     onSubmit({
       title: trimmed,
-      // 수정 모달은 제목만 편집 — 기존 설명 유지
+      type,
+      // 수정 모달은 제목·종류만 편집 — 기존 설명 유지
       description:
         mode === "edit"
           ? (project?.premise ?? "").trim()
@@ -87,7 +96,7 @@ export function ProjectModal({
       title={isEdit ? "작품 수정" : "새 작품"}
       description={
         isEdit
-          ? "작품 제목을 수정합니다."
+          ? "작품 제목과 종류를 수정합니다."
           : "작업실에 새 작품을 추가합니다."
       }
       size="md"
@@ -120,6 +129,40 @@ export function ProjectModal({
           autoFocus
           required
         />
+
+        <fieldset className="flex flex-col gap-ns-2">
+          <legend className="text-ns-sm font-medium text-ns-ink">
+            작품 종류
+          </legend>
+          <ul className="flex flex-col gap-ns-1" role="radiogroup">
+            {PROJECT_TYPE_OPTIONS.map((option) => {
+              const checked = type === option;
+              return (
+                <li key={option}>
+                  <label
+                    className={cn(
+                      "flex cursor-pointer items-center gap-ns-3 rounded-ns-md px-ns-2 py-ns-2",
+                      "hover:bg-ns-muted",
+                      checked && "bg-ns-muted",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="project-type"
+                      value={option}
+                      checked={checked}
+                      onChange={() => setType(option)}
+                      className="h-4 w-4 accent-[var(--ns-accent)]"
+                    />
+                    <span className="text-ns-sm text-ns-ink">
+                      {PROJECT_TYPE_LABELS[option]}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
 
         {!isEdit ? (
           <div className="flex w-full flex-col gap-ns-2">

@@ -8,3 +8,14 @@ export { ProjectList } from "./components/ProjectList";
 export { ProjectModal } from "./components/ProjectModal";
 export { ProjectDeleteDialog } from "./components/ProjectDeleteDialog";
 export { useProjects } from "./hooks/useProjects";
+export type {
+  Project,
+  ProjectStatus,
+  ProjectType,
+} from "./types/project";
+export {
+  DEFAULT_PROJECT_TYPE,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPE_OPTIONS,
+  isProjectType,
+} from "./types/project";

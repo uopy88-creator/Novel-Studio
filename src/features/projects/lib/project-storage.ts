@@ -7,7 +7,11 @@
  * =============================================================================
  */
 
-import type { Project } from "@/features/projects/types/project";
+import type { Project, ProjectType } from "@/features/projects/types/project";
+import {
+  DEFAULT_PROJECT_TYPE,
+  isProjectType,
+} from "@/features/projects/types/project";
 import type { ProjectId } from "@/types/ids";
 import {
   isSupabaseDataMode,
@@ -32,11 +36,38 @@ export { PROJECTS_STORAGE_KEY };
 export interface ProjectInput {
   title: string;
   description: string;
+  /** 작품 종류 — 기본값 novel */
+  type?: ProjectType;
+}
+
+/** type 없는 레거시 로컬 데이터를 novel 로 정규화 */
+function normalizeProject(raw: unknown): Project | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as Partial<Project>;
+  if (typeof item.id !== "string" || typeof item.title !== "string") {
+    return null;
+  }
+
+  return {
+    id: item.id,
+    title: item.title,
+    premise: item.premise,
+    type: isProjectType(item.type) ? item.type : DEFAULT_PROJECT_TYPE,
+    status: item.status ?? "ideation",
+    targetWordCount: item.targetWordCount,
+    sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 0,
+    createdAt:
+      typeof item.createdAt === "string" ? item.createdAt : nowIso(),
+    updatedAt:
+      typeof item.updatedAt === "string" ? item.updatedAt : nowIso(),
+  };
 }
 
 /** 로컬 전용 모드(Supabase 미설정)에서만 사용 */
 function readLocalProjects(): Project[] {
-  return readJsonArray<Project>(PROJECTS_STORAGE_KEY);
+  return readJsonArray<unknown>(PROJECTS_STORAGE_KEY)
+    .map(normalizeProject)
+    .filter((item): item is Project => item !== null);
 }
 
 function writeLocalProjects(projects: Project[]): void {
@@ -46,6 +77,11 @@ function writeLocalProjects(projects: Project[]): void {
 
 function backupProjects(projects: Project[]): void {
   writeWorkDataBackup(PROJECTS_STORAGE_KEY, projects);
+}
+
+function resolveType(input: ProjectInput, fallback?: ProjectType): ProjectType {
+  if (isProjectType(input.type)) return input.type;
+  return fallback ?? DEFAULT_PROJECT_TYPE;
 }
 
 export function createProjectId(): ProjectId {
@@ -64,6 +100,7 @@ export async function readProjects(): Promise<Project[]> {
 
 export async function createProject(input: ProjectInput): Promise<Project> {
   const timestamp = nowIso();
+  const type = resolveType(input);
 
   if (isSupabaseDataMode()) {
     await requireCloudDb();
@@ -76,6 +113,7 @@ export async function createProject(input: ProjectInput): Promise<Project> {
       id: createProjectId(),
       title: input.title.trim(),
       premise: input.description.trim() || undefined,
+      type,
       status: "ideation",
       sortOrder: minSort - 1,
       createdAt: timestamp,
@@ -96,6 +134,7 @@ export async function createProject(input: ProjectInput): Promise<Project> {
     id: createProjectId(),
     title: input.title.trim(),
     premise: input.description.trim() || undefined,
+    type,
     status: "ideation",
     sortOrder: minSort - 1,
     createdAt: timestamp,
@@ -115,10 +154,12 @@ export async function updateProject(
     const index = projects.findIndex((project) => project.id === id);
     if (index < 0) return null;
 
+    const current = projects[index];
     const updated: Project = {
-      ...projects[index],
+      ...current,
       title: input.title.trim(),
       premise: input.description.trim() || undefined,
+      type: resolveType(input, current.type),
       updatedAt: nowIso(),
     };
     await cloudUpsertProject(updated);
@@ -129,10 +170,12 @@ export async function updateProject(
   const projects = readLocalProjects();
   const index = projects.findIndex((project) => project.id === id);
   if (index < 0) return null;
+  const current = projects[index];
   const updated: Project = {
-    ...projects[index],
+    ...current,
     title: input.title.trim(),
     premise: input.description.trim() || undefined,
+    type: resolveType(input, current.type),
     updatedAt: nowIso(),
   };
   const next = [...projects];

@@ -4,7 +4,14 @@
  * =============================================================================
  */
 
-import type { Project, ProjectStatus } from "@/features/projects/types/project";
+import type {
+  Project,
+  ProjectStatus,
+} from "@/features/projects/types/project";
+import {
+  DEFAULT_PROJECT_TYPE,
+  isProjectType,
+} from "@/features/projects/types/project";
 import type {
   Chapter,
   ChapterStatus,
@@ -44,6 +51,7 @@ export function projectToRow(project: Project, userId: string): DbProjectRow {
     user_id: userId,
     title: project.title,
     premise: project.premise ?? null,
+    type: project.type ?? DEFAULT_PROJECT_TYPE,
     status: project.status,
     sort_order: project.sortOrder,
     created_at: project.createdAt,
@@ -56,6 +64,7 @@ export function rowToProject(row: DbProjectRow): Project {
     id: row.id,
     title: row.title,
     premise: row.premise ?? undefined,
+    type: isProjectType(row.type) ? row.type : DEFAULT_PROJECT_TYPE,
     status: row.status as ProjectStatus,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
