@@ -378,13 +378,22 @@ export async function migrateProjectToSections(
     bodies,
   );
 
-  await remapSectionMetasForMigration({
-    projectId,
-    primaryDocumentId: primary.id,
-    chapters,
-    flattenedSections: sections,
-    sectionNumberMap,
-  });
+  // 메타 저장 실패가 원고 병합 자체를 막지 않도록 분리한다.
+  // (원격 scenes 에 section_number/icons 미적용 시 과거엔 여기서 전체 로드가 실패했음)
+  try {
+    await remapSectionMetasForMigration({
+      projectId,
+      primaryDocumentId: primary.id,
+      chapters,
+      flattenedSections: sections,
+      sectionNumberMap,
+    });
+  } catch (error) {
+    console.error(
+      "[migrate-to-sections] section meta remap failed — manuscript content will still be saved",
+      error,
+    );
+  }
 
   await saveManuscriptContent({
     projectId,
