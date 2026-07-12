@@ -2,40 +2,28 @@
  * =============================================================================
  * ExpressionService
  * -----------------------------------------------------------------------------
- * 표현 탭 전용. DictionaryService 와 분리한다.
- * 유의어 · 관용 표현만 반환하며, 가나다순으로 정렬한다.
+ * 「표현 바꾸기」탭 전용. Novel Studio 유의어 JSON DB 만 조회한다.
+ * AI·문장 생성·관용 표현 추천은 하지 않는다.
  * =============================================================================
  */
 
-import { EXPRESSION_DATA } from "@/features/sentence-assistant/lib/expression-data";
+import { getSynonymsFromIndex } from "@/data/synonyms";
 import type { ExpressionLookupResult } from "@/features/sentence-assistant/lib/expression-types";
 import { normalizeDictionaryQuery } from "@/features/sentence-assistant/lib/normalize-query";
 
-function sortHangul(items: string[]): string[] {
-  return [...new Set(items.map((s) => s.trim()).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b, "ko"),
-  );
-}
-
 /**
- * 선택 텍스트에 대한 유의어 · 관용 표현을 조회한다.
- * 데이터에 없으면 빈 배열 (UI에서 「관련 표현을 찾을 수 없습니다.」).
+ * 선택 단어에 대한 유의어 목록을 반환한다.
+ * 없으면 빈 배열 (UI: 「등록된 유의어가 없습니다.」).
  */
 export function lookupExpressions(rawQuery: string): ExpressionLookupResult {
   const query = normalizeDictionaryQuery(rawQuery);
   if (!query) {
-    return { query: "", synonyms: [], idioms: [] };
-  }
-
-  const entry = EXPRESSION_DATA[query];
-  if (!entry) {
-    return { query, synonyms: [], idioms: [] };
+    return { query: "", synonyms: [] };
   }
 
   return {
     query,
-    synonyms: sortHangul(entry.synonyms),
-    idioms: sortHangul(entry.idioms),
+    synonyms: getSynonymsFromIndex(query),
   };
 }
 

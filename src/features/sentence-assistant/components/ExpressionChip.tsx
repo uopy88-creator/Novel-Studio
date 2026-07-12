@@ -2,7 +2,7 @@
 
 /**
  * =============================================================================
- * ExpressionChip — 클릭 시 클립보드 복사만 (원고 수정 없음)
+ * ExpressionChip — 클릭 시 선택 단어를 해당 유의어로 교체
  * =============================================================================
  */
 
@@ -10,15 +10,15 @@ import { cn } from "@/lib/utils/cn";
 
 export interface ExpressionChipProps {
   label: string;
-  onCopy: (text: string) => void;
+  onSelect: (text: string) => void;
 }
 
-export function ExpressionChip({ label, onCopy }: ExpressionChipProps) {
+export function ExpressionChip({ label, onSelect }: ExpressionChipProps) {
   return (
     <button
       type="button"
-      onClick={() => onCopy(label)}
-      title="클립보드에 복사"
+      onClick={() => onSelect(label)}
+      title={`${label}(으)로 바꾸기`}
       className={cn(
         "inline-flex max-w-full items-center rounded-ns-md border border-ns-border",
         "bg-ns-surface px-ns-3 py-ns-2 text-left text-ns-sm text-ns-ink",

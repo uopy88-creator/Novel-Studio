@@ -17,7 +17,7 @@ export interface SentenceAssistantTab {
 
 export const SENTENCE_ASSISTANT_TABS: SentenceAssistantTab[] = [
   { id: "word", label: "단어", icon: "📖" },
-  { id: "expression", label: "표현", icon: "✍" },
+  { id: "expression", label: "표현 바꾸기", icon: "✍" },
   { id: "show-tell", label: "Show / Tell", icon: "👁" },
 ];
 

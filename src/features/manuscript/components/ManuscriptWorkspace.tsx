@@ -479,6 +479,16 @@ export function ManuscriptWorkspace({
               <SentenceAssistantHost
                 textareaRef={editorRef}
                 enabled={Boolean(primaryDocumentId)}
+                onReplaceSelection={(nextContent, selectionStart, selectionEnd) => {
+                  // Undo/Redo 스택에 한 단계로 기록
+                  setContentTransactional(nextContent);
+                  requestAnimationFrame(() => {
+                    const el = editorRef.current;
+                    if (!el) return;
+                    el.focus();
+                    el.setSelectionRange(selectionStart, selectionEnd);
+                  });
+                }}
               />
             </div>
           </div>

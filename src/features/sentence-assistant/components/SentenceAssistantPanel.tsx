@@ -24,12 +24,15 @@ export interface SentenceAssistantPanelProps {
   onClose: () => void;
   /** 선택된 원문 (작가가 쓴 그대로) */
   selectedText: string;
+  /** 표현 바꾸기 — 유의어로 교체 */
+  onReplaceWith?: (synonym: string) => void;
 }
 
 export function SentenceAssistantPanel({
   open,
   onClose,
   selectedText,
+  onReplaceWith,
 }: SentenceAssistantPanelProps) {
   const titleId = useId();
   const [tab, setTab] = useState<SentenceAssistantTabId>("word");
@@ -133,7 +136,10 @@ export function SentenceAssistantPanel({
           {tab === "word" ? (
             <SentenceAssistantWord selectedText={selectedText} />
           ) : tab === "expression" ? (
-            <SentenceAssistantExpression selectedText={selectedText} />
+            <SentenceAssistantExpression
+              selectedText={selectedText}
+              onReplaceWith={onReplaceWith}
+            />
           ) : (
             <SentenceAssistantShowTell selectedText={selectedText} />
           )}
