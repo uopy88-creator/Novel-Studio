@@ -32,6 +32,7 @@ import { InspirationModal } from "@/features/inspiration/components/InspirationM
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
+import { ManuscriptColorToolbar } from "@/features/manuscript/components/ManuscriptColorToolbar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
 import { ManuscriptVersionModal } from "@/features/manuscript/components/version-history";
@@ -41,6 +42,14 @@ import { AutoRecoveryDialog } from "@/features/manuscript/components/AutoRecover
 import { ExportModal } from "@/features/export/components/ExportModal";
 import { SentenceAssistantHost } from "@/features/sentence-assistant";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
+import {
+  applyManuscriptFgColor,
+  getUniformManuscriptFgColor,
+  reconcileVisibleEdit,
+  stripManuscriptMarkup,
+  stripManuscriptMarkupWithMap,
+  type ManuscriptFgColor,
+} from "@/features/manuscript/lib/manuscript-markup";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -153,6 +162,79 @@ export function ManuscriptWorkspace({
     useState<Inspiration | null>(null);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  /** 툴바 원형 테두리 — 선택 구간(또는 캐럿)의 통일 색 */
+  const [activeFgColor, setActiveFgColor] = useState<ManuscriptFgColor | null>(
+    null,
+  );
+
+  /** 에디터에는 마커 없는 문자열만 노출 (색은 오버레이) */
+  const visibleContent = useMemo(
+    () => stripManuscriptMarkup(content),
+    [content],
+  );
+  const markupMap = useMemo(
+    () => stripManuscriptMarkupWithMap(content),
+    [content],
+  );
+
+  const handleVisibleChange = useCallback(
+    (nextVisible: string) => {
+      setContent(reconcileVisibleEdit(content, nextVisible));
+    },
+    [content, setContent],
+  );
+
+  const syncActiveFgColor = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) {
+      setActiveFgColor(null);
+      return;
+    }
+    const map = stripManuscriptMarkupWithMap(content);
+    let visStart = el.selectionStart;
+    const visEnd = el.selectionEnd;
+    if (visStart === visEnd) {
+      // 캐럿만 있을 때 — 직전 글자 색 (없으면 검정)
+      if (visStart === 0) {
+        setActiveFgColor("k");
+        return;
+      }
+      visStart = visStart - 1;
+    }
+    const storageStart = map.toStorageOffset(visStart);
+    const storageEnd = map.toStorageOffset(visEnd);
+    setActiveFgColor(
+      getUniformManuscriptFgColor(content, storageStart, storageEnd),
+    );
+  }, [content]);
+
+  const applyFgColor = useCallback(
+    (color: ManuscriptFgColor) => {
+      const el = editorRef.current;
+      if (!el || el.selectionStart === el.selectionEnd) return;
+
+      const map = stripManuscriptMarkupWithMap(content);
+      const visStart = el.selectionStart;
+      const visEnd = el.selectionEnd;
+      const storageStart = map.toStorageOffset(visStart);
+      const storageEnd = map.toStorageOffset(visEnd);
+      const next = applyManuscriptFgColor(
+        content,
+        storageStart,
+        storageEnd,
+        color,
+      );
+      setContentTransactional(next);
+      setActiveFgColor(color);
+
+      // 선택 구간(표시 좌표) 유지
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(visStart, visEnd);
+      });
+    },
+    [content, setContentTransactional],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -182,6 +264,21 @@ export function ManuscriptWorkspace({
     void refreshInspirations();
   }, [refreshInspirations, content]);
 
+  // 선택 변경 시 색상 툴바 테두리 동기화
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const onSel = () => syncActiveFgColor();
+    el.addEventListener("select", onSel);
+    el.addEventListener("keyup", onSel);
+    el.addEventListener("mouseup", onSel);
+    return () => {
+      el.removeEventListener("select", onSel);
+      el.removeEventListener("keyup", onSel);
+      el.removeEventListener("mouseup", onSel);
+    };
+  }, [syncActiveFgColor, isReady]);
+
   /** Inspiration 오프셋은 이미 프로젝트 원고 좌표로 저장 (마이그레이션 후) */
   const gutterInspirations = useMemo(
     () => projectInspirations,
@@ -189,8 +286,10 @@ export function ManuscriptWorkspace({
   );
 
   const stats = useMemo(() => {
-    const totalChars = countCharsWithSpaces(content);
-    const charsWithoutSpaces = countCharsWithoutSpaces(content);
+    // 통계는 색상 마커를 제외한 순수 글자 수
+    const plain = stripManuscriptMarkup(content);
+    const totalChars = countCharsWithSpaces(plain);
+    const charsWithoutSpaces = countCharsWithoutSpaces(plain);
     return {
       totalChars,
       charsWithoutSpaces,
@@ -199,6 +298,10 @@ export function ManuscriptWorkspace({
     };
   }, [content]);
 
+  /**
+   * start/end 는 저장본(storage) 오프셋.
+   * 에디터는 visible 좌표를 쓰므로 변환 후 스크롤한다.
+   */
   const scrollToOffset = useCallback(
     (
       start: number,
@@ -208,22 +311,27 @@ export function ManuscriptWorkspace({
       const el = editorRef.current;
       if (!el) return;
 
+      const map = stripManuscriptMarkupWithMap(content);
+      const visStart = map.toVisibleOffset(start);
+      const visEnd = map.toVisibleOffset(end);
+
       if (options?.focus !== false) {
         el.focus();
       }
-      el.setSelectionRange(start, end);
+      el.setSelectionRange(visStart, visEnd);
 
-      const before = content.slice(0, start);
+      const before = visibleContent.slice(0, visStart);
       const lineNumber = before.split("\n").length;
       const styles = window.getComputedStyle(el);
       const lineHeight = Number.parseFloat(styles.lineHeight) || 28;
       el.scrollTop = Math.max(0, (lineNumber - 3) * lineHeight);
     },
-    [content],
+    [content, visibleContent],
   );
 
   const jumpToMatch = useCallback(
     (start: number, end: number, options?: { focus?: boolean }) => {
+      // SearchBar 는 storage 오프셋을 반환한다
       scrollToOffset(start, end, { focus: options?.focus ?? false });
     },
     [scrollToOffset],
@@ -371,6 +479,11 @@ export function ManuscriptWorkspace({
                   ↷ Redo
                 </Button>
               </div>
+              {/* 텍스트 색상 — 표시용 4색 (컬러 피커 없음) */}
+              <ManuscriptColorToolbar
+                activeColor={activeFgColor}
+                onSelect={applyFgColor}
+              />
               <ContextHelp topic="manuscript" projectId={projectId} />
               {primaryDocumentId ? (
                 <>
@@ -442,14 +555,16 @@ export function ManuscriptWorkspace({
 
             <div className="relative">
               <InspirationGutter
-                content={content}
+                content={visibleContent}
+                storageContent={content}
                 inspirations={gutterInspirations}
                 onOpen={(item) => setViewingInspiration(item)}
                 className="z-10 pt-ns-5"
               />
               <CharacterMentionField
-                value={content}
-                onChange={setContent}
+                value={visibleContent}
+                colorSource={content}
+                onChange={handleVisibleChange}
                 characters={characters}
                 documentTitle="Manuscript"
                 editorRef={editorRef}
@@ -457,17 +572,26 @@ export function ManuscriptWorkspace({
                 onOpenCharacter={(character) => setProfileId(character.id)}
                 onMentionActiveChange={setMentionActive}
                 onSectionBreak={(cursorOffset) => {
-                  // `#` + Enter → createSection 공통 로직 (번호 자동 부여)
-                  const result = createAtCursor(cursorOffset);
+                  // `#` + Enter — visible → storage 변환 후 Section 생성
+                  const storageOffset = markupMap.toStorageOffset(cursorOffset);
+                  const result = createAtCursor(storageOffset);
                   if (!result) return null;
-                  return { caretOffset: result.caretOffset };
+                  // 삽입분은 순수 텍스트(마커 없음) → 앞쪽 마커 길이만큼만 보정
+                  const markerBias = storageOffset - cursorOffset;
+                  return {
+                    caretOffset: result.caretOffset - markerBias,
+                  };
                 }}
               />
               <InspirationSelectionMenu
                 textareaRef={editorRef}
                 enabled={Boolean(primaryDocumentId) && !mentionActive}
                 onAddInspiration={(selection) =>
-                  setPendingSelection(selection)
+                  setPendingSelection({
+                    text: selection.text,
+                    start: markupMap.toStorageOffset(selection.start),
+                    end: markupMap.toStorageOffset(selection.end),
+                  })
                 }
               />
               <SentenceAssistantHost

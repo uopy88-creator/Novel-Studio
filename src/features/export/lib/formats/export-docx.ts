@@ -3,6 +3,7 @@
  * Export — DOCX (Microsoft Word 호환)
  * -----------------------------------------------------------------------------
  * `docx` 패키지로 OOXML 생성. Word / Pages / Google Docs 에서 바로 열림.
+ * 본문 색상 마커(·ns:fg:…)는 TextRun color 로 유지한다.
  * =============================================================================
  */
 
@@ -20,26 +21,45 @@ import {
   exportTimestamp,
   sanitizeFilename,
 } from "@/features/export/lib/download-blob";
+import {
+  MANUSCRIPT_FG_DOCX,
+  splitColorRunsByLine,
+  type ManuscriptFgColor,
+} from "@/features/manuscript/lib/manuscript-markup";
+
+function textRunsFromLine(
+  lineRuns: { text: string; color: ManuscriptFgColor }[],
+): TextRun[] {
+  if (lineRuns.length === 0 || (lineRuns.length === 1 && !lineRuns[0].text)) {
+    return [];
+  }
+  return lineRuns.map(
+    (run) =>
+      new TextRun({
+        text: run.text,
+        font: "Malgun Gothic",
+        size: 22, // 11pt
+        ...(run.color !== "k"
+          ? { color: MANUSCRIPT_FG_DOCX[run.color] }
+          : {}),
+      }),
+  );
+}
 
 function paragraphsFromText(text: string): Paragraph[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = splitColorRunsByLine(text);
   const result: Paragraph[] = [];
 
-  for (const line of lines) {
-    if (line.trim() === "") {
+  for (const lineRuns of lines) {
+    const children = textRunsFromLine(lineRuns);
+    if (children.length === 0) {
       result.push(new Paragraph({ children: [] }));
       continue;
     }
     result.push(
       new Paragraph({
         spacing: { after: 120, line: 360 },
-        children: [
-          new TextRun({
-            text: line,
-            font: "Malgun Gothic",
-            size: 22, // 11pt
-          }),
-        ],
+        children,
       }),
     );
   }

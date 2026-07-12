@@ -1,6 +1,11 @@
 /**
  * 원고 검색 — 단어 / 문장(구문) 모드
+ *
+ * 색상 마커(·ns:fg:…)는 검색에 영향을 주지 않는다.
+ * 매치 오프셋은 저장본(storage) 좌표로 반환한다 (점프·딥링크용).
  */
+
+import { stripManuscriptMarkupWithMap } from "@/features/manuscript/lib/manuscript-markup";
 
 export type ManuscriptSearchMode = "word" | "sentence";
 
@@ -90,6 +95,9 @@ function findWordMatches(
  * mode
  * - word: 단어 경계 매치
  * - sentence: 문장·구문(부분 문자열) 검색
+ *
+ * content 에 색상 마커가 있어도 순수 텍스트만 검색한다.
+ * 반환 start/end 는 storage 오프셋이다.
  */
 export function findManuscriptMatches(
   content: string,
@@ -99,8 +107,20 @@ export function findManuscriptMatches(
   const trimmed = query.trim();
   if (!trimmed || !content) return [];
 
-  if (mode === "word") {
-    return findWordMatches(content, trimmed);
-  }
-  return findSentenceMatches(content, trimmed);
+  const map = stripManuscriptMarkupWithMap(content);
+  const visible = map.visible;
+  if (!visible) return [];
+
+  const rawMatches =
+    mode === "word"
+      ? findWordMatches(visible, trimmed)
+      : findSentenceMatches(visible, trimmed);
+
+  return rawMatches.map((match) => ({
+    ...match,
+    start: map.toStorageOffset(match.start),
+    end: map.toStorageOffset(match.end),
+    // 미리뷰도 마커 없는 텍스트 기준
+    preview: match.preview,
+  }));
 }

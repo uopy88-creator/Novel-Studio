@@ -10,10 +10,17 @@
 
 import { useMemo } from "react";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
+import {
+  stripManuscriptMarkup,
+  stripManuscriptMarkupWithMap,
+} from "@/features/manuscript/lib/manuscript-markup";
 import { cn } from "@/lib/utils/cn";
 
 export interface InspirationGutterProps {
+  /** 에디터에 보이는 텍스트(마커 제거본) — 줄 위치 계산용 */
   content: string;
+  /** 저장본(마커 포함). 없으면 content 와 동일하게 취급 */
+  storageContent?: string;
   inspirations: Inspiration[];
   onOpen: (inspiration: Inspiration) => void;
   /** textarea와 맞추는 대략적 line-height (px) */
@@ -28,6 +35,7 @@ function lineIndexAtOffset(content: string, offset: number): number {
 
 export function InspirationGutter({
   content,
+  storageContent,
   inspirations,
   onOpen,
   lineHeight = 28,
@@ -36,16 +44,26 @@ export function InspirationGutter({
   const markers = useMemo(() => {
     // 같은 줄에 여러 개면 겹치지 않게 살짝 오프셋
     const byLine = new Map<number, Inspiration[]>();
+    const storage = storageContent ?? content;
+    const map = stripManuscriptMarkupWithMap(storage);
+    const visible = content;
 
     for (const item of inspirations) {
-      let offset = item.startOffset;
-      // 본문이 바뀌어 오프셋이 어긋나면 selectedText로 재탐색
-      const slice = content.slice(item.startOffset, item.endOffset);
-      if (slice !== item.selectedText) {
-        const found = content.indexOf(item.selectedText);
-        offset = found >= 0 ? found : item.startOffset;
+      let storageOffset = item.startOffset;
+      // 본문이 바뀌어 오프셋이 어긋나면 selectedText로 재탐색 (마커 무시)
+      const slicePlain = stripManuscriptMarkup(
+        storage.slice(item.startOffset, item.endOffset),
+      );
+      if (slicePlain !== item.selectedText) {
+        const found = stripManuscriptMarkup(storage).indexOf(item.selectedText);
+        if (found >= 0) {
+          storageOffset = map.toStorageOffset(found);
+        }
       }
-      const line = lineIndexAtOffset(content, offset);
+      const line = lineIndexAtOffset(
+        visible,
+        map.toVisibleOffset(storageOffset),
+      );
       const list = byLine.get(line) ?? [];
       list.push(item);
       byLine.set(line, list);
@@ -65,7 +83,7 @@ export function InspirationGutter({
     }
 
     return result;
-  }, [content, inspirations, lineHeight]);
+  }, [content, storageContent, inspirations, lineHeight]);
 
   if (markers.length === 0) return null;
 

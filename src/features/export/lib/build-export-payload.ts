@@ -39,6 +39,7 @@ import type {
   ExportScope,
 } from "@/features/export/types/export-options";
 import type { ChapterId, ProjectId } from "@/types/ids";
+import { stripManuscriptMarkup } from "@/features/manuscript/lib/manuscript-markup";
 
 export interface BuildExportInput {
   projectId: ProjectId;
@@ -295,6 +296,7 @@ export async function buildExportPayload(
 
 /**
  * 페이로드를 하나의 연속 텍스트로 (TXT / 간단 미리보기용)
+ * 색상 마커는 제거한다.
  */
 export function payloadToPlainText(payload: ExportPayload): string {
   const chunks: string[] = [];
@@ -325,5 +327,8 @@ export function payloadToPlainText(payload: ExportPayload): string {
     chunks.push(payload.appendix.trim());
   }
 
-  return chunks.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  const joined =
+    chunks.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  // TXT 는 색상 정보를 넣지 않는다
+  return stripManuscriptMarkup(joined);
 }

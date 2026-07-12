@@ -19,6 +19,7 @@ import {
   cloudUpsertManuscript,
 } from "@/database/supabase/manuscripts-repo";
 import { countCharsWithoutSpaces } from "@/lib/stats";
+import { stripManuscriptMarkup } from "@/features/manuscript/lib/manuscript-markup";
 import { MANUSCRIPTS_STORAGE_KEY } from "@/lib/storage/keys";
 import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
@@ -93,7 +94,8 @@ export async function saveManuscriptContent(params: {
 }): Promise<Manuscript> {
   const { projectId, chapterId, content } = params;
   const timestamp = nowIso();
-  const plainText = content;
+  // plainText / 글자 수에는 색상 마커를 포함하지 않는다
+  const plainText = stripManuscriptMarkup(content);
   const wordCount = countCharsWithoutSpaces(plainText);
 
   if (isSupabaseDataMode()) {

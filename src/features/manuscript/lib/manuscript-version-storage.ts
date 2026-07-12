@@ -23,6 +23,7 @@ import {
   saveManuscriptContent,
 } from "@/features/manuscript/lib/manuscript-storage";
 import { countCharsWithoutSpaces } from "@/lib/stats";
+import { stripManuscriptMarkup } from "@/features/manuscript/lib/manuscript-markup";
 import { MANUSCRIPT_VERSIONS_STORAGE_KEY } from "@/lib/storage/keys";
 import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
@@ -82,7 +83,7 @@ export async function saveManuscriptVersionSnapshot(params: {
 }): Promise<ManuscriptVersion> {
   const { projectId, chapterId, content, name = "" } = params;
   const timestamp = nowIso();
-  const plainText = content;
+  const plainText = stripManuscriptMarkup(content);
   const wordCount = countCharsWithoutSpaces(plainText);
 
   // manuscript 행이 없으면 먼저 생성 (FK)
