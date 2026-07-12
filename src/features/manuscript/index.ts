@@ -29,6 +29,14 @@ export { useSections } from "./hooks/useSections";
 export { useScenes } from "./hooks/useScenes";
 export { useManuscriptVersions } from "./hooks/useManuscriptVersions";
 export { useAutoRecovery } from "./hooks/useAutoRecovery";
+export type { UseSectionsResult } from "./hooks/useSections";
+// createSection — 모든 Section 생성 경로의 단일 진입점
+export {
+  createSection,
+  createSectionAtCursor,
+  getSectionTriggerAtCursor,
+  defaultSectionTitle,
+} from "./lib/section-operations";
 export type {
   Section,
   SectionDelimiterConfig,

@@ -28,8 +28,9 @@ import {
 import type { ChapterId, ProjectId } from "@/types/ids";
 import { parseSections } from "@/features/manuscript/lib/section-parser";
 import {
-  addSection,
   applySectionsToContent,
+  createSection,
+  createSectionAtCursor,
   deleteSection,
   renameSection,
   reorderSections,
@@ -61,6 +62,13 @@ export interface UseSectionsResult {
   reorder: (activeId: string, overId: string) => void;
   /** 선택한 Section 아래(또는 맨 끝)에 추가. 새 Section 안정 ID 반환 */
   add: (afterIndex?: number) => string | null;
+  /**
+   * Manuscript 커서에서 `#` + Enter 로 Section 생성.
+   * 성공 시 새 캐럿 위치 반환 (실패 시 null).
+   */
+  createAtCursor: (
+    cursorOffset: number,
+  ) => { sectionId: string; caretOffset: number } | null;
   remove: (sectionId: string, mode?: SectionDeleteMode) => void;
   rename: (sectionId: string, title: string) => void;
   setStatus: (sectionId: string, status: SectionStatus) => void;
@@ -264,13 +272,45 @@ export function useSections(
 
   const add = useCallback(
     (afterIndex?: number) => {
-      const prevIds = new Set(sectionsRef.current.map((s) => s.id));
-      const next = addSection(sectionsRef.current, afterIndex);
+      // 「+ 새 Section」— createSection 공통 로직
+      const { sections: next, newSectionId } = createSection(
+        sectionsRef.current,
+        { afterIndex },
+      );
       commitContent(next);
-      const created = next.find((s) => !prevIds.has(s.id));
-      return created?.id ?? null;
+      return newSectionId;
     },
     [commitContent],
+  );
+
+  /**
+   * Manuscript `#` + Enter.
+   * createSectionAtCursor → 메타 병합 → commit (번호 자동 재부여).
+   */
+  const createAtCursor = useCallback(
+    (cursorOffset: number) => {
+      const result = createSectionAtCursor(content, cursorOffset, config);
+      if (!result) return null;
+
+      // 기존 Section 메타(status/memo/icons) 보존
+      const withMeta = result.sections.map((section) => {
+        const prev = sectionsRef.current.find((s) => s.id === section.id);
+        if (!prev) return section;
+        return {
+          ...section,
+          status: prev.status,
+          memo: prev.memo,
+          icons: prev.icons ?? section.icons,
+        };
+      });
+
+      commitContent(withMeta);
+      return {
+        sectionId: result.newSectionId,
+        caretOffset: result.caretOffset,
+      };
+    },
+    [commitContent, config, content],
   );
 
   const remove = useCallback(
@@ -341,6 +381,7 @@ export function useSections(
     setAllCollapsed,
     reorder,
     add,
+    createAtCursor,
     remove,
     rename,
     setStatus,

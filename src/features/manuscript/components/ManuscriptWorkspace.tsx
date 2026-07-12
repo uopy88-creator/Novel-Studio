@@ -101,12 +101,12 @@ export function ManuscriptWorkspace({
     canRedo,
   } = useManuscriptHistory(projectId, content, baseSetContent, isReady);
 
-  // Export · 딥링크 스크롤용 — 구조 편집 UI는 Section 페이지에 있다
-  const { sections } = useSections(
+  // Export · 딥링크 스크롤 · `#`+Enter Section 생성
+  const { sections, createAtCursor } = useSections(
     projectId,
     primaryDocumentId,
     content,
-    setContent,
+    setContentTransactional,
   );
 
   const {
@@ -456,6 +456,12 @@ export function ManuscriptWorkspace({
                 editorClassName="pl-10 font-mono text-[length:var(--ns-editor-font-size,1rem)]"
                 onOpenCharacter={(character) => setProfileId(character.id)}
                 onMentionActiveChange={setMentionActive}
+                onSectionBreak={(cursorOffset) => {
+                  // `#` + Enter → createSection 공통 로직 (번호 자동 부여)
+                  const result = createAtCursor(cursorOffset);
+                  if (!result) return null;
+                  return { caretOffset: result.caretOffset };
+                }}
               />
               <InspirationSelectionMenu
                 textareaRef={editorRef}

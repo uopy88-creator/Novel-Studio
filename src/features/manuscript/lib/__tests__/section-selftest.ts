@@ -10,6 +10,13 @@ import {
   splitTitleAndStableId,
 } from "@/features/manuscript/lib/section-parser";
 import {
+  createSection,
+  createSectionAtCursor,
+  deleteSection,
+  getSectionTriggerAtCursor,
+  reorderSections,
+} from "@/features/manuscript/lib/section-operations";
+import {
   contentNeedsSectionMigration,
   flattenBodiesToSectionContent,
   stripChapterDelimiters,
@@ -129,6 +136,70 @@ Then something happened.`;
   assert.equal(sections.length, 2);
   assert.equal(sections[0].id, "scene_010");
   assert.equal(sections[1].id, "scene_011");
+}
+
+// --- createSection + createSectionAtCursor (# + Enter) ---
+{
+  // shared createSection
+  const empty = parseSections("Hello world");
+  const created = createSection(empty);
+  assert.equal(created.sections.length, 2);
+  assert.equal(created.sections[0].number, 1);
+  assert.equal(created.sections[1].number, 2);
+  assert.equal(created.sections[1].id, created.newSectionId);
+
+  // trigger detection
+  const draft = "Hello\n#";
+  const trig = getSectionTriggerAtCursor(draft, draft.length);
+  assert.ok(trig);
+  assert.equal(trig?.title, "");
+
+  // # + Enter creates numbered section and renumbers
+  const atCursor = createSectionAtCursor(draft, draft.length);
+  assert.ok(atCursor);
+  const numbered = parseSections(atCursor!.content);
+  assert.equal(numbered.length, 2);
+  assert.equal(numbered[0].number, 1);
+  assert.equal(numbered[1].number, 2);
+  assert.match(atCursor!.content, /^#1 /m);
+  assert.match(atCursor!.content, /^#2 /m);
+
+  // insert between renumbers 1..N
+  const three = createSection(created.sections, { afterIndex: 0 });
+  assert.deepEqual(
+    three.sections.map((s) => s.number),
+    [1, 2, 3],
+  );
+
+  // reorder renumbers
+  const reordered = reorderSections(
+    three.sections,
+    three.sections[2].id,
+    three.sections[0].id,
+  );
+  assert.deepEqual(
+    reordered.map((s) => s.number),
+    [1, 2, 3],
+  );
+  assert.equal(reordered[0].id, three.sections[2].id);
+
+  // delete renumbers without gaps
+  const afterDelete = deleteSection(three.sections, three.sections[1].id);
+  assert.deepEqual(
+    afterDelete.map((s) => s.number),
+    [1, 2],
+  );
+
+  // crooked markers get fixed on create path
+  const crookedSrc =
+    `#1 A ·ns:section_001\nbody\n\n#5 B ·ns:section_005\nmore\n#`;
+  const crooked = createSectionAtCursor(crookedSrc, crookedSrc.length);
+  assert.ok(crooked);
+  const fixed = parseSections(crooked!.content);
+  assert.deepEqual(
+    fixed.map((s) => s.number),
+    [1, 2, 3],
+  );
 }
 
 console.log("section-selftest: all assertions passed");

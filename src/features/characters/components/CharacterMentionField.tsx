@@ -41,6 +41,13 @@ export interface CharacterMentionFieldProps {
   onOpenCharacter?: (character: Character) => void;
   /** @멘션 메뉴가 열려 있을 때 (영감 메뉴 등과 충돌 방지) */
   onMentionActiveChange?: (active: boolean) => void;
+  /**
+   * Manuscript 줄에 `#` 입력 후 Enter → Section 생성.
+   * 성공 시 새 캐럿 오프셋을 반환한다.
+   */
+  onSectionBreak?: (
+    cursorOffset: number,
+  ) => { caretOffset: number } | null;
 }
 
 interface CaretMenuPosition {
@@ -86,6 +93,7 @@ export function CharacterMentionField({
   editorRef,
   onOpenCharacter,
   onMentionActiveChange,
+  onSectionBreak,
 }: CharacterMentionFieldProps) {
   const localRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = editorRef ?? localRef;
@@ -173,6 +181,27 @@ export function CharacterMentionField({
     // IME 조합 중(한글 등) Arrow/Enter 는 브라우저/IME 가 처리하도록 둔다
     if (event.nativeEvent.isComposing || event.keyCode === 229) {
       return;
+    }
+
+    // `#` + Enter → Section 생성 (@멘션 메뉴가 열려 있지 않을 때)
+    if (
+      event.key === "Enter" &&
+      onSectionBreak &&
+      !(mention && candidates.length > 0)
+    ) {
+      const el = textareaRef.current;
+      if (el && el.selectionStart === el.selectionEnd) {
+        const result = onSectionBreak(el.selectionStart);
+        if (result) {
+          event.preventDefault();
+          const caret = result.caretOffset;
+          requestAnimationFrame(() => {
+            el.focus();
+            el.setSelectionRange(caret, caret);
+          });
+          return;
+        }
+      }
     }
 
     if (!mention || candidates.length === 0) return;
