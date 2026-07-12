@@ -4,18 +4,22 @@
  * =============================================================================
  * SentenceAssistantWord
  * -----------------------------------------------------------------------------
- * 📖 단어 탭 — 선택한 단어의 「뜻」만 표시한다.
- * 유의어·예문·AI 추천·문장 수정은 다루지 않는다.
+ * 📖 단어 탭 — 국립국어원 표준국어대사전으로 「단어 뜻」을 표시한다.
+ * AI·유의어·예문 추천은 다루지 않는다.
+ *
+ * 표시: 단어 · 품사 · 뜻풀이 · 출처 링크
  * =============================================================================
  */
 
 import { useEffect, useState } from "react";
 import {
+  DICTIONARY_ERROR_MESSAGE,
   DICTIONARY_NOT_FOUND_MESSAGE,
   type DictionaryLookupResult,
 } from "@/features/sentence-assistant/lib/dictionary-types";
 import { DictionaryService } from "@/features/sentence-assistant/lib/DictionaryService";
 import { normalizeDictionaryQuery } from "@/features/sentence-assistant/lib/normalize-query";
+import { cn } from "@/lib/utils/cn";
 
 export interface SentenceAssistantWordProps {
   selectedText: string;
@@ -24,8 +28,7 @@ export interface SentenceAssistantWordProps {
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; result: DictionaryLookupResult }
-  | { status: "error" };
+  | { status: "ready"; result: DictionaryLookupResult };
 
 export function SentenceAssistantWord({
   selectedText,
@@ -37,7 +40,7 @@ export function SentenceAssistantWord({
     if (!query) {
       setState({
         status: "ready",
-        result: { query: "", definition: null },
+        result: { status: "not_found", query: "" },
       });
       return;
     }
@@ -55,14 +58,15 @@ export function SentenceAssistantWord({
         setState({ status: "ready", result });
       } catch {
         if (controller.signal.aborted) return;
-        setState({ status: "error" });
+        setState({
+          status: "ready",
+          result: { status: "error", query },
+        });
       }
     })();
 
     return () => controller.abort();
   }, [query]);
-
-  const displayWord = query || selectedText.trim() || "—";
 
   return (
     <div className="flex flex-col gap-ns-5">
@@ -71,7 +75,7 @@ export function SentenceAssistantWord({
           선택
         </h3>
         <p className="mt-ns-2 whitespace-pre-wrap break-words text-ns-base font-medium leading-ns-relaxed text-ns-ink">
-          “{displayWord}”
+          “{query || selectedText.trim() || "—"}”
         </p>
       </section>
 
@@ -79,7 +83,7 @@ export function SentenceAssistantWord({
 
       <section>
         <h3 className="text-ns-xs font-semibold uppercase tracking-wide text-ns-ink-tertiary">
-          뜻
+          단어 뜻
         </h3>
         <DefinitionBody state={state} />
       </section>
@@ -90,11 +94,34 @@ export function SentenceAssistantWord({
 function DefinitionBody({ state }: { state: LoadState }) {
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <p className="mt-ns-2 text-ns-sm text-ns-ink-tertiary">뜻을 찾는 중…</p>
+      <div
+        className="mt-ns-3 flex items-center gap-ns-2 text-ns-sm text-ns-ink-tertiary"
+        role="status"
+        aria-live="polite"
+      >
+        <span
+          className={cn(
+            "inline-block h-4 w-4 shrink-0 rounded-full border-2 border-ns-border",
+            "border-t-ns-accent animate-spin",
+          )}
+          aria-hidden
+        />
+        검색 중…
+      </div>
     );
   }
 
-  if (state.status === "error") {
+  const { result } = state;
+
+  if (result.status === "error") {
+    return (
+      <p className="mt-ns-2 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
+        {DICTIONARY_ERROR_MESSAGE}
+      </p>
+    );
+  }
+
+  if (result.status === "not_found" || !result.entry) {
     return (
       <p className="mt-ns-2 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
         {DICTIONARY_NOT_FOUND_MESSAGE}
@@ -102,25 +129,33 @@ function DefinitionBody({ state }: { state: LoadState }) {
     );
   }
 
-  const definition = state.result.definition?.trim();
-  if (!definition) {
-    return (
-      <p className="mt-ns-2 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
-        {DICTIONARY_NOT_FOUND_MESSAGE}
-      </p>
-    );
-  }
+  const { word, pos, definition, link } = result.entry;
 
   return (
-    <div className="mt-ns-2 flex flex-col gap-ns-2">
+    <div className="mt-ns-2 flex flex-col gap-ns-3">
+      <div>
+        <p className="text-ns-base font-semibold text-ns-ink">{word}</p>
+        {pos ? (
+          <p className="mt-ns-1 text-ns-xs text-ns-ink-tertiary">{pos}</p>
+        ) : null}
+      </div>
+
       <p className="text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
         {definition}
       </p>
-      {state.result.source ? (
-        <p className="text-ns-xs text-ns-ink-tertiary">
-          출처 · {state.result.source}
-        </p>
-      ) : null}
+
+      {link ? (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-ns-xs font-medium text-ns-accent underline-offset-2 hover:underline"
+        >
+          표준국어대사전에서 보기
+        </a>
+      ) : (
+        <p className="text-ns-xs text-ns-ink-tertiary">출처 · 표준국어대사전</p>
+      )}
     </div>
   );
 }
