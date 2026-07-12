@@ -107,7 +107,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "🗑 버튼을 누르면 확인 창이 열립니다. 삭제하면 Chapters · Manuscript · Characters · Writing Vault · Memo · Foreshadowing 등 연결된 데이터가 함께 삭제되며 복구할 수 없습니다.",
+              text: "🗑 버튼을 누르면 확인 창이 열립니다. 삭제하면 Manuscript · Sections · Characters · Writing Vault · Memo · Foreshadowing 등 연결된 데이터가 함께 삭제되며 복구할 수 없습니다.",
             },
           ],
         },
@@ -343,7 +343,7 @@ export const HELP_DOCUMENT: HelpDocument = {
       blocks: [
         {
           type: "paragraph",
-          text: "Memo는 짧은 생각·할 일·질문을 가볍게 남기는 공간입니다. Chapter나 Character에 붙이지 않아도 일단 적어 둘 수 있습니다.",
+          text: "Memo는 짧은 생각·할 일·질문을 가볍게 남기는 공간입니다. Section이나 Character에 붙이지 않아도 일단 적어 둘 수 있습니다.",
         },
         {
           type: "list",

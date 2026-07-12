@@ -4,7 +4,8 @@
  * =============================================================================
  * TimelinePage
  * -----------------------------------------------------------------------------
- * 사건을 시간순으로 정리. 드래그로 순서 변경. Section Navigator 연동.
+ * 사건을 시간순으로 정리. 드래그로 순서 변경.
+ * Section 연결은 primary Manuscript 만 사용 (구 Chapter 데이터 무시).
  * =============================================================================
  */
 
@@ -31,10 +32,6 @@ import type { ProjectId } from "@/types/ids";
 import { useTimelineEvents } from "@/features/timeline/hooks/useTimelineEvents";
 import { TimelineEventItem } from "@/features/timeline/components/TimelineEventItem";
 import { TimelineEventModal } from "@/features/timeline/components/TimelineEventModal";
-import {
-  loadTimelineSceneOptions,
-  type TimelineSceneOption,
-} from "@/features/timeline/lib/timeline-scene-options";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { manuscriptSearchHref } from "@/features/global-search/lib/search-href";
 import { ContentContainer } from "@/components/layout";
@@ -48,55 +45,58 @@ type ModalState =
 
 export interface TimelinePageProps {
   projectId: ProjectId;
-  /** Section Navigator에서 넘어온 Document / Section */
+  /** Section 페이지에서 넘어온 Manuscript Document / Section */
   initialDocumentId?: string;
-  initialSceneId?: string;
+  initialSectionId?: string;
 }
 
 export function TimelinePage({
   projectId,
   initialDocumentId,
-  initialSceneId,
+  initialSectionId,
 }: TimelinePageProps) {
   const router = useRouter();
-  const { events, isReady, error, create, update, remove, reorder } =
-    useTimelineEvents(projectId);
+  const {
+    events,
+    sectionOptions,
+    primaryDocumentId,
+    isReady,
+    error,
+    create,
+    update,
+    remove,
+    reorder,
+  } = useTimelineEvents(projectId);
 
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<TimelineEvent | null>(null);
-  const [sceneOptions, setSceneOptions] = useState<TimelineSceneOption[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [scenes, chars] = await Promise.all([
-        loadTimelineSceneOptions(projectId),
-        readCharactersByProject(projectId),
-      ]);
-      if (cancelled) return;
-      setSceneOptions(scenes);
-      setCharacters(chars);
+      const chars = await readCharactersByProject(projectId);
+      if (!cancelled) setCharacters(chars);
     })();
     return () => {
       cancelled = true;
     };
   }, [projectId]);
 
-  // Section Navigator에서 넘어오면 추가 모달을 바로 연다
+  // Section 페이지에서 넘어오면 추가 모달을 바로 연다
   useEffect(() => {
     if (!isReady) return;
-    if (!initialDocumentId || !initialSceneId) return;
+    if (!initialSectionId) return;
     setModal({ type: "create" });
-  }, [isReady, initialDocumentId, initialSceneId]);
+  }, [isReady, initialSectionId]);
 
-  const sceneLabelByKey = useMemo(() => {
+  const sectionLabelById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const opt of sceneOptions) {
-      map.set(`${opt.documentId}::${opt.sceneStableId}`, opt.label);
+    for (const opt of sectionOptions) {
+      map.set(opt.sectionStableId, opt.label);
     }
     return map;
-  }, [sceneOptions]);
+  }, [sectionOptions]);
 
   const characterNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -123,6 +123,8 @@ export function TimelinePage({
   }
 
   const ids = useMemo(() => events.map((e) => e.id), [events]);
+  const resolvedDocumentId =
+    primaryDocumentId ?? initialDocumentId ?? undefined;
 
   return (
     <ContentContainer width="default">
@@ -131,7 +133,7 @@ export function TimelinePage({
           <p className="ns-caption mb-ns-2">이야기</p>
           <h2 className="ns-heading">Timeline</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            사건을 시간순으로 정리합니다. Section Navigator와 연결할 수 있습니다.
+            사건을 시간순으로 정리합니다. Section과 연결할 수 있습니다.
           </p>
         </div>
         <Button
@@ -159,7 +161,7 @@ export function TimelinePage({
             아직 사건이 없습니다.
           </p>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-tertiary">
-            첫 사건을 추가하거나, Section Navigator에서 Timeline으로 연결하세요.
+            첫 사건을 추가하거나, Section 페이지에서 Timeline으로 연결하세요.
           </p>
           <Button
             type="button"
@@ -177,37 +179,33 @@ export function TimelinePage({
         >
           <SortableContext items={ids} strategy={verticalListSortingStrategy}>
             <ol className="flex flex-col gap-ns-2">
-              {events.map((event, index) => {
-                const sceneKey =
-                  event.documentId && event.sceneStableId
-                    ? `${event.documentId}::${event.sceneStableId}`
-                    : "";
-                return (
-                  <TimelineEventItem
-                    key={event.id}
-                    event={event}
-                    index={index}
-                    sceneLabel={
-                      sceneKey ? sceneLabelByKey.get(sceneKey) : undefined
-                    }
-                    characterName={
-                      event.characterId
-                        ? characterNameById.get(event.characterId)
-                        : undefined
-                    }
-                    onEdit={(e) => setModal({ type: "edit", event: e })}
-                    onDelete={setDeleting}
-                    onOpenScene={(e) => {
-                      if (!e.documentId || !e.sceneStableId) return;
-                      router.push(
-                        manuscriptSearchHref(projectId, e.documentId, {
-                          sectionId: e.sceneStableId,
-                        }),
-                      );
-                    }}
-                  />
-                );
-              })}
+              {events.map((event, index) => (
+                <TimelineEventItem
+                  key={event.id}
+                  event={event}
+                  index={index}
+                  sectionLabel={
+                    event.sectionStableId
+                      ? sectionLabelById.get(event.sectionStableId)
+                      : undefined
+                  }
+                  characterName={
+                    event.characterId
+                      ? characterNameById.get(event.characterId)
+                      : undefined
+                  }
+                  onEdit={(e) => setModal({ type: "edit", event: e })}
+                  onDelete={setDeleting}
+                  onOpenSection={(e) => {
+                    if (!e.sectionStableId || !resolvedDocumentId) return;
+                    router.push(
+                      manuscriptSearchHref(projectId, resolvedDocumentId, {
+                        sectionId: e.sectionStableId,
+                      }),
+                    );
+                  }}
+                />
+              ))}
             </ol>
           </SortableContext>
         </DndContext>
@@ -217,10 +215,10 @@ export function TimelinePage({
         open={modal.type !== "closed"}
         mode={modal.type === "edit" ? "edit" : "create"}
         event={modal.type === "edit" ? modal.event : null}
-        sceneOptions={sceneOptions}
+        sectionOptions={sectionOptions}
         characters={characters}
-        defaultDocumentId={initialDocumentId}
-        defaultSceneStableId={initialSceneId}
+        defaultDocumentId={resolvedDocumentId}
+        defaultSectionStableId={initialSectionId}
         onClose={() => setModal({ type: "closed" })}
         onSubmit={(input) => {
           void (async () => {

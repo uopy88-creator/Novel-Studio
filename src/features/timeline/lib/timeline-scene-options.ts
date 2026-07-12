@@ -1,78 +1,14 @@
 /**
- * =============================================================================
- * Timeline ↔ Section 옵션
- * -----------------------------------------------------------------------------
- * 프로젝트의 모든 Document에서 Section 을 모아 선택 목록으로 만든다.
- * Scene Navigator 와 같은 parseSections / 안정 ID 를 사용한다.
- * =============================================================================
+ * @deprecated Re-export — use timeline-section-options.ts
+ * 구 Chapter/Document 순회 로더는 제거됨. primary Manuscript Section 만 사용.
  */
-
-import type { ProjectId } from "@/types/ids";
-import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
-import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
-import { parseSections } from "@/features/manuscript/lib/section-parser";
-
-export interface TimelineSceneOption {
-  /** select value — `${documentId}::${sceneStableId}` */
-  value: string;
-  documentId: string;
-  documentTitle: string;
-  sceneStableId: string;
-  sceneNumber: number;
-  sceneTitle: string;
-  label: string;
-}
-
-export function encodeSceneOptionValue(
-  documentId: string,
-  sceneStableId: string,
-): string {
-  return `${documentId}::${sceneStableId}`;
-}
-
-export function decodeSceneOptionValue(
-  value: string,
-): { documentId: string; sceneStableId: string } | null {
-  const sep = value.indexOf("::");
-  if (sep <= 0) return null;
-  const documentId = value.slice(0, sep);
-  const sceneStableId = value.slice(sep + 2);
-  if (!documentId || !sceneStableId) return null;
-  return { documentId, sceneStableId };
-}
-
-/** 프로젝트 내 Section 선택지 (Document · 번호 · 제목) */
-export async function loadTimelineSceneOptions(
-  projectId: ProjectId,
-): Promise<TimelineSceneOption[]> {
-  const [chapters, manuscripts] = await Promise.all([
-    readChaptersByProject(projectId),
-    readAllManuscripts(),
-  ]);
-
-  const titleById = new Map(
-    chapters.map((c) => [c.id, c.title.trim() || "제목 없는 Document"]),
-  );
-  const options: TimelineSceneOption[] = [];
-
-  for (const manuscript of manuscripts) {
-    if (manuscript.projectId !== projectId) continue;
-    const documentTitle =
-      titleById.get(manuscript.chapterId) ?? "Document";
-    const sections = parseSections(manuscript.content ?? "");
-    for (const section of sections) {
-      const sectionTitle = section.title.trim() || "제목 없음";
-      options.push({
-        value: encodeSceneOptionValue(manuscript.chapterId, section.id),
-        documentId: manuscript.chapterId,
-        documentTitle,
-        sceneStableId: section.id,
-        sceneNumber: section.number,
-        sceneTitle: sectionTitle,
-        label: `${documentTitle} · ${section.number}. ${sectionTitle}`,
-      });
-    }
-  }
-
-  return options;
-}
+export {
+  type TimelineSectionOption,
+  type TimelineSceneOption,
+  encodeSectionOptionValue,
+  encodeSceneOptionValue,
+  decodeSectionOptionValue,
+  decodeSceneOptionValue,
+  loadTimelineSectionOptions,
+  loadTimelineSceneOptions,
+} from "./timeline-section-options";

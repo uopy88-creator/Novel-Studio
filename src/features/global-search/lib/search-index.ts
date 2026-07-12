@@ -17,8 +17,7 @@ import {
   memoSearchHref,
   writingVaultSearchHref,
 } from "@/features/global-search/lib/search-href";
-import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
-import { readAllManuscripts } from "@/features/manuscript/lib/manuscript-storage";
+import { loadProjectManuscript } from "@/features/manuscript/lib/project-manuscript";
 import { parseSections } from "@/features/manuscript/lib/section-parser";
 import { findManuscriptMatches } from "@/features/manuscript/lib/search-manuscript";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
@@ -55,16 +54,14 @@ export async function buildSearchIndex(
   const trimmed = query.trim();
 
   const [
-    chapters,
-    manuscripts,
+    manuscriptBundle,
     characters,
     memos,
     vault,
     foreshadowings,
     inspirations,
   ] = await Promise.all([
-    readChaptersByProject(projectId),
-    readAllManuscripts(),
+    loadProjectManuscript(projectId),
     readCharactersByProject(projectId),
     readMemosByProject(projectId),
     readDialoguesByProject(projectId),
@@ -72,19 +69,12 @@ export async function buildSearchIndex(
     readInspirationsByProject(projectId),
   ]);
 
-  const chapterTitle = new Map(
-    chapters.map((c) => [c.id, c.title.trim() || "제목 없는 Chapter"]),
-  );
-  const projectManuscripts = manuscripts.filter(
-    (m) => m.projectId === projectId,
-  );
-
   const docs: SearchDocument[] = [];
 
-  for (const manuscript of projectManuscripts) {
-    const docTitle =
-      chapterTitle.get(manuscript.chapterId) ?? "Chapter";
-    const content = manuscript.content ?? manuscript.plainText ?? "";
+  // primary Manuscript 만 검색 (구 Chapter/Document 본문은 무시)
+  {
+    const { content, primaryDocumentId } = manuscriptBundle;
+    const docTitle = projectName.trim() || "Manuscript";
 
     if (trimmed) {
       const matches = findManuscriptMatches(content, trimmed, "sentence").slice(
@@ -93,13 +83,13 @@ export async function buildSearchIndex(
       );
       for (const match of matches) {
         docs.push({
-          id: `ms-${manuscript.chapterId}-${match.start}`,
+          id: `ms-${primaryDocumentId}-${match.start}`,
           kind: "manuscript",
           title: docTitle,
           body: match.preview,
           projectId,
           projectName,
-          href: manuscriptSearchHref(projectId, manuscript.chapterId, {
+          href: manuscriptSearchHref(projectId, primaryDocumentId, {
             offset: match.start,
             end: match.end,
           }),
@@ -113,13 +103,13 @@ export async function buildSearchIndex(
         ? `#${section.number} ${section.title.trim()}`
         : `#${section.number}`;
       docs.push({
-        id: `sc-${manuscript.chapterId}-${section.id}`,
+        id: `sc-${primaryDocumentId}-${section.id}`,
         kind: "section",
         title,
         body: joinFields(docTitle, section.body?.slice(0, 200)),
         projectId,
         projectName,
-        href: manuscriptSearchHref(projectId, manuscript.chapterId, {
+        href: manuscriptSearchHref(projectId, primaryDocumentId, {
           sectionId: section.id,
           offset: section.startOffset,
         }),

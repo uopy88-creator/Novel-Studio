@@ -5,7 +5,7 @@ export const memoHelp: ContextHelpContent = {
   title: "Memo 사용법",
   description: [
     "Memo는 짧은 생각·할 일·질문을 가볍게 남기는 공간입니다.",
-    "Chapter나 Character에 붙이지 않아도, 일단 적어 둘 수 있습니다.",
+    "Section이나 Character에 붙이지 않아도, 일단 적어 둘 수 있습니다.",
   ],
   steps: [
     "새 메모를 만들고 본문을 적습니다.",
@@ -14,7 +14,7 @@ export const memoHelp: ContextHelpContent = {
   ],
   tips: [
     "집필 흐름을 끊지 않고 메모만 빠르게 쌓아 두세요.",
-    "나중에 Chapters나 Characters와 연결해 정리할 수 있습니다.",
+    "나중에 Section이나 Characters와 연결해 정리할 수 있습니다.",
   ],
   faqs: [
     {

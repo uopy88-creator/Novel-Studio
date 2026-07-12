@@ -1,6 +1,6 @@
 /**
  * Timeline — 사건을 시간순으로 정리.
- * ?documentId=&sectionId= (& sceneId= 레거시) 로 Section Navigator에서 연결할 수 있다.
+ * ?documentId=&sectionId= (& sceneId= 레거시) 로 Section 페이지에서 연결할 수 있다.
  */
 
 import { TimelinePage } from "@/features/timeline";
@@ -12,6 +12,7 @@ interface TimelineRoutePageProps {
   searchParams: Promise<{
     documentId?: string;
     sectionId?: string;
+    /** @deprecated sectionId 사용 */
     sceneId?: string;
   }>;
 }
@@ -26,7 +27,7 @@ export default async function TimelineRoutePage({
     <TimelinePage
       projectId={projectId}
       initialDocumentId={documentId}
-      initialSceneId={sectionId ?? sceneId}
+      initialSectionId={sectionId ?? sceneId}
     />
   );
 }

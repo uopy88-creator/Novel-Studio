@@ -14,21 +14,21 @@ import { cn } from "@/lib/utils/cn";
 export interface TimelineEventItemProps {
   event: TimelineEvent;
   index: number;
-  sceneLabel?: string;
+  sectionLabel?: string;
   characterName?: string;
   onEdit: (event: TimelineEvent) => void;
   onDelete: (event: TimelineEvent) => void;
-  onOpenScene?: (event: TimelineEvent) => void;
+  onOpenSection?: (event: TimelineEvent) => void;
 }
 
 export function TimelineEventItem({
   event,
   index,
-  sceneLabel,
+  sectionLabel,
   characterName,
   onEdit,
   onDelete,
-  onOpenScene,
+  onOpenSection,
 }: TimelineEventItemProps) {
   const {
     attributes,
@@ -87,14 +87,14 @@ export function TimelineEventItem({
         </button>
 
         <div className="mt-ns-2 flex flex-wrap gap-ns-2">
-          {sceneLabel && event.documentId && event.sceneStableId ? (
+          {sectionLabel && event.sectionStableId ? (
             <button
               type="button"
               className="rounded-ns-md bg-ns-muted px-ns-2 py-0.5 text-ns-xs text-ns-ink-secondary hover:text-ns-ink"
-              onClick={() => onOpenScene?.(event)}
-              title="Section Navigator로 이동"
+              onClick={() => onOpenSection?.(event)}
+              title="Manuscript의 Section으로 이동"
             >
-              🎬 {sceneLabel}
+              📑 {sectionLabel}
             </button>
           ) : null}
           {characterName ? (

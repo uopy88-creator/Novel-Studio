@@ -4,7 +4,8 @@
  * =============================================================================
  * TimelineEventModal — 사건 추가/수정
  * -----------------------------------------------------------------------------
- * 제목 · 설명 · 관련 Section · 관련 Character (단순 폼)
+ * 제목 · 설명 · 관련 Section · 관련 Character
+ * Section 목록은 primary Manuscript 기준 (구 Chapter 제외).
  * =============================================================================
  */
 
@@ -12,11 +13,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { Character } from "@/features/characters/types/character";
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type { TimelineEventInput } from "@/features/timeline/lib/timeline-event-storage";
-import type { TimelineSceneOption } from "@/features/timeline/lib/timeline-scene-options";
+import type { TimelineSectionOption } from "@/features/timeline/lib/timeline-section-options";
 import {
-  decodeSceneOptionValue,
-  encodeSceneOptionValue,
-} from "@/features/timeline/lib/timeline-scene-options";
+  decodeSectionOptionValue,
+} from "@/features/timeline/lib/timeline-section-options";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -26,11 +26,11 @@ export interface TimelineEventModalProps {
   open: boolean;
   mode: "create" | "edit";
   event?: TimelineEvent | null;
-  sceneOptions: TimelineSceneOption[];
+  sectionOptions: TimelineSectionOption[];
   characters: Character[];
-  /** Section Navigator에서 넘어온 기본 Section */
+  /** Section 페이지에서 넘어온 기본 Section */
   defaultDocumentId?: string;
-  defaultSceneStableId?: string;
+  defaultSectionStableId?: string;
   onClose: () => void;
   onSubmit: (input: TimelineEventInput) => void;
 }
@@ -39,16 +39,16 @@ export function TimelineEventModal({
   open,
   mode,
   event,
-  sceneOptions,
+  sectionOptions,
   characters,
   defaultDocumentId,
-  defaultSceneStableId,
+  defaultSectionStableId,
   onClose,
   onSubmit,
 }: TimelineEventModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [sceneValue, setSceneValue] = useState("");
+  const [sectionValue, setSectionValue] = useState("");
   const [characterId, setCharacterId] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
 
@@ -58,20 +58,17 @@ export function TimelineEventModal({
     if (mode === "edit" && event) {
       setTitle(event.title);
       setDescription(event.description);
-      setSceneValue(
-        event.documentId && event.sceneStableId
-          ? encodeSceneOptionValue(event.documentId, event.sceneStableId)
-          : "",
-      );
+      setSectionValue(event.sectionStableId ?? "");
       setCharacterId(event.characterId ?? "");
     } else {
       setTitle("");
       setDescription("");
-      setSceneValue(
-        defaultDocumentId && defaultSceneStableId
-          ? encodeSceneOptionValue(defaultDocumentId, defaultSceneStableId)
-          : "",
+      // default 가 현재 옵션에 있을 때만 미리 선택
+      const defaultId = defaultSectionStableId ?? "";
+      const exists = sectionOptions.some(
+        (o) => o.sectionStableId === defaultId,
       );
+      setSectionValue(exists ? defaultId : "");
       setCharacterId("");
     }
     setTitleError(null);
@@ -80,7 +77,8 @@ export function TimelineEventModal({
     mode,
     event,
     defaultDocumentId,
-    defaultSceneStableId,
+    defaultSectionStableId,
+    sectionOptions,
   ]);
 
   const handleSubmit = (formEvent: FormEvent) => {
@@ -91,12 +89,20 @@ export function TimelineEventModal({
       return;
     }
 
-    const decoded = sceneValue ? decodeSceneOptionValue(sceneValue) : null;
+    const decoded = sectionValue
+      ? decodeSectionOptionValue(sectionValue)
+      : null;
+    const sectionStableId = decoded?.sectionStableId ?? "";
+    const matched = sectionOptions.find(
+      (o) => o.sectionStableId === sectionStableId,
+    );
+
     onSubmit({
       title: trimmed,
       description,
-      documentId: decoded?.documentId ?? "",
-      sceneStableId: decoded?.sceneStableId ?? "",
+      // 항상 primary document (옵션에 담긴 id)
+      documentId: matched?.documentId ?? defaultDocumentId ?? "",
+      sectionStableId,
       characterId: characterId || "",
     });
   };
@@ -152,22 +158,22 @@ export function TimelineEventModal({
             관련 Section
           </span>
           <select
-            value={sceneValue}
-            onChange={(e) => setSceneValue(e.target.value)}
+            value={sectionValue}
+            onChange={(e) => setSectionValue(e.target.value)}
             className={cn(
               "min-h-ns-touch w-full rounded-ns-md border border-ns-border bg-ns-surface px-ns-3",
               "text-ns-sm text-ns-ink outline-none focus-visible:border-ns-accent",
             )}
           >
             <option value="">연결 안 함</option>
-            {sceneOptions.map((opt) => (
+            {sectionOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
           <span className="text-ns-xs text-ns-ink-tertiary">
-            Section Navigator의 구간과 연결합니다.
+            Manuscript의 Section과 연결합니다. (구 Chapter는 표시되지 않습니다)
           </span>
         </label>
 

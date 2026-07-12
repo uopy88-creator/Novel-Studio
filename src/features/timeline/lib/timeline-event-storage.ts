@@ -3,13 +3,14 @@
  * Timeline Event Storage — Supabase Database 단일 소스
  * -----------------------------------------------------------------------------
  * 사건 목록 CRUD + 드래그 순서(sortOrder) 저장.
+ * Section 링크 필드는 sectionStableId (DB: scene_stable_id).
  * =============================================================================
  */
 
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type {
   CharacterId,
-  ChapterId,
+  DocumentId,
   ProjectId,
   TimelineEventId,
 } from "@/types/ids";
@@ -37,13 +38,37 @@ export { TIMELINE_EVENTS_STORAGE_KEY };
 export interface TimelineEventInput {
   title: string;
   description?: string;
-  documentId?: ChapterId | "";
-  sceneStableId?: string | "";
+  documentId?: DocumentId | "";
+  sectionStableId?: string | "";
   characterId?: CharacterId | "";
 }
 
+/** 로컬/구버전 JSON 호환 — sceneStableId → sectionStableId */
+type RawTimelineEvent = TimelineEvent & {
+  sceneStableId?: string;
+};
+
+function normalizeEvent(raw: RawTimelineEvent): TimelineEvent {
+  const sectionStableId =
+    raw.sectionStableId ?? raw.sceneStableId ?? undefined;
+  return {
+    id: raw.id,
+    projectId: raw.projectId,
+    title: raw.title ?? "",
+    description: raw.description ?? "",
+    sortOrder: raw.sortOrder ?? 0,
+    documentId: raw.documentId,
+    sectionStableId,
+    characterId: raw.characterId,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
 function readLocal(): TimelineEvent[] {
-  return readJsonArray<TimelineEvent>(TIMELINE_EVENTS_STORAGE_KEY);
+  return readJsonArray<RawTimelineEvent>(TIMELINE_EVENTS_STORAGE_KEY).map(
+    normalizeEvent,
+  );
 }
 
 function writeLocal(events: TimelineEvent[]): void {
@@ -72,7 +97,7 @@ function normalizeOptionalId<T extends string>(
 export async function readAllTimelineEvents(): Promise<TimelineEvent[]> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const list = await cloudListTimelineEvents();
+    const list = (await cloudListTimelineEvents()).map(normalizeEvent);
     backup(list);
     return list;
   }
@@ -84,7 +109,9 @@ export async function readTimelineEventsByProject(
 ): Promise<TimelineEvent[]> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const list = await cloudListTimelineEventsByProject(projectId);
+    const list = (await cloudListTimelineEventsByProject(projectId)).map(
+      normalizeEvent,
+    );
     try {
       backup(await cloudListTimelineEvents());
     } catch {
@@ -114,7 +141,7 @@ export async function createTimelineEvent(
     description: (input.description ?? "").trim(),
     sortOrder: maxOrder + 1,
     documentId: normalizeOptionalId(input.documentId),
-    sceneStableId: normalizeOptionalId(input.sceneStableId),
+    sectionStableId: normalizeOptionalId(input.sectionStableId),
     characterId: normalizeOptionalId(input.characterId),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -151,10 +178,10 @@ export async function updateTimelineEvent(
       patch.documentId !== undefined
         ? normalizeOptionalId(patch.documentId)
         : current.documentId,
-    sceneStableId:
-      patch.sceneStableId !== undefined
-        ? normalizeOptionalId(patch.sceneStableId)
-        : current.sceneStableId,
+    sectionStableId:
+      patch.sectionStableId !== undefined
+        ? normalizeOptionalId(patch.sectionStableId)
+        : current.sectionStableId,
     characterId:
       patch.characterId !== undefined
         ? normalizeOptionalId(patch.characterId)
@@ -164,7 +191,7 @@ export async function updateTimelineEvent(
 
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const all = await cloudListTimelineEvents();
+    const all = (await cloudListTimelineEvents()).map(normalizeEvent);
     const index = all.findIndex((e) => e.id === id);
     if (index < 0) return null;
     const updated = applyPatch(all[index]);
@@ -228,7 +255,6 @@ export async function reorderTimelineEvents(
     });
     byId.delete(id);
   });
-  // 누락된 항목은 뒤에 유지
   for (const leftover of byId.values()) {
     reordered.push({
       ...leftover,

@@ -132,7 +132,7 @@ export function DashboardPage({ projectId }: DashboardPageProps) {
             {snapshot.recentDocuments.length === 0 ? (
               <div className="rounded-ns-xl border border-dashed border-ns-border bg-ns-muted/40 px-ns-6 py-ns-10 text-center">
                 <p className="text-ns-sm text-ns-ink-secondary">
-                  아직 Document가 없습니다. Chapters 메뉴에서 추가해 보세요.
+                  아직 원고가 없습니다. Manuscript에서 글을 시작해 보세요.
                 </p>
               </div>
             ) : (

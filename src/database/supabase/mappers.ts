@@ -431,7 +431,8 @@ export function timelineEventToRow(
     description: event.description,
     sort_order: event.sortOrder,
     document_id: event.documentId ?? null,
-    scene_stable_id: event.sceneStableId ?? null,
+    // DB 컬럼명은 하위 호환 — 도메인은 sectionStableId
+    scene_stable_id: event.sectionStableId ?? null,
     character_id: event.characterId ?? null,
     created_at: event.createdAt,
     updated_at: event.updatedAt,
@@ -446,7 +447,7 @@ export function rowToTimelineEvent(row: DbTimelineEventRow): TimelineEvent {
     description: row.description ?? "",
     sortOrder: row.sort_order ?? 0,
     documentId: (row.document_id as ChapterId | null) ?? undefined,
-    sceneStableId: row.scene_stable_id ?? undefined,
+    sectionStableId: row.scene_stable_id ?? undefined,
     characterId: (row.character_id as CharacterId | null) ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

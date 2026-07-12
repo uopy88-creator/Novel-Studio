@@ -9,7 +9,7 @@ export const exportHelp: ContextHelpContent = {
   ],
   steps: [
     "Manuscript에서 Export를 엽니다.",
-    "형식(TXT / DOCX / PDF)과 범위(전체·현재 Chapter 등)를 고릅니다.",
+    "형식(TXT / DOCX / PDF)과 범위(전체·일부 Section 등)를 고릅니다.",
     "내보내기를 누르면 파일이 다운로드됩니다.",
   ],
   tips: [

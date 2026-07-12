@@ -53,7 +53,6 @@ export function SectionsPage({ projectId }: SectionsPageProps) {
     const params = new URLSearchParams({
       documentId: primaryDocumentId,
       sectionId: activeSectionId,
-      sceneId: activeSectionId,
     });
     return `${studioPath(projectId, "timeline")}?${params.toString()}`;
   }, [projectId, primaryDocumentId, activeSectionId]);
