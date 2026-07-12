@@ -7,17 +7,24 @@
  * Architecture: Project → Manuscript → Sections
  *
  * - 원고 content → Section 파싱 (프로그램이 관리하는 내부 마커)
- * - status / memo / 접힘 → section metas
+ * - status / memo / icons / 접힘 → section metas
  * - 순서·제목·추가·삭제는 content 재직렬화 → Manuscript autosave
+ *
+ * Section 구조 관리는 Section 페이지에서, Manuscript 는 집필·딥링크 스크롤용.
  * =============================================================================
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Section,
+  SectionIconId,
+  SectionIcons,
   SectionStatus,
 } from "@/features/manuscript/types/section";
-import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
+import {
+  DEFAULT_SECTION_DELIMITER,
+  EMPTY_SECTION_ICONS,
+} from "@/features/manuscript/types/section";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import { parseSections } from "@/features/manuscript/lib/section-parser";
 import {
@@ -33,9 +40,17 @@ import {
   collapsedIdsFromMetas,
   readSectionMetasByDocument,
   saveSectionMetasForDocument,
+  withSectionIconToggle,
+  withSectionIcons,
   withSectionMemo,
   withSectionStatus,
 } from "@/features/manuscript/lib/section-meta-storage";
+
+type MetaSlice = {
+  status: SectionStatus;
+  memo: string;
+  icons: SectionIcons;
+};
 
 export interface UseSectionsResult {
   sections: Section[];
@@ -50,6 +65,8 @@ export interface UseSectionsResult {
   rename: (sectionId: string, title: string) => void;
   setStatus: (sectionId: string, status: SectionStatus) => void;
   setMemo: (sectionId: string, memo: string) => void;
+  toggleIcon: (sectionId: string, iconId: SectionIconId) => void;
+  setIcons: (sectionId: string, icons: SectionIcons) => void;
 }
 
 const META_SAVE_MS = 500;
@@ -65,9 +82,9 @@ export function useSections(
     return readSectionDelimiterConfig();
   }, []);
 
-  const [metaByNumber, setMetaByNumber] = useState<
-    Map<number, { status: SectionStatus; memo: string }>
-  >(() => new Map());
+  const [metaByNumber, setMetaByNumber] = useState<Map<number, MetaSlice>>(
+    () => new Map(),
+  );
   const [collapsedStableIds, setCollapsedStableIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -94,7 +111,11 @@ export function useSections(
           new Map(
             metas.map((m) => [
               m.sectionNumber,
-              { status: m.status, memo: m.memo },
+              {
+                status: m.status,
+                memo: m.memo,
+                icons: m.icons ?? { ...EMPTY_SECTION_ICONS },
+              },
             ]),
           ),
         );
@@ -129,6 +150,7 @@ export function useSections(
           ...section,
           status: meta?.status ?? section.status,
           memo: meta?.memo ?? section.memo,
+          icons: meta?.icons ?? section.icons ?? { ...EMPTY_SECTION_ICONS },
         };
       }),
     [parsed, metaByNumber],
@@ -180,7 +202,14 @@ export function useSections(
   const syncMetaStateFromSections = useCallback((next: Section[]) => {
     setMetaByNumber(
       new Map(
-        next.map((s) => [s.number, { status: s.status, memo: s.memo }]),
+        next.map((s) => [
+          s.number,
+          {
+            status: s.status,
+            memo: s.memo,
+            icons: s.icons ?? { ...EMPTY_SECTION_ICONS },
+          },
+        ]),
       ),
     );
   }, []);
@@ -276,6 +305,28 @@ export function useSections(
     [persistMetas, syncMetaStateFromSections],
   );
 
+  const toggleIcon = useCallback(
+    (sectionId: string, iconId: SectionIconId) => {
+      const next = withSectionIconToggle(
+        sectionsRef.current,
+        sectionId,
+        iconId,
+      );
+      syncMetaStateFromSections(next);
+      persistMetas(next, collapsedRef.current);
+    },
+    [persistMetas, syncMetaStateFromSections],
+  );
+
+  const setIcons = useCallback(
+    (sectionId: string, icons: SectionIcons) => {
+      const next = withSectionIcons(sectionsRef.current, sectionId, icons);
+      syncMetaStateFromSections(next);
+      persistMetas(next, collapsedRef.current);
+    },
+    [persistMetas, syncMetaStateFromSections],
+  );
+
   useEffect(() => {
     return () => {
       if (metaTimerRef.current) clearTimeout(metaTimerRef.current);
@@ -294,5 +345,7 @@ export function useSections(
     rename,
     setStatus,
     setMemo,
+    toggleIcon,
+    setIcons,
   };
 }

@@ -25,6 +25,7 @@ import { readCharactersByProject } from "@/features/characters/lib/character-sto
 import { readMemosByProject } from "@/features/memo/lib/memo-storage";
 import { readDialoguesByProject } from "@/features/dialogue-vault/lib/dialogue-storage";
 import { readForeshadowingsByProject } from "@/features/foreshadowing/lib/foreshadowing-storage";
+import { foreshadowingStatusLabel } from "@/features/foreshadowing/lib/foreshadowing-service";
 import { readInspirationsByProject } from "@/features/inspiration/lib/inspiration-storage";
 
 const MAX_MATCHES_PER_DOCUMENT = 4;
@@ -183,7 +184,11 @@ export async function buildSearchIndex(
       id: `fs-${item.id}`,
       kind: "foreshadowing",
       title: item.title.trim() || "제목 없는 복선",
-      body: joinFields(item.title, item.description, item.status),
+      body: joinFields(
+        item.title,
+        item.description,
+        foreshadowingStatusLabel(item.status),
+      ),
       projectId,
       projectName,
       href: foreshadowingSearchHref(projectId, item.id),

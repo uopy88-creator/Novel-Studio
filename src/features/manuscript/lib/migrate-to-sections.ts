@@ -15,7 +15,10 @@
 
 import type { Chapter } from "@/features/manuscript/types/chapter";
 import type { Section, SectionMeta } from "@/features/manuscript/types/section";
-import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
+import {
+  DEFAULT_SECTION_DELIMITER,
+  EMPTY_SECTION_ICONS,
+} from "@/features/manuscript/types/section";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import { readChaptersByProject } from "@/features/manuscript/lib/chapter-storage";
 import {
@@ -196,6 +199,7 @@ export function flattenChapterBodiesToSections(
         charCount: countCharsWithoutSpaces(trimmed),
         status: "draft",
         memo: "",
+        icons: { ...EMPTY_SECTION_ICONS },
       });
       pending.push({
         documentId: chapter.id,
@@ -259,7 +263,10 @@ export async function remapSectionMetasForMigration(params: {
 
   const remappedByNumber = new Map<
     number,
-    Pick<SectionMeta, "status" | "memo" | "isCollapsed" | "id" | "createdAt">
+    Pick<
+      SectionMeta,
+      "status" | "memo" | "icons" | "isCollapsed" | "id" | "createdAt"
+    >
   >();
 
   for (const chapter of chapters) {
@@ -274,6 +281,7 @@ export async function remapSectionMetasForMigration(params: {
         id: meta.id,
         status: meta.status,
         memo: meta.memo,
+        icons: meta.icons ?? { ...EMPTY_SECTION_ICONS },
         isCollapsed: meta.isCollapsed,
         createdAt: meta.createdAt,
       });
@@ -290,6 +298,7 @@ export async function remapSectionMetasForMigration(params: {
       ...section,
       status: remapped?.status ?? section.status,
       memo: remapped?.memo ?? section.memo,
+      icons: remapped?.icons ?? section.icons ?? { ...EMPTY_SECTION_ICONS },
     };
   });
 

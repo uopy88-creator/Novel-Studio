@@ -4,20 +4,30 @@
  * =============================================================================
  * SectionNavigatorItem
  * -----------------------------------------------------------------------------
- * 드래그 핸들 · 접기 · 번호/제목 · 상태 · 메모 · 삭제
+ * 드래그 핸들 · 접기 · 번호/제목 · 상태 · 아이콘 · 메모 · 삭제
  * =============================================================================
  */
 
 import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Section, SectionStatus } from "@/features/manuscript/types/section";
+import type {
+  Section,
+  SectionIconId,
+  SectionStatus,
+} from "@/features/manuscript/types/section";
+import {
+  EMPTY_SECTION_ICONS,
+  SECTION_ICON_META,
+} from "@/features/manuscript/types/section";
 import {
   SectionStatusDot,
   SectionStatusSelect,
 } from "@/features/manuscript/components/section-navigator/SectionStatusSelect";
 import { SectionMemoField } from "@/features/manuscript/components/section-navigator/SectionMemoField";
 import { cn } from "@/lib/utils/cn";
+
+const ICON_IDS = Object.keys(SECTION_ICON_META) as SectionIconId[];
 
 export interface SectionNavigatorItemProps {
   section: Section;
@@ -30,6 +40,7 @@ export interface SectionNavigatorItemProps {
   onDeleteRequest: (section: Section) => void;
   onStatusChange: (sectionId: string, status: SectionStatus) => void;
   onMemoChange: (sectionId: string, memo: string) => void;
+  onIconToggle?: (sectionId: string, iconId: SectionIconId) => void;
   canDelete: boolean;
 }
 
@@ -43,6 +54,7 @@ export function SectionNavigatorItem({
   onDeleteRequest,
   onStatusChange,
   onMemoChange,
+  onIconToggle,
   canDelete,
 }: SectionNavigatorItemProps) {
   const {
@@ -65,6 +77,8 @@ export function SectionNavigatorItem({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const icons = section.icons ?? EMPTY_SECTION_ICONS;
 
   function commitTitle() {
     setEditing(false);
@@ -121,6 +135,12 @@ export function SectionNavigatorItem({
             <span className="flex items-center gap-1.5 text-ns-xs font-medium text-ns-ink-tertiary">
               <SectionStatusDot status={section.status} />
               #{section.number}
+              {/* 활성 아이콘 미리보기 */}
+              {ICON_IDS.filter((id) => icons[id]).map((id) => (
+                <span key={id} aria-hidden title={SECTION_ICON_META[id].label}>
+                  {SECTION_ICON_META[id].emoji}
+                </span>
+              ))}
             </span>
             {!editing ? (
               <span
@@ -162,12 +182,41 @@ export function SectionNavigatorItem({
             />
           ) : null}
 
-          {/* 접혀도 상태 칩은 보이게 — 빠른 전환 */}
-          <div className="mt-ns-2" onClick={(e) => e.stopPropagation()}>
+          {/* 접혀도 상태·아이콘은 보이게 — 빠른 전환 */}
+          <div
+            className="mt-ns-2 flex flex-wrap items-center gap-ns-2"
+            onClick={(e) => e.stopPropagation()}
+          >
             <SectionStatusSelect
               value={section.status}
               onChange={(status) => onStatusChange(section.id, status)}
             />
+            {onIconToggle ? (
+              <div className="flex items-center gap-0.5" role="group" aria-label="Section 아이콘">
+                {ICON_IDS.map((iconId) => {
+                  const meta = SECTION_ICON_META[iconId];
+                  const pressed = icons[iconId];
+                  return (
+                    <button
+                      key={iconId}
+                      type="button"
+                      aria-pressed={pressed}
+                      aria-label={meta.label}
+                      title={meta.label}
+                      onClick={() => onIconToggle(section.id, iconId)}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-ns-md text-ns-sm",
+                        pressed
+                          ? "bg-ns-accent-soft text-ns-ink"
+                          : "text-ns-ink-tertiary hover:bg-ns-muted hover:text-ns-ink",
+                      )}
+                    >
+                      <span aria-hidden>{meta.emoji}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           {!collapsed ? (

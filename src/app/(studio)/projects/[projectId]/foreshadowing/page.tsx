@@ -1,22 +1,26 @@
 /**
- * Foreshadowing — 기능 미구현, Context Help 제공
+ * Foreshadowing — 복선 관리.
+ * ?id= 로 특정 복선을 바로 연다 (전역 검색).
  */
 
-import { ComingSoon } from "@/components/layout";
+import { ForeshadowingPage } from "@/features/foreshadowing";
 
-interface ForeshadowingPageProps {
-  params: Promise<{ projectId: string }>;
+interface ForeshadowingRoutePageProps {
+  params: Promise<{
+    projectId: string;
+  }>;
+  searchParams: Promise<{
+    id?: string;
+  }>;
 }
 
-export default async function ForeshadowingPage({
+export default async function ForeshadowingRoutePage({
   params,
-}: ForeshadowingPageProps) {
+  searchParams,
+}: ForeshadowingRoutePageProps) {
   const { projectId } = await params;
+  const { id } = await searchParams;
   return (
-    <ComingSoon
-      featureName="Foreshadowing"
-      helpTopic="foreshadowing"
-      projectId={projectId}
-    />
+    <ForeshadowingPage projectId={projectId} initialForeshadowingId={id} />
   );
 }

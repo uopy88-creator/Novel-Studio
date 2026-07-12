@@ -18,6 +18,13 @@ export type {
   SectionStatus,
   SectionMeta,
   SectionDelimiterConfig,
+  SectionIconId,
+  SectionIcons,
+} from "./section";
+export {
+  EMPTY_SECTION_ICONS,
+  SECTION_ICON_META,
+  SECTION_STATUS_LABELS,
 } from "./section";
 /** @deprecated Use Section types */
 export type { Scene, SceneStatus, SceneMeta, SceneDelimiterConfig } from "./scene";

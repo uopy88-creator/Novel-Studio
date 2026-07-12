@@ -14,7 +14,10 @@ import type {
   Section,
   SectionDelimiterConfig,
 } from "@/features/manuscript/types/section";
-import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
+import {
+  DEFAULT_SECTION_DELIMITER,
+  EMPTY_SECTION_ICONS,
+} from "@/features/manuscript/types/section";
 import { buildSectionMarkerRegex } from "@/features/manuscript/lib/section-delimiter-settings";
 import {
   ensureStableSectionId,
@@ -168,6 +171,7 @@ export function parseSections(
       charCount: countCharsWithoutSpaces(body),
       status: "draft" as const,
       memo: "",
+      icons: { ...EMPTY_SECTION_ICONS },
     };
   });
 

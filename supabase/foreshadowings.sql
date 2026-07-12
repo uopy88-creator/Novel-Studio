@@ -6,7 +6,7 @@ create table if not exists public.foreshadowings (
   user_id uuid not null references auth.users (id) on delete cascade,
   title text not null default '',
   description text,
-  status text not null default 'planned',
+  status text not null default 'planted',
   planted_document_id uuid references public.documents (id) on delete set null,
   payoff_document_id uuid references public.documents (id) on delete set null,
   related_character_ids uuid[] not null default '{}',

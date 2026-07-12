@@ -4,13 +4,28 @@
  */
 
 import type {
+  SectionIcons,
   SectionMeta,
   SectionStatus,
 } from "@/features/manuscript/types/section";
+import { EMPTY_SECTION_ICONS } from "@/features/manuscript/types/section";
 import { requireCloudUserId } from "@/database/supabase/cloud-mode";
 import { DB_TABLES, type DbSectionMetaRow } from "@/database/supabase/types";
 import { requireSupabaseClient } from "@/lib/supabase/client";
 import { nowIso } from "@/lib/storage/browser";
+
+/** icons jsonb → SectionIcons (마이그레이션 전 null 허용) */
+function iconsFromRow(raw: unknown): SectionIcons {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ...EMPTY_SECTION_ICONS };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    important: Boolean(o.important),
+    foreshadowing: Boolean(o.foreshadowing),
+    dialogue: Boolean(o.dialogue),
+  };
+}
 
 function rowToMeta(row: DbSectionMetaRow): SectionMeta {
   const status = (["draft", "editing", "done"] as SectionStatus[]).includes(
@@ -33,6 +48,7 @@ function rowToMeta(row: DbSectionMetaRow): SectionMeta {
     sectionNumber,
     status,
     memo: row.memo ?? "",
+    icons: iconsFromRow(row.icons ?? null),
     isCollapsed: Boolean(row.is_collapsed),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -49,6 +65,7 @@ function metaToRow(meta: SectionMeta, userId: string): DbSectionMetaRow {
     section_number: meta.sectionNumber,
     status: meta.status,
     memo: meta.memo,
+    icons: meta.icons ?? { ...EMPTY_SECTION_ICONS },
     is_collapsed: meta.isCollapsed,
     created_at: meta.createdAt,
     updated_at: meta.updatedAt,

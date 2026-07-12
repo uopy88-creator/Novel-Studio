@@ -6,9 +6,9 @@
  * -----------------------------------------------------------------------------
  * Architecture: Project → Manuscript → Sections
  *
- * 프로젝트당 하나의 원고를 편집한다.
- * Section Navigator (#1 #2 …) 로 구간을 관리한다.
- * Chapter Outline / Chapter 생성 UI 는 없다.
+ * 프로젝트당 하나의 원고를 편집한다 (집필 전용).
+ * Section 구조 관리는 Section 페이지에서 한다.
+ * Section 딥링크(?sectionId=)로 해당 오프셋까지 스크롤한다.
  * =============================================================================
  */
 
@@ -30,7 +30,6 @@ import { InspirationGutter } from "@/features/inspiration/components/Inspiration
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
-import { SectionNavigator } from "@/features/manuscript/components/section-navigator";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
@@ -42,7 +41,6 @@ import { ExportModal } from "@/features/export/components/ExportModal";
 import { SentenceAssistantHost } from "@/features/sentence-assistant";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import { ContentContainer } from "@/components/layout";
-import { studioPath } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
 import { useUserSettings } from "@/features/settings";
@@ -64,6 +62,7 @@ export interface ManuscriptWorkspaceProps {
   /**
    * Section 안정 ID 딥링크.
    * 레거시 `?sceneId=` 와 신규 `?sectionId=` 모두 이 prop 으로 전달된다.
+   * Section 페이지에서 항목을 누르면 이 경로로 이동한다.
    */
   initialSectionId?: string;
   /** @deprecated Use initialSectionId */
@@ -91,18 +90,13 @@ export function ManuscriptWorkspace({
     lastSavedAt,
   } = useManuscript(projectId, initialDocumentId);
 
-  const {
-    sections,
-    collapsedIds,
-    toggleCollapsed,
-    setAllCollapsed,
-    reorder,
-    add,
-    remove,
-    rename,
-    setStatus,
-    setMemo,
-  } = useSections(projectId, primaryDocumentId, content, setContent);
+  // Export · 딥링크 스크롤용 — 구조 편집 UI는 Section 페이지에 있다
+  const { sections } = useSections(
+    projectId,
+    primaryDocumentId,
+    content,
+    setContent,
+  );
 
   const {
     versions,
@@ -146,7 +140,6 @@ export function ManuscriptWorkspace({
     useState<Inspiration | null>(null);
   const [deletingInspiration, setDeletingInspiration] =
     useState<Inspiration | null>(null);
-  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
@@ -184,17 +177,6 @@ export function ManuscriptWorkspace({
     [projectInspirations],
   );
 
-  useEffect(() => {
-    if (sections.length === 0) {
-      setActiveSectionId(null);
-      return;
-    }
-    setActiveSectionId((current) => {
-      if (current && sections.some((s) => s.id === current)) return current;
-      return sections[0].id;
-    });
-  }, [sections]);
-
   const stats = useMemo(() => {
     const totalChars = countCharsWithSpaces(content);
     const charsWithoutSpaces = countCharsWithoutSpaces(content);
@@ -205,17 +187,6 @@ export function ManuscriptWorkspace({
       bookPages: estimateBookPages(totalChars),
     };
   }, [content]);
-
-  const timelineHref = useMemo(() => {
-    if (!primaryDocumentId || !activeSectionId) return null;
-    const params = new URLSearchParams({
-      documentId: primaryDocumentId,
-      sectionId: activeSectionId,
-      // 레거시 호환
-      sceneId: activeSectionId,
-    });
-    return `${studioPath(projectId, "timeline")}?${params.toString()}`;
-  }, [projectId, primaryDocumentId, activeSectionId]);
 
   const scrollToOffset = useCallback(
     (
@@ -247,9 +218,9 @@ export function ManuscriptWorkspace({
     [scrollToOffset],
   );
 
+  /** Section 페이지 / 검색 딥링크 → 해당 구간으로 스크롤 */
   const selectSection = useCallback(
     (section: Section) => {
-      setActiveSectionId(section.id);
       scrollToOffset(section.startOffset, section.startOffset);
     },
     [scrollToOffset],
@@ -314,8 +285,8 @@ export function ManuscriptWorkspace({
           <p className="ns-caption mb-ns-2">집필</p>
           <h2 className="ns-heading">Manuscript</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            프로젝트 전체 원고입니다. Section Navigator로 구간을 나누고
-            순서를 바꿀 수 있습니다.
+            프로젝트 전체 원고를 이어서 씁니다. 구간 추가·순서·상태는 Section
+            페이지에서 관리합니다.
           </p>
         </div>
         {isReady ? (
@@ -375,68 +346,49 @@ export function ManuscriptWorkspace({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-ns-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
-          <div className="flex min-w-0 flex-col gap-ns-4 lg:flex-row lg:items-start lg:gap-ns-4">
-            <SectionNavigator
-              sections={sections}
-              activeSectionId={activeSectionId}
-              collapsedIds={collapsedIds}
-              onSelect={selectSection}
-              onReorder={reorder}
-              onAdd={() => add()}
-              onDelete={remove}
-              onRename={rename}
-              onStatusChange={setStatus}
-              onMemoChange={setMemo}
-              onToggleCollapse={toggleCollapsed}
-              onCollapseAll={() => setAllCollapsed(true)}
-              onExpandAll={() => setAllCollapsed(false)}
-              timelineHref={timelineHref}
-            />
+          <div className="flex min-w-0 flex-col gap-ns-4">
+            <div className="flex flex-col gap-ns-1">
+              <p className="text-ns-xs font-medium text-ns-accent">
+                프로젝트 전체 원고
+              </p>
+              <h3 className="text-ns-lg font-semibold text-ns-ink">
+                Manuscript
+              </h3>
+              <p className="text-ns-sm text-ns-ink-secondary">
+                Section(`#1`…) 구조는 사이드바의 Section 페이지에서 관리합니다.
+              </p>
+            </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-ns-4">
-              <div className="flex flex-col gap-ns-1">
-                <p className="text-ns-xs font-medium text-ns-accent">
-                  프로젝트 전체 원고
-                </p>
-                <h3 className="text-ns-lg font-semibold text-ns-ink">
-                  Manuscript
-                </h3>
-                <p className="text-ns-sm text-ns-ink-secondary">
-                  Section(`#1`…)은 Navigator에서 자동으로 관리됩니다.
-                </p>
-              </div>
+            <SearchBar content={content} onJump={jumpToMatch} />
 
-              <SearchBar content={content} onJump={jumpToMatch} />
-
-              <div className="relative">
-                <InspirationGutter
-                  content={content}
-                  inspirations={gutterInspirations}
-                  onOpen={(item) => setViewingInspiration(item)}
-                  className="z-10 pt-ns-5"
-                />
-                <CharacterMentionField
-                  value={content}
-                  onChange={setContent}
-                  characters={characters}
-                  documentTitle="Manuscript"
-                  editorRef={editorRef}
-                  editorClassName="pl-10 font-mono text-[length:var(--ns-editor-font-size,1rem)]"
-                  onOpenCharacter={(character) => setProfileId(character.id)}
-                  onMentionActiveChange={setMentionActive}
-                />
-                <InspirationSelectionMenu
-                  textareaRef={editorRef}
-                  enabled={Boolean(primaryDocumentId) && !mentionActive}
-                  onAddInspiration={(selection) =>
-                    setPendingSelection(selection)
-                  }
-                />
-                <SentenceAssistantHost
-                  textareaRef={editorRef}
-                  enabled={Boolean(primaryDocumentId)}
-                />
-              </div>
+            <div className="relative">
+              <InspirationGutter
+                content={content}
+                inspirations={gutterInspirations}
+                onOpen={(item) => setViewingInspiration(item)}
+                className="z-10 pt-ns-5"
+              />
+              <CharacterMentionField
+                value={content}
+                onChange={setContent}
+                characters={characters}
+                documentTitle="Manuscript"
+                editorRef={editorRef}
+                editorClassName="pl-10 font-mono text-[length:var(--ns-editor-font-size,1rem)]"
+                onOpenCharacter={(character) => setProfileId(character.id)}
+                onMentionActiveChange={setMentionActive}
+              />
+              <InspirationSelectionMenu
+                textareaRef={editorRef}
+                enabled={Boolean(primaryDocumentId) && !mentionActive}
+                onAddInspiration={(selection) =>
+                  setPendingSelection(selection)
+                }
+              />
+              <SentenceAssistantHost
+                textareaRef={editorRef}
+                enabled={Boolean(primaryDocumentId)}
+              />
             </div>
           </div>
 

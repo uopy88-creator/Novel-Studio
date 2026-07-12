@@ -167,6 +167,15 @@ export type DbSectionMetaRow = {
   section_number?: number | null;
   status: string;
   memo: string;
+  /**
+   * Section 아이콘 jsonb.
+   * 마이그레이션 전 읽기 대비 optional.
+   */
+  icons?: {
+    important?: boolean;
+    foreshadowing?: boolean;
+    dialogue?: boolean;
+  } | null;
   is_collapsed: boolean;
   created_at: string;
   updated_at: string;

@@ -12,7 +12,10 @@ import type {
   Section,
   SectionDelimiterConfig,
 } from "@/features/manuscript/types/section";
-import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
+import {
+  DEFAULT_SECTION_DELIMITER,
+  EMPTY_SECTION_ICONS,
+} from "@/features/manuscript/types/section";
 import {
   parseSections,
   serializeSections,
@@ -75,6 +78,7 @@ export function addSection(
     charCount: 0,
     status: "draft",
     memo: "",
+    icons: { ...EMPTY_SECTION_ICONS },
   };
 
   const next = [...sections];

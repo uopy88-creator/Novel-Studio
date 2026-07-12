@@ -441,7 +441,7 @@ supabase db push
 | 로그인 | Supabase Auth |
 | 작품 데이터 전체 | **Supabase Database** (주 저장소) |
 | LocalStorage | 클라우드 성공 후 **백업** + 명시적 복원용 |
-| Memo / Foreshadowing / Word Treasury UI | Coming soon (테이블·저장 계층은 준비됨) |
+| Memo / Word Treasury UI | Coming soon (테이블·저장 계층은 준비됨) |
 
 | 경로 | 역할 |
 |------|------|

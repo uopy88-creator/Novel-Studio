@@ -1,6 +1,8 @@
 /**
  * manuscript feature 공개 진입점.
- * - Manuscript: 원고 편집 · Section Navigator
+ * Architecture: Project → Manuscript → Sections
+ * - Manuscript: 집필
+ * - SectionsPage: Section 구조 관리
  */
 export { DocumentsPage } from "./components/DocumentsPage";
 export { DocumentCard } from "./components/DocumentCard";
@@ -10,6 +12,7 @@ export { DocumentDeleteDialog } from "./components/DocumentDeleteDialog";
 export { useChapters, useDocuments } from "./hooks/useChapters";
 
 export { ManuscriptWorkspace } from "./components/ManuscriptWorkspace";
+export { SectionsPage } from "./components/SectionsPage";
 export { ManuscriptEditor } from "./components/ManuscriptEditor";
 export { SearchBar } from "./components/SearchBar";
 export { StatisticsPanel } from "./components/StatisticsPanel";
@@ -30,6 +33,13 @@ export type {
   SectionDelimiterConfig,
   SectionStatus,
   SectionMeta,
+  SectionIconId,
+  SectionIcons,
+} from "./types/section";
+export {
+  EMPTY_SECTION_ICONS,
+  SECTION_ICON_META,
+  SECTION_STATUS_LABELS,
 } from "./types/section";
 /** @deprecated Use Section types */
 export type { Scene, SceneDelimiterConfig } from "./types/scene";

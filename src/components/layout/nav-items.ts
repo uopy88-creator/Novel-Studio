@@ -22,6 +22,7 @@ export interface StudioNavItem {
 export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { segment: "dashboard", label: "Dashboard", icon: "🏠" },
   { segment: "manuscript", label: "Manuscript", icon: "✍" },
+  { segment: "sections", label: "Section", icon: "📑" },
   { segment: "timeline", label: "Timeline", icon: "⏱" },
   { segment: "characters", label: "Characters", icon: "👤" },
   { segment: "writing-vault", label: "Writing Vault", icon: "💬" },

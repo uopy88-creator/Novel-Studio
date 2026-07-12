@@ -4,10 +4,14 @@
  * =============================================================================
  * SectionNavigator
  * -----------------------------------------------------------------------------
- * 원고 왼쪽(데스크톱) / 상단 드로어(모바일·iPad) Section 목록.
- * @dnd-kit 으로 PC·터치 드래그를 지원한다.
+ * Architecture: Project → Manuscript → Sections
  *
- * Manuscript 는 하나의 긴 문서이며, Section 은 #1 #2 … 구분자로만 나뉜다.
+ * Section 페이지(variant="page")에서 구조를 관리한다.
+ * Manuscript 는 집필 전용 — 클릭 시 해당 Section 오프셋으로 딥링크한다.
+ *
+ * variant:
+ * - aside (기본): 좌측 sticky / 모바일 드로어 (레거시 호환)
+ * - page: 전체 너비 목록, 모바일 드로어 없음
  * =============================================================================
  */
 
@@ -27,7 +31,11 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { Section, SectionStatus } from "@/features/manuscript/types/section";
+import type {
+  Section,
+  SectionIconId,
+  SectionStatus,
+} from "@/features/manuscript/types/section";
 import type { SectionDeleteMode } from "@/features/manuscript/lib/section-operations";
 import { SectionNavigatorItem } from "@/features/manuscript/components/section-navigator/SectionNavigatorItem";
 import { SectionNavigatorToolbar } from "@/features/manuscript/components/section-navigator/SectionNavigatorToolbar";
@@ -48,8 +56,15 @@ export interface SectionNavigatorProps {
   onToggleCollapse: (sectionId: string) => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
+  /** 아이콘 토글 (중요 / 복선 / 대사) */
+  onIconToggle?: (sectionId: string, iconId: SectionIconId) => void;
   /** 선택 Section → Timeline 사건 추가 링크 */
   timelineHref?: string | null;
+  /**
+   * aside: sticky 사이드 + 모바일 드로어
+   * page: Section 페이지용 전체 너비 목록
+   */
+  variant?: "aside" | "page";
   className?: string;
 }
 
@@ -67,11 +82,14 @@ export function SectionNavigator({
   onToggleCollapse,
   onCollapseAll,
   onExpandAll,
+  onIconToggle,
   timelineHref = null,
+  variant = "aside",
   className,
 }: SectionNavigatorProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [deleting, setDeleting] = useState<Section | null>(null);
+  const isPage = variant === "page";
 
   // 터치·마우스·키보드 모두 지원 (activationConstraint 로 스크롤과 구분)
   const sensors = useSensors(
@@ -98,6 +116,7 @@ export function SectionNavigator({
     <div
       className={cn(
         "flex h-full min-h-0 flex-col rounded-ns-xl border border-ns-border bg-ns-surface",
+        isPage && "min-h-[24rem]",
         className,
       )}
     >
@@ -124,13 +143,14 @@ export function SectionNavigator({
                 collapsed={collapsedIds.has(section.id)}
                 onSelect={(s) => {
                   onSelect(s);
-                  setMobileOpen(false);
+                  if (!isPage) setMobileOpen(false);
                 }}
                 onToggleCollapse={onToggleCollapse}
                 onRename={onRename}
                 onDeleteRequest={(s) => setDeleting(s)}
                 onStatusChange={onStatusChange}
                 onMemoChange={onMemoChange}
+                onIconToggle={onIconToggle}
                 canDelete={sections.length > 1}
               />
             ))}
@@ -139,6 +159,24 @@ export function SectionNavigator({
       </DndContext>
     </div>
   );
+
+  // Section 페이지: 항상 전체 너비 목록 (모바일 드로어 없음)
+  if (isPage) {
+    return (
+      <>
+        <div className="w-full">{panel}</div>
+        <SectionDeleteDialog
+          open={Boolean(deleting)}
+          section={deleting}
+          onClose={() => setDeleting(null)}
+          onConfirm={(section, mode) => {
+            onDelete(section.id, mode);
+            setDeleting(null);
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <>

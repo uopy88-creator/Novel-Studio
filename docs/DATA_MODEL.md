@@ -185,7 +185,7 @@ Manuscript의 텍스트에서 계산한다.
 | projectId | 소속 작품 |
 | title | 짧은 이름 |
 | description | 설명 |
-| status | planned / planted / paid_off / dropped |
+| status | planted(심음) / pending_payoff(회수 예정) / paid_off(회수 완료) |
 | plantedDocumentId | 심은 문서 |
 | payoffDocumentId | 회수할(한) 문서 |
 | relatedCharacterIds | 관련 인물 |

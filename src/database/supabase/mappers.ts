@@ -23,10 +23,8 @@ import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { Memo, MemoKind } from "@/features/memo/types/memo";
-import type {
-  Foreshadowing,
-  ForeshadowingStatus,
-} from "@/features/foreshadowing/types/foreshadowing";
+import type { Foreshadowing } from "@/features/foreshadowing/types/foreshadowing";
+import { normalizeForeshadowingStatus } from "@/features/foreshadowing/types/foreshadowing";
 import type { WordTreasuryEntry } from "@/features/word-treasury/types/word-treasury";
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type {
@@ -409,7 +407,8 @@ export function rowToForeshadowing(row: DbForeshadowingRow): Foreshadowing {
     projectId: row.project_id,
     title: row.title ?? "",
     description: row.description ?? undefined,
-    status: (row.status as ForeshadowingStatus) || "planned",
+    // 구 상태(planned/dropped)도 새 상태(planted 등)로 정규화
+    status: normalizeForeshadowingStatus(row.status),
     plantedChapterId:
       (row.planted_document_id as ChapterId | null) ?? undefined,
     payoffChapterId: (row.payoff_document_id as ChapterId | null) ?? undefined,

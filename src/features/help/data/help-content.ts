@@ -123,7 +123,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Manuscript 오른쪽 Section Navigator에서 원고 구간을 보고, 상태를 바꾸거나 접을 수 있습니다. 구간을 선택하면 해당 위치로 스크롤됩니다.",
+              text: "사이드바의 Section 페이지에서 원고 구간을 보고, 상태를 바꾸거나 접을 수 있습니다. 구간을 선택하면 Manuscript의 해당 위치로 이동합니다.",
             },
           ],
         },
@@ -133,7 +133,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Section Navigator에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
+              text: "Section 페이지에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
             },
           ],
         },
@@ -144,6 +144,16 @@ export const HELP_DOCUMENT: HelpDocument = {
             {
               type: "paragraph",
               text: "Section을 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
+            },
+          ],
+        },
+        {
+          id: "sections-icons",
+          title: "아이콘",
+          blocks: [
+            {
+              type: "paragraph",
+              text: "★ 중요 · 📌 복선 · 💬 대사 아이콘으로 구간을 표시할 수 있습니다.",
             },
           ],
         },
@@ -159,7 +169,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Manuscript는 프로젝트 전체 원고를 한 화면에서 보여 줍니다. Section Navigator로 구간을 나누며, 이어 쓰기에 집중할 수 있습니다.",
+              text: "Manuscript는 프로젝트 전체 원고를 한 화면에서 보여 줍니다. 구간 구조는 Section 페이지에서 관리하고, 여기서는 이어 쓰기에 집중할 수 있습니다.",
             },
           ],
         },
@@ -179,7 +189,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Section Navigator에서 구간을 보고, 상태를 바꾸거나 접을 수 있습니다. 구간을 선택하면 해당 원고 위치로 스크롤됩니다.",
+              text: "구간 추가·순서·상태·아이콘은 사이드바의 Section 페이지에서 관리합니다. 구간을 선택하면 Manuscript의 해당 위치로 스크롤됩니다.",
             },
           ],
         },
@@ -189,7 +199,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Section Navigator에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
+              text: "Section 페이지에서 새 Section을 추가하면 마커가 자동으로 붙습니다. 번호는 프로그램이 관리하므로 직접 입력할 필요가 없습니다.",
             },
           ],
         },
@@ -199,7 +209,7 @@ export const HELP_DOCUMENT: HelpDocument = {
           blocks: [
             {
               type: "paragraph",
-              text: "Section을 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
+              text: "Section 페이지에서 구간을 드래그로 순서를 바꿀 수 있습니다. 순서를 바꾸면 원고 내용 순서도 함께 맞춰집니다.",
             },
           ],
         },
@@ -355,9 +365,9 @@ export const HELP_DOCUMENT: HelpDocument = {
         {
           type: "list",
           items: [
-            "planned → planted → paid_off 상태로 관리합니다.",
-            "쓰지 않기로 한 복선은 dropped로 표시할 수 있습니다.",
-            "어느 장에 심고 회수할지 기록해 두면 긴 연재에서도 놓치기 어렵습니다.",
+            "심음 → 회수 예정 → 회수 완료 상태로 관리합니다.",
+            "제목·설명으로 검색하고, 상태별로 필터할 수 있습니다.",
+            "작가가 직접 기록합니다. AI가 생성하거나 분석하지 않습니다.",
           ],
         },
       ],

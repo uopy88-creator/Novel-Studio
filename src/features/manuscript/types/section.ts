@@ -6,9 +6,10 @@
  *
  * Manuscript 는 프로젝트당 하나의 긴 문서다. Section 은 별도 문서가 아니다.
  *
+ * - Section 구조(추가·이름·순서·상태·아이콘·메모)는 Section 페이지에서 관리한다.
+ * - Manuscript 는 집필 전용이며, Section 클릭 시 해당 오프셋으로 스크롤한다.
  * - 사용자에게 Section 번호·구분자를 직접 입력하게 하지 않는다.
- * - 프로그램이 Navigator / 「＋ 새 Section」으로만 Section 을 관리한다.
- * - 내부 저장은 원고 content 의 자동 마커 + section metas(상태·메모·접힘).
+ * - 내부 저장은 원고 content 의 자동 마커 + section metas(상태·메모·아이콘·접힘).
  * - id 는 안정 키(`section_001` …). 레거시 `scene_001` 도 파서가 수용한다.
  * - number 는 표시용 1, 2, 3… (순서에 따라 재계산).
  *
@@ -47,6 +48,30 @@ export const SECTION_STATUS_LABELS: Record<SectionStatus, string> = {
 /** @deprecated Use SECTION_STATUS_LABELS */
 export const SCENE_STATUS_LABELS = SECTION_STATUS_LABELS;
 
+/** Section 표시 아이콘 (중요 / 복선 / 대사) */
+export type SectionIconId = "important" | "foreshadowing" | "dialogue";
+
+export interface SectionIcons {
+  important: boolean;
+  foreshadowing: boolean;
+  dialogue: boolean;
+}
+
+export const EMPTY_SECTION_ICONS: SectionIcons = {
+  important: false,
+  foreshadowing: false,
+  dialogue: false,
+};
+
+export const SECTION_ICON_META: Record<
+  SectionIconId,
+  { emoji: string; label: string }
+> = {
+  important: { emoji: "★", label: "중요" },
+  foreshadowing: { emoji: "📌", label: "복선" },
+  dialogue: { emoji: "💬", label: "대사" },
+};
+
 /**
  * 파싱된 Section + 메타.
  * - id: 안정 키 `section_001` (또는 레거시 `scene_001`)
@@ -67,6 +92,8 @@ export interface Section {
   status: SectionStatus;
   /** 작가 전용 메모 (원고/export 미포함) */
   memo: string;
+  /** 표시 아이콘 (중요 / 복선 / 대사) */
+  icons: SectionIcons;
 }
 
 /** @deprecated Use Section */
@@ -81,6 +108,7 @@ export interface SectionMeta {
   sectionNumber: number;
   status: SectionStatus;
   memo: string;
+  icons: SectionIcons;
   isCollapsed: boolean;
   createdAt: string;
   updatedAt: string;

@@ -10,8 +10,13 @@
 
 import type {
   Section,
+  SectionIcons,
+  SectionIconId,
   SectionMeta,
   SectionStatus,
+} from "@/features/manuscript/types/section";
+import {
+  EMPTY_SECTION_ICONS,
 } from "@/features/manuscript/types/section";
 import type { ChapterId, ProjectId } from "@/types/ids";
 import {
@@ -40,7 +45,21 @@ export { SECTION_METAS_STORAGE_KEY };
 type RawMeta = Partial<SectionMeta> & {
   sceneNumber?: number;
   sectionNumber?: number;
+  icons?: unknown;
 };
+
+/** icons jsonb / 객체 → SectionIcons (없거나 깨진 값은 전부) */
+export function normalizeSectionIcons(raw: unknown): SectionIcons {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ...EMPTY_SECTION_ICONS };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    important: Boolean(o.important),
+    foreshadowing: Boolean(o.foreshadowing),
+    dialogue: Boolean(o.dialogue),
+  };
+}
 
 function normalizeMeta(raw: RawMeta): SectionMeta | null {
   if (!raw || typeof raw.id !== "string") return null;
@@ -68,6 +87,7 @@ function normalizeMeta(raw: RawMeta): SectionMeta | null {
     sectionNumber,
     status,
     memo: typeof raw.memo === "string" ? raw.memo : "",
+    icons: normalizeSectionIcons(raw.icons),
     isCollapsed: Boolean(raw.isCollapsed),
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : nowIso(),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : nowIso(),
@@ -152,6 +172,7 @@ export function mergeSectionsWithMetas(
       ...section,
       status: meta?.status ?? "draft",
       memo: meta?.memo ?? "",
+      icons: meta?.icons ?? { ...EMPTY_SECTION_ICONS },
     };
   });
 }
@@ -183,6 +204,7 @@ export async function saveSectionMetasForDocument(input: {
       sectionNumber: section.number,
       status: section.status,
       memo: section.memo,
+      icons: section.icons ?? { ...EMPTY_SECTION_ICONS },
       isCollapsed: collapsedNumbers.has(section.number),
       createdAt: prev?.createdAt ?? timestamp,
       updatedAt: timestamp,
@@ -219,6 +241,31 @@ export function withSectionMemo(
   memo: string,
 ): Section[] {
   return sections.map((s) => (s.id === sectionId ? { ...s, memo } : s));
+}
+
+export function withSectionIconToggle(
+  sections: Section[],
+  sectionId: string,
+  iconId: SectionIconId,
+): Section[] {
+  return sections.map((s) => {
+    if (s.id !== sectionId) return s;
+    const icons = s.icons ?? { ...EMPTY_SECTION_ICONS };
+    return {
+      ...s,
+      icons: { ...icons, [iconId]: !icons[iconId] },
+    };
+  });
+}
+
+export function withSectionIcons(
+  sections: Section[],
+  sectionId: string,
+  icons: SectionIcons,
+): Section[] {
+  return sections.map((s) =>
+    s.id === sectionId ? { ...s, icons: { ...icons } } : s,
+  );
 }
 
 /** @deprecated */

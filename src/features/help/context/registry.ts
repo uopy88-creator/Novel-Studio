@@ -13,6 +13,7 @@ import type {
 import { dashboardHelp } from "@/features/help/context/topics/dashboard";
 import { projectHelp } from "@/features/help/context/topics/project";
 import { manuscriptHelp } from "@/features/help/context/topics/manuscript";
+import { sectionsHelp } from "@/features/help/context/topics/sections";
 import { characterHelp } from "@/features/help/context/topics/character";
 import { vaultHelp } from "@/features/help/context/topics/vault";
 import { memoHelp } from "@/features/help/context/topics/memo";
@@ -24,6 +25,7 @@ const REGISTRY: Record<ContextHelpTopicId, ContextHelpContent> = {
   dashboard: dashboardHelp,
   project: projectHelp,
   manuscript: manuscriptHelp,
+  sections: sectionsHelp,
   character: characterHelp,
   vault: vaultHelp,
   memo: memoHelp,

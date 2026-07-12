@@ -4,10 +4,16 @@
  * -----------------------------------------------------------------------------
  * Supabase 설정 시: CRUD 는 클라우드만. LocalStorage 는 성공 후 백업 쓰기만.
  * Supabase 미설정(로컬 개발) 시에만 LocalStorage 를 데이터 소스로 사용.
+ *
+ * UI·비즈니스 로직(필터·정렬)은 foreshadowing-service.ts 를 사용한다.
  * =============================================================================
  */
 
 import type { Foreshadowing } from "@/features/foreshadowing/types/foreshadowing";
+import {
+  DEFAULT_FORESHADOWING_STATUS,
+  normalizeForeshadowingStatus,
+} from "@/features/foreshadowing/types/foreshadowing";
 import type { ForeshadowingId, ProjectId } from "@/types/ids";
 import {
   isSupabaseDataMode,
@@ -29,19 +35,35 @@ import {
 
 export { FORESHADOWINGS_STORAGE_KEY };
 
+/** 생성·수정 시 전달하는 입력 (필수: title) */
 export interface ForeshadowingInput {
   title: string;
   description?: string;
   status?: Foreshadowing["status"];
+  /** 향후 Section 연결용 — 현재 UI에서 사용하지 않음 */
   plantedChapterId?: Foreshadowing["plantedChapterId"];
+  /** 향후 Section 연결용 — 현재 UI에서 사용하지 않음 */
   payoffChapterId?: Foreshadowing["payoffChapterId"];
+  /** 향후 Character 연결용 — 현재 UI에서 사용하지 않음 */
   relatedCharacterIds?: Foreshadowing["relatedCharacterIds"];
   importance?: Foreshadowing["importance"];
 }
 
 /** 로컬 전용 모드(Supabase 미설정)에서만 사용 */
 function readLocal(): Foreshadowing[] {
-  return readJsonArray<Foreshadowing>(FORESHADOWINGS_STORAGE_KEY);
+  return readJsonArray<Foreshadowing>(FORESHADOWINGS_STORAGE_KEY).map(
+    normalizeLocalItem,
+  );
+}
+
+/** 로컬에 남은 구 상태 값을 읽어올 때 정규화 */
+function normalizeLocalItem(item: Foreshadowing): Foreshadowing {
+  return {
+    ...item,
+    status: normalizeForeshadowingStatus(item.status),
+    relatedCharacterIds: item.relatedCharacterIds ?? [],
+    importance: item.importance ?? 3,
+  };
 }
 
 function writeLocal(items: Foreshadowing[]): void {
@@ -92,7 +114,8 @@ export async function createForeshadowing(
     projectId,
     title: input.title.trim(),
     description: input.description?.trim() || undefined,
-    status: input.status ?? "planned",
+    // 기본 상태: 심음
+    status: input.status ?? DEFAULT_FORESHADOWING_STATUS,
     plantedChapterId: input.plantedChapterId,
     payoffChapterId: input.payoffChapterId,
     relatedCharacterIds: input.relatedCharacterIds ?? [],
