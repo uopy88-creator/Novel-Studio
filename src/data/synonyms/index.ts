@@ -24,16 +24,18 @@ export type SynonymCatalog = Record<string, string[]>;
 
 /**
  * 등록된 모든 카테고리.
+ * 같은 표제어가 여러 파일에 있으면 나중 카탈로그가 덮어쓴다.
+ * Action Pack 이 movement 스텁보다 우선하도록 action 을 뒤에 둔다.
  * TODO: 새 JSON 추가 시 import 후 이 배열에 push.
  */
 export const SYNONYM_CATALOGS: readonly SynonymCatalog[] = [
   emotion,
-  action,
   movement,
   speech,
   appearance,
   nature,
   time,
+  action,
 ] as const;
 
 const MAX_SYNONYMS = 5;
