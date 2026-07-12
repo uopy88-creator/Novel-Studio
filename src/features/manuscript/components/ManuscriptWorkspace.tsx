@@ -479,14 +479,15 @@ export function ManuscriptWorkspace({
               <SentenceAssistantHost
                 textareaRef={editorRef}
                 enabled={Boolean(primaryDocumentId)}
-                onReplaceSelection={(nextContent, selectionStart, selectionEnd) => {
-                  // Undo/Redo 스택에 한 단계로 기록
+                onReplaceSelection={(nextContent, caretStart, caretEnd) => {
+                  // 한 번의 transactional 편집 → Undo/Redo · 기존 autosave 경로
                   setContentTransactional(nextContent);
                   requestAnimationFrame(() => {
                     const el = editorRef.current;
                     if (!el) return;
                     el.focus();
-                    el.setSelectionRange(selectionStart, selectionEnd);
+                    // 커서는 교체된 단어 뒤 (collapsed)
+                    el.setSelectionRange(caretStart, caretEnd);
                   });
                 }}
               />

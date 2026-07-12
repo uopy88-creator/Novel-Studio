@@ -7,8 +7,10 @@
  * Manuscript textarea에 우클릭 · Ctrl+Shift+Space 를 연결하고
  * Side Panel 을 띄운다.
  *
- * 「표현 바꾸기」Chip 클릭 시 선택 구간을 유의어로 교체한다.
- * 교체는 setContentTransactional 경로로 들어가 Undo/Redo 가 동작한다.
+ * 「표현 바꾸기」Chip 클릭 시:
+ * - 선택 위치의 단어만 교체 (동일 문자열이 있어도 그 오프셋만)
+ * - setContentTransactional → Undo/Redo · 자동 저장 경로 유지
+ * - 내부 selection 은 새 단어 구간으로 갱신, 커서는 단어 뒤에 둠
  * =============================================================================
  */
 
@@ -23,13 +25,13 @@ export interface SentenceAssistantHostProps {
   enabled?: boolean;
   /**
    * 유의어 교체 적용.
-   * nextContent 전체를 transactional 로 저장하고,
-   * 새 선택 구간(start~end)을 유지한다.
+   * nextContent 는 transactional 저장.
+   * caretStart/caretEnd — 보통 교체 단어 끝의 collapsed caret.
    */
   onReplaceSelection?: (
     nextContent: string,
-    selectionStart: number,
-    selectionEnd: number,
+    caretStart: number,
+    caretEnd: number,
   ) => void;
 }
 
@@ -53,43 +55,54 @@ export function SentenceAssistantHost({
 
   /**
    * Chip → 선택 단어를 synonym 으로 교체.
-   * 커서/선택은 교체된 유의어 구간으로 유지한다.
+   * - 패널용 selection: 새 단어 [start, end)
+   * - textarea caret: end 위치 (단어 뒤)
    */
   const handleReplaceWith = useCallback(
     (synonym: string) => {
       const el = textareaRef.current;
       if (!el || !selection || !onReplaceSelection) return;
 
-      const { start, end } = selection;
-      // 패널을 연 뒤 본문이 바뀌었으면, 가능한 경우 현재 선택으로 보정
+      const { start, end, text } = selection;
+      // 패널을 연 시점의 오프셋을 우선 사용 (같은 단어가 여러 곳이어도 그 위치만)
+      let rangeStart = start;
+      let rangeEnd = end;
+
+      // 라이브 선택이 있고, 이전에 기억한 텍스트와 같으면 라이브 오프셋 사용
       const live = readTextareaSelection(el);
-      const rangeStart = live?.start ?? start;
-      const rangeEnd = live?.end ?? end;
+      if (live && live.text === text) {
+        rangeStart = live.start;
+        rangeEnd = live.end;
+      } else if (el.value.slice(start, end) !== text) {
+        // 본문이 어긋났으면 기억한 텍스트를 해당 오프셋 근처에서 재탐색
+        const found = el.value.indexOf(text, Math.max(0, start - 32));
+        if (found >= 0) {
+          rangeStart = found;
+          rangeEnd = found + text.length;
+        }
+      }
 
       const value = el.value;
-      if (rangeStart < 0 || rangeEnd > value.length || rangeStart > rangeEnd) {
+      if (
+        rangeStart < 0 ||
+        rangeEnd > value.length ||
+        rangeStart > rangeEnd
+      ) {
         return;
       }
 
+      // 선택 구간만 splice — 전체 Manuscript 트리를 remount 하지 않음
       const nextContent =
         value.slice(0, rangeStart) + synonym + value.slice(rangeEnd);
       const newStart = rangeStart;
       const newEnd = rangeStart + synonym.length;
 
-      onReplaceSelection(nextContent, newStart, newEnd);
+      onReplaceSelection(nextContent, newEnd, newEnd);
 
-      // 패널 표시 단어도 교체 결과로 갱신 (연속 교체 가능)
       setSelection({
         text: synonym,
         start: newStart,
         end: newEnd,
-      });
-
-      requestAnimationFrame(() => {
-        const editor = textareaRef.current;
-        if (!editor) return;
-        editor.focus();
-        editor.setSelectionRange(newStart, newEnd);
       });
     },
     [onReplaceSelection, selection, textareaRef],
@@ -103,7 +116,7 @@ export function SentenceAssistantHost({
 
     const onContextMenu = (event: MouseEvent) => {
       const current = readTextareaSelection(el);
-      if (!current) return; // 선택 없으면 브라우저 기본 메뉴
+      if (!current) return;
       event.preventDefault();
       const pad = 8;
       const menuW = 200;
