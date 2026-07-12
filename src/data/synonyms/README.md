@@ -33,6 +33,22 @@ node scripts/build-emotion-synonyms.mjs
 node scripts/build-action-synonyms.mjs
 ```
 
+## Speech Pack
+
+`speech.json` — 말하기·대화 표제어 300개 이상.
+
+- 단어당 유의어 최대 5개
+- 가나다순 정렬
+- 목록 내 중복 없음
+- 현대 소설에서 자연스러운 표현만 (사투리·고어·비속어·전문용어 제외)
+
+원본: `scripts/data/speech-raw.json`  
+재생성:
+
+```bash
+node scripts/build-speech-synonyms.mjs
+```
+
 ## 파일 추가 방법
 
 1. 이 폴더에 `category-name.json` 을 추가합니다.
