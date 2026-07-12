@@ -3,7 +3,6 @@
  * Export — PDF (A4 · 여백 · 제목 · 페이지 번호 · 한글 줄바꿈)
  * -----------------------------------------------------------------------------
  * jsPDF + Pretendard(로컬 TTF). CJK 는 글자 단위로 폭을 재며 줄바꿈한다.
- * 본문 색상 마커(·ns:fg:…)는 setTextColor 로 유지한다.
  * =============================================================================
  */
 
@@ -14,12 +13,6 @@ import {
   exportTimestamp,
   sanitizeFilename,
 } from "@/features/export/lib/download-blob";
-import {
-  MANUSCRIPT_FG_PDF,
-  parseManuscriptColorRuns,
-  type ManuscriptFgColor,
-  type ManuscriptTextRun,
-} from "@/features/manuscript/lib/manuscript-markup";
 
 const FONT_NAME = "Pretendard";
 const FONT_FILE = "Pretendard-Regular.ttf";
@@ -51,122 +44,18 @@ async function loadKoreanFontBase64(): Promise<string> {
   return fontBase64Cache;
 }
 
-type ColoredLine = ManuscriptTextRun[];
-
 /**
- * 색상 run 을 maxWidth 에 맞게 줄 단위로 나눈다.
- * 각 출력 줄은 색이 다른 조각들의 배열이다.
+ * 한글·영문 혼합 텍스트를 maxWidth 에 맞게 줄 단위로 나눈다.
+ * - 공백이 있으면 단어 경계 우선
+ * - CJK 구간은 글자 단위로 자연스럽게 넘김 (keep-all 에 가깝게)
  */
-function wrapColoredRuns(
+function wrapText(
   doc: jsPDF,
-  runs: ManuscriptTextRun[],
+  text: string,
   maxWidth: number,
-): ColoredLine[] {
-  const lines: ColoredLine[] = [];
-  let currentLine: ColoredLine = [];
-  let currentWidth = 0;
-
-  const flushLine = () => {
-    lines.push(currentLine.length > 0 ? currentLine : [{ text: "", color: "k" }]);
-    currentLine = [];
-    currentWidth = 0;
-  };
-
-  const pushPiece = (text: string, color: ManuscriptFgColor) => {
-    if (!text) return;
-    const last = currentLine[currentLine.length - 1];
-    if (last && last.color === color) {
-      last.text += text;
-    } else {
-      currentLine.push({ text, color });
-    }
-  };
-
-  for (const run of runs) {
-    const normalized = run.text.replace(/\r\n/g, "\n");
-    const paragraphs = normalized.split("\n");
-
-    for (let p = 0; p < paragraphs.length; p += 1) {
-      if (p > 0) flushLine();
-      const chars = Array.from(paragraphs[p]);
-      let pending = "";
-
-      for (let i = 0; i < chars.length; i += 1) {
-        const ch = chars[i];
-        const trial = pending + ch;
-        const trialWidth = doc.getTextWidth(trial);
-        if (currentWidth + trialWidth <= maxWidth) {
-          pending = trial;
-          continue;
-        }
-
-        // 넘침 — pending 확정 후 새 줄
-        if (pending) {
-          const spaceIdx = pending.lastIndexOf(" ");
-          if (spaceIdx > 0 && /[A-Za-z0-9]/.test(ch)) {
-            pushPiece(pending.slice(0, spaceIdx), run.color);
-            flushLine();
-            pending = pending.slice(spaceIdx + 1) + ch;
-            currentWidth = doc.getTextWidth(pending);
-          } else {
-            pushPiece(pending, run.color);
-            flushLine();
-            pending = ch === " " ? "" : ch;
-            currentWidth = pending ? doc.getTextWidth(pending) : 0;
-          }
-        } else if (currentLine.length > 0) {
-          flushLine();
-          pending = ch === " " ? "" : ch;
-          currentWidth = pending ? doc.getTextWidth(pending) : 0;
-        } else {
-          pushPiece(ch, run.color);
-          flushLine();
-          pending = "";
-          currentWidth = 0;
-        }
-      }
-      if (pending) {
-        pushPiece(pending, run.color);
-        currentWidth += doc.getTextWidth(pending);
-      }
-    }
-  }
-
-  if (currentLine.length > 0 || lines.length === 0) flushLine();
-  return lines;
-}
-
-function registerFont(doc: jsPDF, base64: string): void {
-  doc.addFileToVFS(FONT_FILE, base64);
-  doc.addFont(FONT_FILE, FONT_NAME, "normal");
-  doc.setFont(FONT_NAME, "normal");
-}
-
-function applyFgColor(doc: jsPDF, color: ManuscriptFgColor): void {
-  const [r, g, b] = MANUSCRIPT_FG_PDF[color];
-  doc.setTextColor(r, g, b);
-}
-
-function drawColoredLine(
-  doc: jsPDF,
-  line: ColoredLine,
-  x: number,
-  y: number,
-): void {
-  let cursorX = x;
-  for (const run of line) {
-    if (!run.text) continue;
-    applyFgColor(doc, run.color);
-    doc.text(run.text, cursorX, y);
-    cursorX += doc.getTextWidth(run.text);
-  }
-  // 기본색 복원 (푸터 등)
-  doc.setTextColor(0);
-}
-
-/** 제목 등 단색 줄바꿈 (기존 로직) */
-function wrapPlainText(doc: jsPDF, text: string, maxWidth: number): string[] {
+): string[] {
   if (!text) return [""];
+
   const lines: string[] = [];
   const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
 
@@ -175,8 +64,10 @@ function wrapPlainText(doc: jsPDF, text: string, maxWidth: number): string[] {
       lines.push("");
       continue;
     }
+
     let current = "";
     const chars = Array.from(paragraph);
+
     for (let i = 0; i < chars.length; i += 1) {
       const ch = chars[i];
       const next = current + ch;
@@ -184,7 +75,10 @@ function wrapPlainText(doc: jsPDF, text: string, maxWidth: number): string[] {
         current = next;
         continue;
       }
+
+      // 넘침 — 현재 줄 확정
       if (current) {
+        // 영단어 중간이면 마지막 공백까지 되돌림
         const spaceIdx = current.lastIndexOf(" ");
         if (spaceIdx > 0 && /[A-Za-z0-9]/.test(ch)) {
           lines.push(current.slice(0, spaceIdx));
@@ -194,13 +88,21 @@ function wrapPlainText(doc: jsPDF, text: string, maxWidth: number): string[] {
           current = ch === " " ? "" : ch;
         }
       } else {
+        // 한 글자도 안 들어가면 강제 한 글자
         lines.push(ch);
         current = "";
       }
     }
     if (current) lines.push(current);
   }
+
   return lines;
+}
+
+function registerFont(doc: jsPDF, base64: string): void {
+  doc.addFileToVFS(FONT_FILE, base64);
+  doc.addFont(FONT_FILE, FONT_NAME, "normal");
+  doc.setFont(FONT_NAME, "normal");
 }
 
 export async function exportAsPdf(payload: ExportPayload): Promise<boolean> {
@@ -222,7 +124,7 @@ export async function exportAsPdf(payload: ExportPayload): Promise<boolean> {
 
   const title = payload.projectTitle || payload.title;
 
-  // 표지 제목은 별도 렌더 — 본문에는 Document/부록만 (색상 마커 유지)
+  // 표지 제목은 별도 렌더 — 본문에는 Document/부록만
   const bodyChunks: string[] = [];
   for (let i = 0; i < payload.documents.length; i += 1) {
     const docBlock = payload.documents[i];
@@ -247,7 +149,7 @@ export async function exportAsPdf(payload: ExportPayload): Promise<boolean> {
 
   // —— 표지 제목 (첫 페이지 상단) ——
   doc.setFontSize(18);
-  const titleLines = wrapPlainText(doc, title, contentWidth);
+  const titleLines = wrapText(doc, title, contentWidth);
   let y = margin;
   for (const line of titleLines) {
     doc.text(line, pageWidth / 2, y, { align: "center" });
@@ -256,11 +158,7 @@ export async function exportAsPdf(payload: ExportPayload): Promise<boolean> {
   y += 6;
   doc.setFontSize(fontSize);
 
-  const contentLines = wrapColoredRuns(
-    doc,
-    parseManuscriptColorRuns(bodyText),
-    contentWidth,
-  );
+  const contentLines = wrapText(doc, bodyText, contentWidth);
 
   const drawFooter = (pageNumber: number) => {
     doc.setFontSize(9);
@@ -293,11 +191,7 @@ export async function exportAsPdf(payload: ExportPayload): Promise<boolean> {
       drawFooter(pageNumber);
       y = topContent;
     }
-    if (line.length === 1 && !line[0].text) {
-      // 빈 줄
-    } else {
-      drawColoredLine(doc, line, margin, y);
-    }
+    doc.text(line || " ", margin, y);
     y += lineHeight;
   }
 

@@ -48,11 +48,6 @@ export interface CharacterMentionFieldProps {
   onSectionBreak?: (
     cursorOffset: number,
   ) => { caretOffset: number } | null;
-  /**
-   * 색상 마커가 포함된 저장 본문.
-   * 지정 시 에디터에 색상 오버레이를 표시한다 (value 는 마커 제거본).
-   */
-  colorSource?: string;
 }
 
 interface CaretMenuPosition {
@@ -99,7 +94,6 @@ export function CharacterMentionField({
   onOpenCharacter,
   onMentionActiveChange,
   onSectionBreak,
-  colorSource,
 }: CharacterMentionFieldProps) {
   const localRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = editorRef ?? localRef;
@@ -293,7 +287,6 @@ export function CharacterMentionField({
         <ManuscriptEditor
           ref={textareaRef}
           value={value}
-          colorSource={colorSource}
           onChange={(next) => {
             onChange(next);
             requestAnimationFrame(syncMentionFromCursor);
