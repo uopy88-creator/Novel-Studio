@@ -317,6 +317,7 @@ export function memoToRow(memo: Memo, userId: string): DbMemoRow {
     character_id: memo.characterId ?? null,
     foreshadowing_id: memo.foreshadowingId ?? null,
     section_stable_id: memo.sectionStableId ?? null,
+    source_text: memo.sourceText ?? null,
     tags: memo.tags ?? [],
     created_at: memo.createdAt,
     updated_at: memo.updatedAt,
@@ -336,6 +337,7 @@ export function rowToMemo(row: DbMemoRow): Memo {
     foreshadowingId:
       (row.foreshadowing_id as ForeshadowingId | null) ?? undefined,
     sectionStableId: row.section_stable_id ?? undefined,
+    sourceText: row.source_text ?? undefined,
     tags: row.tags ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,

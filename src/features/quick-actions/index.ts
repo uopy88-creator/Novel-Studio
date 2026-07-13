@@ -31,4 +31,5 @@ export type { QuickActionsProps } from "@/features/quick-actions/components/Quic
 export {
   createSentenceAssistantAction,
   createInspirationSaveAction,
+  createMemoSaveAction,
 } from "@/features/quick-actions/actions/manuscript-actions";

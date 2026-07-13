@@ -43,3 +43,19 @@ export function createInspirationSaveAction(options: {
     },
   };
 }
+
+/** Memo 만들기 — 선택 텍스트를 본문에 미리 채움 */
+export function createMemoSaveAction(options: {
+  openMemo: (selection: QuickActionSelection) => void;
+}): QuickAction {
+  return {
+    id: "memo-save",
+    label: "Memo 만들기",
+    icon: "📝",
+    priority: 30,
+    isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
+    execute: (ctx) => {
+      options.openMemo(ctx.selection);
+    },
+  };
+}

@@ -31,6 +31,8 @@ import { InspirationModal } from "@/features/inspiration/components/InspirationM
 import { findSectionStableIdAtOffset } from "@/features/sections";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
+import { createMemo } from "@/features/memo/lib/memo-storage";
+import { MemoModal } from "@/features/memo/components/MemoModal";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
 import { StatisticsPanel } from "@/features/manuscript/components/StatisticsPanel";
 import { AutoSaveIndicator } from "@/features/manuscript/components/AutoSaveIndicator";
@@ -48,6 +50,7 @@ import {
   createActionEngine,
   createActionRegistry,
   createInspirationSaveAction,
+  createMemoSaveAction,
   createSentenceAssistantAction,
 } from "@/features/quick-actions";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
@@ -158,6 +161,8 @@ export function ManuscriptWorkspace({
   );
   const [pendingSelection, setPendingSelection] =
     useState<TextSelectionRange | null>(null);
+  const [pendingMemoSelection, setPendingMemoSelection] =
+    useState<TextSelectionRange | null>(null);
   const [viewingInspiration, setViewingInspiration] =
     useState<Inspiration | null>(null);
   const [deletingInspiration, setDeletingInspiration] =
@@ -187,6 +192,11 @@ export function ManuscriptWorkspace({
       createInspirationSaveAction({
         saveInspiration: (selection) => {
           setPendingSelection(selection);
+        },
+      }),
+      createMemoSaveAction({
+        openMemo: (selection) => {
+          setPendingMemoSelection(selection);
         },
       }),
     ]);
@@ -580,6 +590,30 @@ export function ManuscriptWorkspace({
             });
             setPendingSelection(null);
             await refreshInspirations();
+          })();
+        }}
+      />
+
+      <MemoModal
+        open={Boolean(pendingMemoSelection)}
+        mode="create"
+        initialBody={pendingMemoSelection?.text ?? ""}
+        onClose={() => setPendingMemoSelection(null)}
+        onSubmit={(input) => {
+          if (!pendingMemoSelection) return;
+          void (async () => {
+            await createMemo(projectId, {
+              body: input.body,
+              isPinned: input.isPinned,
+              kind: "note",
+              sourceText: pendingMemoSelection.text,
+              sectionStableId:
+                findSectionStableIdAtOffset(
+                  content,
+                  pendingMemoSelection.start,
+                ) ?? undefined,
+            });
+            setPendingMemoSelection(null);
           })();
         }}
       />

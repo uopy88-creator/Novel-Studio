@@ -62,6 +62,13 @@ export interface Memo extends Timestamps {
   sectionStableId?: string;
 
   /**
+   * 원고에서 드래그해 만든 경우의 원문 선택 텍스트.
+   * body 와 따로 두어, 작가가 본문을 고쳐도 출처 문장을 남길 수 있다.
+   * (연결 UI 는 이후 단계)
+   */
+  sourceText?: string;
+
+  /**
    * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
    */
   chapterId?: ChapterId;

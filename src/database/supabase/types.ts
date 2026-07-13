@@ -125,6 +125,8 @@ export interface DbMemoRow {
   foreshadowing_id: string | null;
   /** Section 안정 ID — 마이그레이션 전 null 가능 */
   section_stable_id?: string | null;
+  /** 원고 선택 원문 — 마이그레이션 전 null 가능 */
+  source_text?: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;

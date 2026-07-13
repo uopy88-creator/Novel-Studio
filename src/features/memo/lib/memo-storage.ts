@@ -35,6 +35,7 @@ export interface MemoInput {
   isPinned?: boolean;
   isResolved?: boolean;
   sectionStableId?: Memo["sectionStableId"];
+  sourceText?: Memo["sourceText"];
   chapterId?: Memo["chapterId"];
   characterId?: Memo["characterId"];
   foreshadowingId?: Memo["foreshadowingId"];
@@ -97,6 +98,7 @@ export async function createMemo(
     isPinned: Boolean(input.isPinned),
     isResolved: Boolean(input.isResolved),
     sectionStableId: input.sectionStableId,
+    sourceText: input.sourceText?.trim() || undefined,
     chapterId: input.chapterId,
     characterId: input.characterId,
     foreshadowingId: input.foreshadowingId,
@@ -140,6 +142,10 @@ export async function updateMemo(
         patch.sectionStableId !== undefined
           ? patch.sectionStableId
           : all[index].sectionStableId,
+      sourceText:
+        patch.sourceText !== undefined
+          ? patch.sourceText.trim() || undefined
+          : all[index].sourceText,
       chapterId:
         patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
       characterId:
@@ -176,6 +182,10 @@ export async function updateMemo(
       patch.sectionStableId !== undefined
         ? patch.sectionStableId
         : all[index].sectionStableId,
+    sourceText:
+      patch.sourceText !== undefined
+        ? patch.sourceText.trim() || undefined
+        : all[index].sourceText,
     chapterId:
       patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
     characterId:
@@ -213,4 +223,22 @@ export async function deleteMemo(id: MemoId): Promise<boolean> {
   const after = before.filter((m) => m.id !== id);
   writeLocalMemos(after);
   return after.length < before.length;
+}
+
+/** pinned 우선, 그다음 최근 수정순 */
+export function sortMemos(memos: Memo[]): Memo[] {
+  return [...memos].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+
+export function filterMemos(memos: Memo[], query: string): Memo[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return memos;
+  return memos.filter(
+    (m) =>
+      m.body.toLowerCase().includes(q) ||
+      (m.sourceText?.toLowerCase().includes(q) ?? false),
+  );
 }

@@ -10,6 +10,7 @@ import {
   createActionEngine,
   createActionRegistry,
   createInspirationSaveAction,
+  createMemoSaveAction,
   createSentenceAssistantAction,
   type QuickAction,
   type QuickActionContext,
@@ -26,6 +27,7 @@ async function main() {
 
   let saOpened = false;
   let inspSaved = false;
+  let memoOpened = false;
 
   registry.register(
     createSentenceAssistantAction({
@@ -41,19 +43,27 @@ async function main() {
       },
     }),
   );
+  registry.register(
+    createMemoSaveAction({
+      openMemo: () => {
+        memoOpened = true;
+      },
+    }),
+  );
 
-  assert.equal(registry.size, 2);
+  assert.equal(registry.size, 3);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "inspiration-save"],
+    ["sentence-assistant", "inspiration-save", "memo-save"],
   );
 
   await engine.run("sentence-assistant", ctx);
   await engine.run("inspiration-save", ctx);
+  await engine.run("memo-save", ctx);
   assert.equal(saOpened, true);
   assert.equal(inspSaved, true);
+  assert.equal(memoOpened, true);
 
-  // —— Dummy Action: 등록만으로 버튼 목록에 나타나는지 ——
   const dummy: QuickAction = {
     id: "dummy-action",
     label: "Dummy",
@@ -69,7 +79,7 @@ async function main() {
   assert.ok(registry.has("dummy-action"));
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["dummy-action", "sentence-assistant", "inspiration-save"],
+    ["dummy-action", "sentence-assistant", "inspiration-save", "memo-save"],
   );
 
   let dummyRan = false;
@@ -82,12 +92,11 @@ async function main() {
   await engine.run("dummy-action", ctx);
   assert.equal(dummyRan, true);
 
-  // Dummy 제거 — 프로덕션 Registry 에 남지 않음
   registry.unregister("dummy-action");
   assert.equal(registry.has("dummy-action"), false);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "inspiration-save"],
+    ["sentence-assistant", "inspiration-save", "memo-save"],
   );
 
   console.log("quick-actions registry-selftest: ok");
