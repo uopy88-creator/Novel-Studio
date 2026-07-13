@@ -61,8 +61,9 @@ export const SECTION_METAS_STORAGE_KEY = "novel-studio:section-metas";
 export const SCENE_METAS_STORAGE_KEY = "novel-studio:scene-metas";
 
 /**
- * Chapter→Section 통합 마이그레이션 완료 플래그 (프로젝트별).
- * 값: JSON string[] of projectId
+ * @deprecated Migration 완료는 LocalStorage 플래그로 판단하지 않는다.
+ * Section 구조 여부(`isAlreadySectionStructure`)로만 판단한다.
+ * 하위 호환을 위해 키 문자열만 남긴다 — 신규 코드에서 쓰지 말 것.
  */
 export const SECTIONS_MIGRATION_FLAG_KEY =
   "novel-studio:sections-migration-done";

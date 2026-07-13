@@ -5,7 +5,8 @@
  * Architecture: Project → Manuscript (one hidden Document) → Sections
  *
  * UI 편집 대상은 primary Document 의 평탄한 Section 원고다.
- * 로드 시 ensure + Chapter→Section 마이그레이션을 한 번 수행한다.
+ * 로드 시 ensure + Chapter→Section 마이그레이션을 수행한다.
+ * (Migration 은 Section 구조 여부로만 판단 — LocalStorage 플래그 없음)
  * =============================================================================
  */
 
@@ -26,7 +27,6 @@ export async function loadProjectManuscript(
   content: string;
   primaryDocumentId: ChapterId;
 }> {
-  // 숨은 Manuscript Document 보장 + Chapter 블록 → Section 통합
   await ensureManuscriptDocument(projectId);
   const migration = await migrateProjectToSections(projectId);
 
@@ -34,20 +34,36 @@ export async function loadProjectManuscript(
   const primary =
     chapters.find((c) => c.id === migration.primaryDocumentId) ?? chapters[0];
 
-  const manuscript = primary
-    ? await getManuscriptByChapterId(projectId, primary.id)
-    : null;
+  if (!primary) {
+    return {
+      chapters,
+      content: migration.content,
+      primaryDocumentId: migration.primaryDocumentId as ChapterId,
+    };
+  }
+
+  const manuscript = await getManuscriptByChapterId(projectId, primary.id);
+
+  // null = 행 없음 (새 프로젝트) → migration 결과 또는 ""
+  // Manuscript 행이 있으면 content 사용 ("" 포함 = 실제 빈 원고)
+  // 조회 실패는 getManuscriptByChapterId 가 throw
+  let content: string;
+  if (manuscript == null) {
+    content = migration.content;
+  } else {
+    content = manuscript.content;
+  }
 
   return {
     chapters,
-    content: manuscript?.content ?? migration.content ?? "",
-    primaryDocumentId: (primary?.id ?? migration.primaryDocumentId) as ChapterId,
+    content,
+    primaryDocumentId: primary.id,
   };
 }
 
 /**
  * 통합 원고를 primary Document manuscript 에만 저장한다.
- * (다른 Document 행은 FK 호환용으로 비운 채 유지)
+ * 사용자 편집 경로이므로 빈 문자열(전체 삭제) 저장을 허용한다.
  */
 export async function saveProjectManuscript(params: {
   projectId: ProjectId;
@@ -65,6 +81,8 @@ export async function saveProjectManuscript(params: {
     projectId,
     chapterId: primaryId,
     content,
+    // 사용자가 textarea 에서 전부 비운 경우만 빈 저장 허용
+    allowEmptyOverwrite: true,
   });
   return { updatedAt: saved.updatedAt };
 }

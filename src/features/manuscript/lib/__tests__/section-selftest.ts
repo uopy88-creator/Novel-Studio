@@ -19,6 +19,8 @@ import {
 import {
   contentNeedsSectionMigration,
   flattenBodiesToSectionContent,
+  isAlreadySectionStructure,
+  projectNeedsSectionMigration,
   stripChapterDelimiters,
 } from "@/features/manuscript/lib/migrate-to-sections";
 import type { Chapter } from "@/features/manuscript/types/chapter";
@@ -200,6 +202,100 @@ Then something happened.`;
     fixed.map((s) => s.number),
     [1, 2, 3],
   );
+}
+
+// --- isAlreadySectionStructure: never re-migrate section manuscripts ---
+{
+  assert.equal(
+    isAlreadySectionStructure("#1 Opening ·ns:section_001\nHello"),
+    true,
+  );
+  assert.equal(
+    isAlreadySectionStructure(
+      "================\n⟦ns:chapter:x⟧ Ch\n================\nHi",
+    ),
+    false,
+  );
+  assert.equal(isAlreadySectionStructure("plain prose only"), false);
+  assert.equal(isAlreadySectionStructure(""), false);
+}
+
+// --- projectNeedsSectionMigration: section primary skips even with leftovers ---
+{
+  const chapters = [
+    makeChapter("c1", "Manuscript", 0),
+    makeChapter("c2", "Old", 1),
+  ];
+  const primaryId = "c1" as ChapterId;
+  const sectionPrimary = "#1 A ·ns:section_001\nBody A\n\n#2 B ·ns:section_002\nBody B";
+
+  // Already section structure on primary → false (do not re-flatten leftovers)
+  const bodiesLeftover = new Map([
+    [primaryId, sectionPrimary],
+    ["c2" as ChapterId, "Leftover chapter text"],
+  ]);
+  assert.equal(
+    projectNeedsSectionMigration(
+      chapters,
+      sectionPrimary + "\nLeftover",
+      bodiesLeftover,
+      primaryId,
+    ),
+    false,
+  );
+
+  // Multi non-empty plain docs → true
+  const bodiesMulti = new Map([
+    [primaryId, "First chapter body"],
+    ["c2" as ChapterId, "Second chapter body"],
+  ]);
+  assert.equal(
+    projectNeedsSectionMigration(
+      chapters,
+      "First chapter body\nSecond chapter body",
+      bodiesMulti,
+      primaryId,
+    ),
+    true,
+  );
+
+  // null body (missing row) must not be treated as empty-string source alone
+  const bodiesMissing = new Map([
+    [primaryId, null],
+    ["c2" as ChapterId, null],
+  ]);
+  assert.equal(
+    projectNeedsSectionMigration(chapters, "", bodiesMissing, primaryId),
+    false,
+  );
+
+  // New single empty project → false
+  const bodiesNew = new Map([[primaryId, ""]]);
+  assert.equal(
+    projectNeedsSectionMigration(
+      [chapters[0]],
+      "",
+      bodiesNew,
+      primaryId,
+    ),
+    false,
+  );
+}
+
+// --- null vs empty: flatten only uses present string bodies ---
+{
+  const chapters = [
+    makeChapter("c1", "A", 0),
+    makeChapter("c2", "B", 1),
+  ];
+  // Only c1 present — c2 omitted (null row), must not invent empty section
+  const bodies = new Map<ChapterId, string>([
+    ["c1" as ChapterId, "Only body"],
+  ]);
+  const content = flattenBodiesToSectionContent(chapters, bodies);
+  const sections = parseSections(content);
+  assert.equal(sections.length, 1);
+  assert.equal(sections[0].body, "Only body");
 }
 
 console.log("section-selftest: all assertions passed");

@@ -9,6 +9,8 @@
     "lint": "eslint",
     "validate:synonyms": "node ./scripts/validate-synonyms.mjs",
     "test:show-tell": "npx --yes tsx ./scripts/test-show-tell.ts",
+    "test:sections": "npx --yes tsx ./src/features/manuscript/lib/__tests__/section-selftest.ts",
+    "test:manuscript-stability": "npx --yes tsx ./src/features/manuscript/lib/__tests__/manuscript-stability-selftest.ts",
     "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
   },
   "dependencies": {
