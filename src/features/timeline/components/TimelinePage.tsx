@@ -186,7 +186,8 @@ export function TimelinePage({
                   index={index}
                   sectionLabel={
                     event.sectionStableId
-                      ? sectionLabelById.get(event.sectionStableId)
+                      ? (sectionLabelById.get(event.sectionStableId) ??
+                        "연결 해제됨")
                       : undefined
                   }
                   characterName={

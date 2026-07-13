@@ -157,23 +157,31 @@ export function TimelineEventModal({
           <span className="text-ns-sm font-medium text-ns-ink">
             관련 Section
           </span>
-          <select
-            value={sectionValue}
-            onChange={(e) => setSectionValue(e.target.value)}
-            className={cn(
-              "min-h-ns-touch w-full rounded-ns-md border border-ns-border bg-ns-surface px-ns-3",
-              "text-ns-sm text-ns-ink outline-none focus-visible:border-ns-accent",
-            )}
-          >
-            <option value="">연결 안 함</option>
-            {sectionOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          {sectionOptions.length === 0 ? (
+            <p className="rounded-ns-md border border-ns-border bg-ns-muted px-ns-3 py-ns-3 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
+              아직 Section이 없습니다.
+              <br />
+              먼저 Manuscript에서 Section을 생성하세요.
+            </p>
+          ) : (
+            <select
+              value={sectionValue}
+              onChange={(e) => setSectionValue(e.target.value)}
+              className={cn(
+                "min-h-ns-touch w-full rounded-ns-md border border-ns-border bg-ns-surface px-ns-3",
+                "text-ns-sm text-ns-ink outline-none focus-visible:border-ns-accent",
+              )}
+            >
+              <option value="">연결 안 함</option>
+              {sectionOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-ns-xs text-ns-ink-tertiary">
-            Manuscript의 Section과 연결합니다. (구 Chapter는 표시되지 않습니다)
+            Section ID로 연결합니다. 번호가 바뀌어도 연결은 유지됩니다.
           </span>
         </label>
 

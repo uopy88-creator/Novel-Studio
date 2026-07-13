@@ -4,14 +4,12 @@
  * =============================================================================
  * useTimelineEvents
  * -----------------------------------------------------------------------------
- * Timeline 사건 CRUD + 드래그 순서 + Section 동기화.
- *
- * Manuscript Section 이 추가·삭제·재정렬되면 sync 로 옵션/링크를 맞춘다.
- * (구 Chapter Document 목록은 더 이상 읽지 않는다.)
+ * Timeline 사건 CRUD + 드래그 순서.
+ * Section 목록은 Section Registry(SSOT) 를 구독한다 — 별도 조회 없음.
  * =============================================================================
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type { DocumentId, ProjectId, TimelineEventId } from "@/types/ids";
 import {
@@ -22,63 +20,118 @@ import {
   updateTimelineEvent,
   type TimelineEventInput,
 } from "@/features/timeline/lib/timeline-event-storage";
+import { syncTimelineEventsWithSectionRegistry } from "@/features/timeline/lib/timeline-section-sync";
 import {
-  syncTimelineEventsWithSections,
-} from "@/features/timeline/lib/timeline-section-sync";
-import type { TimelineSectionOption } from "@/features/timeline/lib/timeline-section-options";
+  timelineOptionsFromSectionRefs,
+  type TimelineSectionOption,
+} from "@/features/timeline/lib/timeline-section-options";
+import {
+  getSectionRegistrySnapshot,
+  useSectionRegistry,
+} from "@/features/sections";
 
 export function useTimelineEvents(projectId: ProjectId) {
+  const registry = useSectionRegistry(projectId);
+
   const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [sectionOptions, setSectionOptions] = useState<
-    TimelineSectionOption[]
-  >([]);
-  const [primaryDocumentId, setPrimaryDocumentId] =
-    useState<DocumentId | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
+  // Registry → 옵션 (Manuscript 와 동일한 SSOT, 추가 조회 없음)
+  const sectionOptions: TimelineSectionOption[] = useMemo(
+    () =>
+      timelineOptionsFromSectionRefs(
+        registry.sections,
+        registry.primaryDocumentId,
+      ),
+    [registry.sections, registry.primaryDocumentId],
+  );
+
+  const primaryDocumentId: DocumentId | null = registry.primaryDocumentId;
+
+  const normalizeWithRegistry = useCallback(
+    async (list: TimelineEvent[]) => {
+      const snap = getSectionRegistrySnapshot(projectId);
+      if (!snap.ready) return list;
+      const synced = await syncTimelineEventsWithSectionRegistry(list, snap);
+      return synced.events;
+    },
+    [projectId],
+  );
+
+  // 사건 목록 로드 (프로젝트당 1회 경로) + Registry 준비 시 링크 정규화
+  useEffect(() => {
+    let cancelled = false;
+    setIsReady(false);
+
+    void (async () => {
+      try {
+        const list = await readTimelineEventsByProject(projectId);
+        if (cancelled) return;
+        const normalized = await normalizeWithRegistry(list);
+        if (cancelled) return;
+        setEvents(normalized);
+        setError(null);
+      } catch (err) {
+        console.error("[useTimelineEvents] load failed", err);
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Timeline을 불러오지 못했습니다.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, normalizeWithRegistry]);
+
+  // Section 추가/삭제/이름변경/재정렬 → Registry generation 변경 시 링크만 재정규화
+  useEffect(() => {
+    if (!registry.ready || !isReady) return;
+
+    let cancelled = false;
+    void (async () => {
+      const normalized = await normalizeWithRegistry(eventsRef.current);
+      if (cancelled) return;
+      setEvents(normalized);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    registry.ready,
+    registry.generation,
+    isReady,
+    normalizeWithRegistry,
+  ]);
 
   const refresh = useCallback(async () => {
     try {
       const list = await readTimelineEventsByProject(projectId);
-      const synced = await syncTimelineEventsWithSections(projectId, list);
-      setEvents(synced.events);
-      setSectionOptions(synced.options);
-      setPrimaryDocumentId(synced.primaryDocumentId);
+      const normalized = await normalizeWithRegistry(list);
+      setEvents(normalized);
       setError(null);
     } catch (err) {
-      console.error("[useTimelineEvents] load failed", err);
+      console.error("[useTimelineEvents] refresh failed", err);
       setError(
         err instanceof Error ? err.message : "Timeline을 불러오지 못했습니다.",
       );
-    } finally {
-      setIsReady(true);
     }
-  }, [projectId]);
-
-  useEffect(() => {
-    setIsReady(false);
-    void refresh();
-  }, [refresh]);
-
-  // Section 페이지에서 추가/삭제 후 돌아올 때 옵션 갱신
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      void refresh();
-    };
-    window.addEventListener("focus", onVisible);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", onVisible);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [refresh]);
+  }, [projectId, normalizeWithRegistry]);
 
   const create = useCallback(
     async (input: TimelineEventInput) => {
       const created = await createTimelineEvent(projectId, {
         ...input,
-        // 항상 primary Manuscript 에 연결
         documentId: input.documentId || primaryDocumentId || "",
       });
       await refresh();
@@ -139,6 +192,7 @@ export function useTimelineEvents(projectId: ProjectId) {
     events,
     sectionOptions,
     primaryDocumentId,
+    sectionsReady: registry.ready,
     isReady,
     error,
     refresh,

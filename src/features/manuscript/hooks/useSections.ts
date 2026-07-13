@@ -46,6 +46,11 @@ import {
   withSectionMemo,
   withSectionStatus,
 } from "@/features/manuscript/lib/section-meta-storage";
+import {
+  isEmptyManuscriptContent,
+  publishSections,
+  sectionRefsFromSections,
+} from "@/features/sections";
 
 type MetaSlice = {
   status: SectionStatus;
@@ -163,6 +168,18 @@ export function useSections(
       }),
     [parsed, metaByNumber],
   );
+
+  // Section Registry (SSOT) — Manuscript 가 관리, Timeline 등은 구독만
+  useEffect(() => {
+    const refs = isEmptyManuscriptContent(content)
+      ? []
+      : sectionRefsFromSections(sections);
+    publishSections(projectId, {
+      sections: refs,
+      primaryDocumentId: documentId,
+      source: "live",
+    });
+  }, [projectId, documentId, content, sections]);
 
   useEffect(() => {
     const pending = pendingCollapseNumbersRef.current;

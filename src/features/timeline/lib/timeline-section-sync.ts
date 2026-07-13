@@ -2,53 +2,55 @@
  * =============================================================================
  * Timeline ↔ Section 동기화
  * -----------------------------------------------------------------------------
- * - 구 Chapter/Document 에 묶인 사건 링크를 primary Manuscript 로 옮긴다.
  * - 삭제된 Section 을 가리키는 링크는 제거한다 (사건은 유지, 연결만 해제).
- * - Section 선택 라벨은 현재 Manuscript 순서를 따른다.
+ * - Section 목록은 Registry 스냅샷을 사용한다 (재조회 없음).
  * =============================================================================
  */
 
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
-import type { DocumentId, ProjectId } from "@/types/ids";
-import { loadProjectManuscript } from "@/features/manuscript/lib/project-manuscript";
-import { parseSections } from "@/features/manuscript/lib/section-parser";
+import type { DocumentId } from "@/types/ids";
 import {
-  loadTimelineSectionOptions,
+  timelineOptionsFromSectionRefs,
   type TimelineSectionOption,
 } from "@/features/timeline/lib/timeline-section-options";
 import { updateTimelineEvent } from "@/features/timeline/lib/timeline-event-storage";
+import type { SectionRegistrySnapshot } from "@/features/sections/section-registry";
 
 export interface TimelineSectionSyncResult {
   options: TimelineSectionOption[];
   /** 화면용으로 정규화된 사건 */
   events: TimelineEvent[];
-  /** primary Manuscript Document ID */
-  primaryDocumentId: DocumentId;
+  /** primary Manuscript Document ID (딥링크용) */
+  primaryDocumentId: DocumentId | null;
 }
 
 /**
  * 사건 목록을 현재 Section 집합에 맞춰 정규화한다.
- * - documentId → 항상 primary
- * - sectionStableId 가 현재 Manuscript 에 없으면 링크 제거
+ * - sectionStableId 가 현재 Registry 에 없으면 링크 제거 (오류 없음)
+ * - documentId → 가능하면 primary 로 맞춤
  */
 export function normalizeTimelineEventsToSections(
   events: TimelineEvent[],
   options: TimelineSectionOption[],
-  primaryDocumentId: DocumentId,
+  primaryDocumentId: DocumentId | null,
 ): TimelineEvent[] {
   const validIds = new Set(options.map((o) => o.sectionStableId));
 
   return events.map((event) => {
     const sectionId = event.sectionStableId;
     if (!sectionId) {
-      if (event.documentId && event.documentId !== primaryDocumentId) {
+      if (
+        primaryDocumentId &&
+        event.documentId &&
+        event.documentId !== primaryDocumentId
+      ) {
         return { ...event, documentId: primaryDocumentId };
       }
       return event;
     }
 
     if (!validIds.has(sectionId)) {
-      // 삭제된 Section / 구 Chapter 잔여 — 연결만 해제
+      // 삭제된 Section — 연결만 해제 (사건 자체는 유지)
       return {
         ...event,
         documentId: undefined,
@@ -56,7 +58,7 @@ export function normalizeTimelineEventsToSections(
       };
     }
 
-    if (event.documentId !== primaryDocumentId) {
+    if (primaryDocumentId && event.documentId !== primaryDocumentId) {
       return { ...event, documentId: primaryDocumentId };
     }
     return event;
@@ -91,27 +93,22 @@ export async function persistTimelineSectionSync(
 }
 
 /**
- * Section 옵션 로드 + 사건 링크 정규화(+저장).
- * 새 Section / 삭제 / 순서 변경이 Manuscript 에 반영된 뒤 Timeline 이 이를 따른다.
+ * Registry 스냅샷으로 옵션을 만들고 사건 링크를 정규화한다.
+ * Manuscript 를 다시 조회하지 않는다.
  */
-export async function syncTimelineEventsWithSections(
-  projectId: ProjectId,
+export async function syncTimelineEventsWithSectionRegistry(
   events: TimelineEvent[],
+  registry: SectionRegistrySnapshot,
 ): Promise<TimelineSectionSyncResult> {
-  const [{ primaryDocumentId }, options] = await Promise.all([
-    loadProjectManuscript(projectId),
-    loadTimelineSectionOptions(projectId),
-  ]);
-
-  // options 의 documentId 가 primary 와 일치하는지 한 번 더 맞춤
-  const alignedOptions = options.map((opt) => ({
-    ...opt,
-    documentId: primaryDocumentId,
-  }));
+  const primaryDocumentId = registry.primaryDocumentId;
+  const options = timelineOptionsFromSectionRefs(
+    registry.sections,
+    primaryDocumentId,
+  );
 
   const normalized = normalizeTimelineEventsToSections(
     events,
-    alignedOptions,
+    options,
     primaryDocumentId,
   );
 
@@ -125,18 +122,18 @@ export async function syncTimelineEventsWithSections(
   }
 
   return {
-    options: alignedOptions,
+    options,
     events: normalized,
     primaryDocumentId,
   };
 }
 
 /**
- * 현재 Manuscript Section 안정 ID 집합 (테스트·검증용).
+ * @deprecated syncTimelineEventsWithSectionRegistry 사용
  */
-export async function listCurrentSectionStableIds(
-  projectId: ProjectId,
-): Promise<Set<string>> {
-  const { content } = await loadProjectManuscript(projectId);
-  return new Set(parseSections(content ?? "").map((s) => s.id));
+export async function syncTimelineEventsWithSections(
+  events: TimelineEvent[],
+  registry: SectionRegistrySnapshot,
+): Promise<TimelineSectionSyncResult> {
+  return syncTimelineEventsWithSectionRegistry(events, registry);
 }

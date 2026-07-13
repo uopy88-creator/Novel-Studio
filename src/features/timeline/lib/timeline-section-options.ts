@@ -1,31 +1,33 @@
 /**
  * =============================================================================
- * Timeline ↔ Section 옵션
+ * Timeline ↔ Section 옵션 (Registry 어댑터)
  * -----------------------------------------------------------------------------
- * Architecture: Project → Manuscript → Sections
- *
- * Timeline 은 Section 만 사용한다.
- * 예전 multi-Document(Chapter) 원고는 무시하고, primary Manuscript 의
- * Section 목록만 Section 순서(#N)대로 제공한다.
+ * Section 목록은 Section Registry(SSOT) 에서만 온다.
+ * Documents(Chapter) 를 조회하지 않는다.
  * =============================================================================
  */
 
-import type { DocumentId, ProjectId } from "@/types/ids";
-import { loadProjectManuscript } from "@/features/manuscript/lib/project-manuscript";
-import { parseSections } from "@/features/manuscript/lib/section-parser";
+import type { DocumentId } from "@/types/ids";
+import {
+  formatSectionRefLabel,
+  type SectionRef,
+} from "@/features/sections/section-registry";
 
-/** Section 선택지 — Document(구 Chapter) 제목은 노출하지 않는다 */
+/** Section 선택지 — Registry SectionRef 를 Timeline UI 에 맞게 변환 */
 export interface TimelineSectionOption {
-  /** select value — section 안정 ID (또는 레거시 `${documentId}::${id}`) */
+  /** select value — section 안정 ID */
   value: string;
-  /** 숨은 Manuscript Document ID (저장용, UI 비표시) */
+  /**
+   * 숨은 primary Manuscript Document ID (딥링크 저장용).
+   * Section 목록 소스가 아니다.
+   */
   documentId: DocumentId;
   /** Section 안정 ID — section_001 / 레거시 scene_001 */
   sectionStableId: string;
-  /** Manuscript 안 Section 순서 (1-based) */
+  /** Manuscript 안 Section 표시 번호 (1-based) */
   sectionNumber: number;
   sectionTitle: string;
-  /** UI 라벨 — `1. 제목` */
+  /** UI 라벨 — `#1 프롤로그` */
   label: string;
 }
 
@@ -41,7 +43,6 @@ export function encodeSectionOptionValue(
   documentId: string,
   sectionStableId: string,
 ): string {
-  // UI value 는 section id 단독. documentId 는 제출 시 primary 로 채운다.
   void documentId;
   return sectionStableId;
 }
@@ -75,28 +76,36 @@ export function decodeSectionOptionValue(
 export const decodeSceneOptionValue = decodeSectionOptionValue;
 
 /**
- * primary Manuscript 의 Section 만 로드한다.
- * Section 순서 = Manuscript 파서 순서 (reorder 와 동일).
+ * Registry SectionRef → Timeline 선택 옵션.
+ * documentId 는 딥링크용 primary 만 붙인다 (목록 조회에 사용하지 않음).
  */
-export async function loadTimelineSectionOptions(
-  projectId: ProjectId,
-): Promise<TimelineSectionOption[]> {
-  const { content, primaryDocumentId } =
-    await loadProjectManuscript(projectId);
-  const sections = parseSections(content ?? "");
-
-  return sections.map((section) => {
-    const sectionTitle = section.title.trim() || "제목 없음";
-    return {
-      value: section.id,
-      documentId: primaryDocumentId,
-      sectionStableId: section.id,
-      sectionNumber: section.number,
-      sectionTitle,
-      label: `${section.number}. ${sectionTitle}`,
-    };
-  });
+export function timelineOptionsFromSectionRefs(
+  refs: SectionRef[],
+  primaryDocumentId: DocumentId | null,
+): TimelineSectionOption[] {
+  const documentId = (primaryDocumentId ?? "") as DocumentId;
+  return refs.map((ref) => ({
+    value: ref.id,
+    documentId,
+    sectionStableId: ref.id,
+    sectionNumber: ref.number,
+    sectionTitle: ref.title,
+    label: formatSectionRefLabel(ref),
+  }));
 }
 
-/** @deprecated loadTimelineSectionOptions 별칭 */
+/**
+ * @deprecated Registry 를 사용하세요. 하위 호환용 no-op 래퍼는 제거됨 —
+ * sync / hook 이 Registry 스냅샷을 직접 쓴다.
+ */
+export async function loadTimelineSectionOptions(): Promise<
+  TimelineSectionOption[]
+> {
+  console.warn(
+    "[timeline-section-options] loadTimelineSectionOptions is deprecated; use Section Registry",
+  );
+  return [];
+}
+
+/** @deprecated */
 export const loadTimelineSceneOptions = loadTimelineSectionOptions;

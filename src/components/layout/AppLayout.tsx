@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { GlobalSearchModal } from "@/features/global-search";
+import { SectionRegistryProvider } from "@/features/sections";
 import { getProjectById } from "@/features/projects/lib/project-storage";
 import { SIDEBAR_COLLAPSED_KEY } from "@/lib/storage/keys";
 import {
@@ -31,6 +32,7 @@ import {
   writeStorageString,
 } from "@/lib/storage/browser";
 import { cn } from "@/lib/utils/cn";
+import type { ProjectId } from "@/types/ids";
 
 export interface AppLayoutProps {
   /** URL의 작품 ID */
@@ -93,34 +95,36 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex min-h-dvh min-h-screen bg-ns-canvas text-ns-ink">
-      <Sidebar
-        projectId={projectId}
-        collapsed={collapsed}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-        onToggleCollapsed={toggleCollapsed}
-      />
-
-      <div className={cn("flex min-w-0 flex-1 flex-col")}>
-        <Header
-          projectTitle={projectTitle}
-          titleLoading={titleLoading}
-          onOpenMobileMenu={() => setMobileOpen(true)}
-          onOpenSearch={openSearch}
+    <SectionRegistryProvider projectId={projectId as ProjectId}>
+      <div className="flex min-h-dvh min-h-screen bg-ns-canvas text-ns-ink">
+        <Sidebar
+          projectId={projectId}
+          collapsed={collapsed}
+          mobileOpen={mobileOpen}
+          onCloseMobile={() => setMobileOpen(false)}
+          onToggleCollapsed={toggleCollapsed}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-ns-canvas">
-          {children}
-        </main>
-      </div>
+        <div className={cn("flex min-w-0 flex-1 flex-col")}>
+          <Header
+            projectTitle={projectTitle}
+            titleLoading={titleLoading}
+            onOpenMobileMenu={() => setMobileOpen(true)}
+            onOpenSearch={openSearch}
+          />
 
-      <GlobalSearchModal
-        open={searchOpen}
-        onClose={closeSearch}
-        projectId={projectId}
-        projectName={projectTitle}
-      />
-    </div>
+          <main className="min-h-0 flex-1 overflow-y-auto bg-ns-canvas">
+            {children}
+          </main>
+        </div>
+
+        <GlobalSearchModal
+          open={searchOpen}
+          onClose={closeSearch}
+          projectId={projectId}
+          projectName={projectTitle}
+        />
+      </div>
+    </SectionRegistryProvider>
   );
 }
