@@ -26,7 +26,6 @@ import { replaceMentionNameInText } from "@/features/characters/lib/mention";
 import { CharacterMentionField } from "@/features/characters/components/CharacterMentionField";
 import { CharacterFormModal } from "@/features/characters/components/CharacterFormModal";
 import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
-import { InspirationSelectionMenu } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { InspirationGutter } from "@/features/inspiration/components/InspirationGutter";
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
@@ -39,7 +38,17 @@ import { useManuscriptVersions } from "@/features/manuscript/hooks/useManuscript
 import { useAutoRecovery } from "@/features/manuscript/hooks/useAutoRecovery";
 import { AutoRecoveryDialog } from "@/features/manuscript/components/AutoRecoveryDialog";
 import { ExportModal } from "@/features/export/components/ExportModal";
-import { SentenceAssistantHost } from "@/features/sentence-assistant";
+import {
+  SentenceAssistantHost,
+  type SentenceAssistantHostHandle,
+} from "@/features/sentence-assistant";
+import {
+  QuickActions,
+  createActionEngine,
+  createActionRegistry,
+  createInspirationSaveAction,
+  createSentenceAssistantAction,
+} from "@/features/quick-actions";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
@@ -139,6 +148,7 @@ export function ManuscriptWorkspace({
   } = useInspirations(projectId);
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const sentenceAssistantRef = useRef<SentenceAssistantHostHandle>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [profileId, setProfileId] = useState<CharacterId | null>(null);
   const [mentionActive, setMentionActive] = useState(false);
@@ -164,6 +174,23 @@ export function ManuscriptWorkspace({
       cancelled = true;
     };
   }, [projectId]);
+
+  // Quick Actions: Registry 에 Action 등록 → UI 버튼 자동 생성 (하드코딩 없음)
+  const quickActionEngine = useMemo(() => {
+    const registry = createActionRegistry([
+      createSentenceAssistantAction({
+        openAssistant: (selection) => {
+          sentenceAssistantRef.current?.openFromSelection(selection);
+        },
+      }),
+      createInspirationSaveAction({
+        saveInspiration: (selection) => {
+          setPendingSelection(selection);
+        },
+      }),
+    ]);
+    return createActionEngine(registry);
+  }, []);
 
   // 열린 프로필은 스냅샷이 아니라 live characters 에서 id 로 해석
   const profileCharacter = useMemo(
@@ -469,14 +496,13 @@ export function ManuscriptWorkspace({
                   return { caretOffset: result.caretOffset };
                 }}
               />
-              <InspirationSelectionMenu
+              <QuickActions
                 textareaRef={editorRef}
+                engine={quickActionEngine}
                 enabled={Boolean(primaryDocumentId) && !mentionActive}
-                onAddInspiration={(selection) =>
-                  setPendingSelection(selection)
-                }
               />
               <SentenceAssistantHost
+                ref={sentenceAssistantRef}
                 textareaRef={editorRef}
                 enabled={Boolean(primaryDocumentId)}
                 onReplaceSelection={(nextContent, caretStart, caretEnd) => {

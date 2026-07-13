@@ -6,11 +6,14 @@
  */
 
 export { SentenceAssistantHost } from "./components/SentenceAssistantHost";
+export type {
+  SentenceAssistantHostProps,
+  SentenceAssistantHostHandle,
+} from "./components/SentenceAssistantHost";
 export { SentenceAssistantPanel } from "./components/SentenceAssistantPanel";
 export { SentenceAssistantWord } from "./components/SentenceAssistantWord";
 export { SentenceAssistantExpression } from "./components/SentenceAssistantExpression";
 export { SentenceAssistantShowTell } from "./components/SentenceAssistantShowTell";
-export type { SentenceAssistantHostProps } from "./components/SentenceAssistantHost";
 export type { SentenceAssistantPanelProps } from "./components/SentenceAssistantPanel";
 export type { SentenceAssistantWordProps } from "./components/SentenceAssistantWord";
 export type { SentenceAssistantExpressionProps } from "./components/SentenceAssistantExpression";
