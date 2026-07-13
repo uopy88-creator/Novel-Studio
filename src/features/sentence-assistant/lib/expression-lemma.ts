@@ -10,7 +10,7 @@ export {
 
 import { lemmaEngine } from "@/features/sentence-assistant/engines/lemma/LemmaEngine";
 
-/** @deprecated use lemmaEngine.resolve */
+/** @deprecated use lemmaEngine.resolve / analyze */
 export function resolveExpressionLemma(
   rawWord: string,
   headwords: ReadonlySet<string> | ReadonlyMap<string, unknown>,

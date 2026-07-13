@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * 단어 뜻 조회 훅 — Core → Dictionary Engine
+ * 단어 뜻 조회 훅 — Core → Lemma → Dictionary Engine
+ * 선택 원문은 화면에 그대로 두고, 검색은 기본형으로 수행한다.
  */
 
 import { useEffect, useState } from "react";
@@ -14,10 +15,14 @@ export type DictionaryLoadState =
   | { status: "ready"; result: DictionaryLookupResult };
 
 export function useDictionaryLookup(selectedText: string): {
+  /** 작가가 선택한 원문(정규화) — UI 「선택」표시용 */
   query: string;
+  /** Lemma Engine 기본형 — 실제 사전 검색어 */
+  lemma: string;
   state: DictionaryLoadState;
 } {
   const query = sentenceAssistantCore.normalizeQuery(selectedText);
+  const lemma = query ? sentenceAssistantCore.resolveLemma(query) : "";
   const [state, setState] = useState<DictionaryLoadState>({ status: "idle" });
 
   useEffect(() => {
@@ -34,6 +39,7 @@ export function useDictionaryLookup(selectedText: string): {
 
     void (async () => {
       try {
+        // Core 가 내부에서 Lemma → Dictionary 순으로 처리
         const result = await sentenceAssistantCore.lookupDefinition(
           query,
           controller.signal,
@@ -44,13 +50,13 @@ export function useDictionaryLookup(selectedText: string): {
         if (controller.signal.aborted) return;
         setState({
           status: "ready",
-          result: { status: "error", query },
+          result: { status: "error", query: lemma || query },
         });
       }
     })();
 
     return () => controller.abort();
-  }, [query]);
+  }, [query, lemma]);
 
-  return { query, state };
+  return { query, lemma, state };
 }

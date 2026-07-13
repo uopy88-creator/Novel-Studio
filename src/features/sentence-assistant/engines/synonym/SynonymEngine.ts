@@ -2,7 +2,9 @@
  * =============================================================================
  * Synonym Engine — Novel Studio 유의어 DB
  * -----------------------------------------------------------------------------
- * JSON 인덱스 조회. Lemma Engine 으로 활용형을 기본형으로 맞춘 뒤 검색한다.
+ * JSON 인덱스 조회.
+ * 기본형은 Core / Lemma Engine 과 동일한 LemmaEngine 인스턴스로 분석한다.
+ * (단어 뜻과 같은 엔진 — 중복 구현 없음)
  * =============================================================================
  */
 
@@ -27,7 +29,7 @@ export class SynonymEngine {
 
   /**
    * 선택 단어에 대한 유의어 목록을 반환한다.
-   * 활용형이어도 기본형으로 찾아 유의어를 붙인다.
+   * Lemma Engine 으로 기본형을 맞춘 뒤 JSON 인덱스를 조회한다.
    */
   lookup(rawQuery: string): SynonymLookupResult {
     const query = normalizeDictionaryQuery(rawQuery);
@@ -41,6 +43,7 @@ export class SynonymEngine {
     );
     if (cached) return cached;
 
+    // 인덱스에 있는 후보를 우선 — 없으면 analyze() 형태 추정
     const lemma = this.lemma.resolve(query, SYNONYM_INDEX);
     const result: SynonymLookupResult = {
       query,

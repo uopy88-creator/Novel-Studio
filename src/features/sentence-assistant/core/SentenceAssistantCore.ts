@@ -46,7 +46,6 @@ import {
 } from "@/features/sentence-assistant/engines/synonym/SynonymEngine";
 import type { SynonymLookupResult } from "@/features/sentence-assistant/engines/synonym/synonym-types";
 import { normalizeDictionaryQuery } from "@/features/sentence-assistant/utils/normalize-query";
-import { SYNONYM_INDEX } from "@/data/synonyms";
 
 /** 통합 분석 결과 — 일부 필드만 실패해도 나머지는 채운다. */
 export interface CoreAnalysisResult {
@@ -142,35 +141,57 @@ export class SentenceAssistantCore {
     return this.registry.get(id) as T | undefined;
   }
 
-  /** Lemma Engine */
+  /**
+   * 공통 Lemma — Dictionary / Synonym / 향후 Engine 이 동일 경로를 쓴다.
+   * 형태 규칙만으로 분석한다 (표제어 인덱스 무관).
+   * 실패 시 원문 반환.
+   */
   resolveLemma(rawWord: string): string {
-    const result = safeSync(() =>
-      this.lemma.resolve(rawWord, SYNONYM_INDEX),
-    );
-    return result.ok ? result.value : rawWord.trim();
+    const query = this.normalizeQuery(rawWord);
+    if (!query) return "";
+    const result = safeSync(() => this.lemma.analyze(query));
+    return result.ok ? result.value : query;
   }
 
-  /** Dictionary Engine — 뜻 조회 */
+  /**
+   * Dictionary Engine — 뜻 조회
+   * 반드시 Lemma Engine 결과(기본형)로 API 를 호출한다.
+   * 예) 걸었다 → 걷다 → 국립국어원 검색
+   */
   async lookupDefinition(
     rawQuery: string,
     signal?: AbortSignal,
   ): Promise<DictionaryLookupResult> {
+    const surface = this.normalizeQuery(rawQuery);
+    if (!surface) {
+      return { status: "not_found", query: "" };
+    }
+
+    const lemma = this.resolveLemma(surface);
     const result = await safeAsync(() =>
-      this.dictionary.lookup(rawQuery, signal),
+      this.dictionary.lookup(lemma, signal),
     );
-    if (result.ok) return result.value;
+    if (result.ok) {
+      // query 필드는 실제 검색에 쓴 기본형으로 통일
+      return { ...result.value, query: lemma };
+    }
     return {
       status: "error",
-      query: this.normalizeQuery(rawQuery),
+      query: lemma,
     };
   }
 
-  /** Synonym Engine — 유의어 조회 (내부에서 Lemma 사용) */
+  /**
+   * Synonym Engine — 유의어 조회
+   * 동일한 Lemma Engine 결과(기본형)를 사용한다.
+   * SynonymEngine 내부에서도 lemma.resolve(인덱스 우선)를 호출한다.
+   */
   lookupSynonyms(rawQuery: string): SynonymLookupResult {
     const result = safeSync(() => this.synonym.lookup(rawQuery));
     if (result.ok) return result.value;
     const query = this.normalizeQuery(rawQuery);
-    return { query, lemma: query, synonyms: [] };
+    const lemma = this.resolveLemma(query);
+    return { query, lemma, synonyms: [] };
   }
 
   /** 기존 ExpressionService API 이름 호환 */
@@ -205,15 +226,12 @@ export class SentenceAssistantCore {
     signal?: AbortSignal,
   ): Promise<CoreAnalysisResult> {
     const query = this.normalizeQuery(raw);
-
-    const lemmaResult = safeSync(() =>
-      this.lemma.resolve(query, SYNONYM_INDEX),
-    );
-    const lemma = lemmaResult.ok ? lemmaResult.value : query;
+    const lemma = this.resolveLemma(query);
 
     const [dictionaryResult, synonymResult, showTellResult] =
       await Promise.all([
-        safeAsync(() => this.dictionary.lookup(query, signal)),
+        // Dictionary 도 기본형으로 검색
+        safeAsync(() => this.dictionary.lookup(lemma, signal)),
         Promise.resolve(safeSync(() => this.synonym.lookup(query))),
         Promise.resolve(safeSync(() => this.showTell.analyze(raw))),
       ]);
@@ -221,7 +239,9 @@ export class SentenceAssistantCore {
     return {
       query,
       lemma,
-      dictionary: dictionaryResult.ok ? dictionaryResult.value : null,
+      dictionary: dictionaryResult.ok
+        ? { ...dictionaryResult.value, query: lemma }
+        : null,
       dictionaryError: dictionaryResult.ok ? null : dictionaryResult.error,
       synonyms: synonymResult.ok ? synonymResult.value : null,
       synonymError: synonymResult.ok ? null : synonymResult.error,
