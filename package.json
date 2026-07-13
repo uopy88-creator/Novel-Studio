@@ -13,6 +13,7 @@
     "test:manuscript-stability": "npx --yes tsx ./src/features/manuscript/lib/__tests__/manuscript-stability-selftest.ts",
     "test:timeline-sections": "npx --yes tsx ./src/features/timeline/lib/__tests__/timeline-section-selftest.ts",
     "test:section-registry": "npx --yes tsx ./src/features/sections/__tests__/section-registry-ssot-selftest.ts",
+    "test:quick-actions-position": "npx --yes tsx ./src/features/quick-actions/__tests__/position-selftest.ts",
     "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
   },
   "dependencies": {

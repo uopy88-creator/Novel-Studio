@@ -2,17 +2,22 @@
 
 /**
  * =============================================================================
- * Quick Actions UI
+ * Quick Actions UI (Selection Action Menu)
  * -----------------------------------------------------------------------------
  * - UI 만 담당. Action 을 직접 실행하지 않는다.
- * - Action Registry 를 읽어 버튼을 자동 생성한다 (하드코딩 금지).
- * - 클릭 시 Action Engine.run 만 호출한다.
- *
- * 새 Action 추가: Registry.register 만 하면 이 컴포넌트는 수정하지 않는다.
+ * - Action Registry 를 읽어 버튼을 자동 생성한다.
+ * - 위치는 Selection 변경 시에만 재계산 (스크롤 중 재계산 없음 → 스크롤 시 닫음).
  * =============================================================================
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ActionEngine } from "@/features/quick-actions/engine/ActionEngine";
 import { estimateQuickActionsPosition } from "@/features/quick-actions/lib/position";
 import type {
@@ -32,6 +37,8 @@ interface MenuState {
   top: number;
   left: number;
   selection: QuickActionSelection;
+  /** 이 Selection 에 대해 실측 보정했는지 */
+  measured: boolean;
 }
 
 function readSelection(
@@ -46,37 +53,80 @@ function readSelection(
   return { text, start, end };
 }
 
+function selectionKey(selection: QuickActionSelection): string {
+  return `${selection.start}:${selection.end}`;
+}
+
 export function QuickActions({
   textareaRef,
   engine,
   enabled = true,
 }: QuickActionsProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const lastSelectionKeyRef = useRef<string | null>(null);
+
+  const placeMenu = useCallback(
+    (
+      selection: QuickActionSelection,
+      measuredSize?: { width: number; height: number },
+    ) => {
+      const el = textareaRef.current;
+      if (!el) return;
+
+      const pos = estimateQuickActionsPosition(
+        el,
+        selection.start,
+        selection.end,
+        measuredSize?.width ?? 320,
+        measuredSize?.height ?? 52,
+      );
+
+      setMenu({
+        top: pos.top,
+        left: pos.left,
+        selection,
+        measured: Boolean(measuredSize),
+      });
+    },
+    [textareaRef],
+  );
 
   const syncFromSelection = useCallback(() => {
     const el = textareaRef.current;
     if (!enabled || !el) {
       setMenu(null);
+      lastSelectionKeyRef.current = null;
       return;
     }
 
     const selection = readSelection(el);
     if (!selection) {
       setMenu(null);
+      lastSelectionKeyRef.current = null;
       return;
     }
 
-    const pos = estimateQuickActionsPosition(el, selection.start);
-    setMenu({
-      top: pos.top,
-      left: pos.left,
-      selection,
-    });
-  }, [enabled, textareaRef]);
+    const key = selectionKey(selection);
+    if (key === lastSelectionKeyRef.current) {
+      return;
+    }
+    lastSelectionKeyRef.current = key;
+    placeMenu(selection);
+  }, [enabled, placeMenu, textareaRef]);
+
+  // 실제 메뉴 높이/너비로 1회 보정
+  useLayoutEffect(() => {
+    if (!menu || menu.measured || !menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8) return;
+    placeMenu(menu.selection, { width: rect.width, height: rect.height });
+  }, [menu, placeMenu]);
 
   useEffect(() => {
     if (!enabled) {
       setMenu(null);
+      lastSelectionKeyRef.current = null;
       return;
     }
 
@@ -88,20 +138,15 @@ export function QuickActions({
     };
 
     const onTouchEnd = () => {
-      // iPhone / Android / iPad — 선택 확정 후
       requestAnimationFrame(syncFromSelection);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenu(null);
+        lastSelectionKeyRef.current = null;
         return;
       }
-      requestAnimationFrame(syncFromSelection);
-    };
-
-    // 스크롤: 화면에 sticky 고정하지 않고, 선택 오프셋 기준으로 재배치
-    const onScroll = () => {
       requestAnimationFrame(syncFromSelection);
     };
 
@@ -109,18 +154,24 @@ export function QuickActions({
       requestAnimationFrame(syncFromSelection);
     };
 
+    // 스크롤: 재계산하지 않고 닫기
+    const onScroll = () => {
+      setMenu(null);
+      lastSelectionKeyRef.current = null;
+    };
+
     el.addEventListener("mouseup", onMouseUp);
     el.addEventListener("touchend", onTouchEnd);
     el.addEventListener("keyup", onKeyUp);
-    el.addEventListener("scroll", onScroll);
     el.addEventListener("select", onSelect);
+    el.addEventListener("scroll", onScroll);
 
     return () => {
       el.removeEventListener("mouseup", onMouseUp);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("keyup", onKeyUp);
-      el.removeEventListener("scroll", onScroll);
       el.removeEventListener("select", onSelect);
+      el.removeEventListener("scroll", onScroll);
     };
   }, [enabled, syncFromSelection, textareaRef]);
 
@@ -141,6 +192,7 @@ export function QuickActions({
 
   return (
     <div
+      ref={menuRef}
       className={cn(
         "absolute z-40 flex flex-wrap items-center gap-ns-1",
         "rounded-ns-full border border-ns-border bg-ns-surface",
@@ -156,18 +208,17 @@ export function QuickActions({
           type="button"
           data-quick-action={action.id}
           className={cn(
-            // 모바일 최소 터치 영역 44×44
             "inline-flex min-h-11 min-w-11 items-center justify-center gap-ns-2",
             "rounded-ns-full px-ns-3 text-ns-sm font-medium text-ns-ink",
             "hover:bg-ns-muted",
             "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
           )}
           onMouseDown={(event) => {
-            // textarea 선택 유지
             event.preventDefault();
             if (!ctx) return;
             void engine.run(action.id, ctx).then(() => {
               setMenu(null);
+              lastSelectionKeyRef.current = null;
             });
           }}
         >
