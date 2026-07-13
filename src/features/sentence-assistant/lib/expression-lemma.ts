@@ -10,7 +10,7 @@ export {
 
 import { lemmaEngine } from "@/features/sentence-assistant/engines/lemma/LemmaEngine";
 
-/** @deprecated use lemmaEngine.resolve / analyze */
+/** @deprecated use sentenceAssistantCore.analyzeWord / resolveLemma */
 export function resolveExpressionLemma(
   rawWord: string,
   headwords: ReadonlySet<string> | ReadonlyMap<string, unknown>,
@@ -18,7 +18,7 @@ export function resolveExpressionLemma(
   return lemmaEngine.resolve(rawWord, headwords);
 }
 
-/** @deprecated use lemmaEngine.clearCache */
+/** @deprecated use sentenceAssistantCore.clearAllCaches / sentenceEngine.clearCache */
 export function clearExpressionLemmaCache(): void {
   lemmaEngine.clearCache();
 }

@@ -1,25 +1,13 @@
 /**
  * =============================================================================
- * Lemma Engine — 활용형 → 기본형(lemma)
+ * Lemma Engine — 활용형 → 기본형(lemma) 규칙 엔진
  * -----------------------------------------------------------------------------
- * Sentence Assistant 공통 기본형 분석기.
- * - 단어 뜻 (Dictionary) 과 표현 바꾸기 (Synonym) 가 동일한 엔진을 사용한다.
+ * Sentence Engine 이 내부적으로 호출한다.
+ * UI / Dictionary / Synonym 은 SentenceEngine 을 통해서만 기본형을 얻는다.
+ *
  * - AI / 외부 형태소 분석기 없음. 짧은 접미·음절 규칙만 사용한다.
- * - 캐시는 CacheManager (namespace: lemma) 만 사용한다. (중복 분석 방지)
- *
- * 실패 시: 원문을 그대로 반환한다. 검색을 중단하지 않는다.
- *
- * 예)
- *   걸었다 → 걷다
- *   걷는다 → 걷다
- *   걷고   → 걷다
- *   좋았다 → 좋다
- *   예뻤다 → 예쁘다
- *   웃었다 → 웃다
- *   웃는다 → 웃다
- *   바라봤다 → 바라보다
- *   생각했다 → 생각하다
- *   사랑했다 → 사랑하다
+ * - 캐시는 CacheManager (namespace: lemma).
+ * - 실패 시: 원문을 그대로 반환한다.
  * =============================================================================
  */
 
@@ -36,6 +24,8 @@ import {
 
 /** 종성 ㄷ 인덱스 (JONGSEONG) — ㄷ 불규칙(걷다↔걸었다) */
 const JONG_DIGEUT = 7;
+/** 종성 ㅂ — ㅂ 불규칙(춥다↔추웠다), 관형사형(아름다운↔아름답다) */
+const JONG_BIEUP = 17;
 
 /**
  * 접미 규칙 (긴 것 우선).
@@ -49,7 +39,8 @@ const SUFFIX_RULES: ReadonlyArray<{
   { suffix: "는다고", toCandidate: (stem) => [`${stem}다`] },
   { suffix: "었다", toCandidate: (stem) => candidatesAfterEotPast(stem) },
   { suffix: "았다", toCandidate: (stem) => [`${stem}다`] },
-  { suffix: "였다", toCandidate: (stem) => [`${stem}다`, `${stem}이다`] },
+  // 보였다 → 보이다 우선 (이다 / 다)
+  { suffix: "였다", toCandidate: (stem) => [`${stem}이다`, `${stem}다`] },
   {
     suffix: "했다",
     toCandidate: (stem) => (stem ? [`${stem}하다`] : ["하다"]),
@@ -59,11 +50,32 @@ const SUFFIX_RULES: ReadonlyArray<{
     toCandidate: (stem) => (stem ? [`${stem}하다`] : ["하다"]),
   },
   { suffix: "는다", toCandidate: (stem) => [`${stem}다`] },
+  // 달렸다 → 달리다
+  { suffix: "렸다", toCandidate: (stem) => [`${stem}리다`, `${stem}다`] },
+  // 커졌다 → 커지다
+  { suffix: "졌다", toCandidate: (stem) => [`${stem}지다`] },
   { suffix: "하고", toCandidate: (stem) => [`${stem}하다`] },
   { suffix: "하며", toCandidate: (stem) => [`${stem}하다`] },
-  // 연결어미 「고」: 걷고 → 걷다 (단일 단어 선택 가정)
+  // 웃으며 → 웃다
+  { suffix: "으며", toCandidate: (stem) => [`${stem}다`] },
+  { suffix: "면서", toCandidate: (stem) => [`${stem}다`] },
+  // 연결어미 「고」: 읽고 → 읽다
   { suffix: "고", toCandidate: (stem) => [`${stem}다`] },
+  // 관형사형 「운」: 아름다운 → 아름답다
+  { suffix: "운", toCandidate: (stem) => candidatesAfterUn(stem) },
 ];
+
+/** 아름다운 → 아름답다 (어간 끝 음절에 ㅂ 받침) */
+function candidatesAfterUn(stem: string): string[] {
+  if (!stem) return [];
+  const last = stem[stem.length - 1];
+  const parts = decomposeHangul(last);
+  if (!parts || parts.jong !== 0) {
+    return [`${stem}다`];
+  }
+  const withBieup = composeHangul(parts.cho, parts.jung, JONG_BIEUP);
+  return [`${stem.slice(0, -1)}${withBieup}다`, `${stem}다`];
+}
 
 /** 걸었다 → 걷다(ㄷ불규칙) / 걸다 */
 function candidatesAfterEotPast(stem: string): string[] {
@@ -126,8 +138,17 @@ function candidatesFromContractedPast(word: string): string[] {
     }
   }
 
-  // ㅝ+ㅆ ← ㅜ다 (줬다 → 주다)
+  // ㅝ+ㅆ ← ㅂ 불규칙 우선 (추웠다 → 춥다) / ㅜ다 (줬다 → 주다)
   if (parts.jungChar === "ㅝ") {
+    if (prefix) {
+      const lastOfPrefix = prefix[prefix.length - 1];
+      const pParts = decomposeHangul(lastOfPrefix);
+      if (pParts && pParts.jong === 0) {
+        out.push(
+          `${prefix.slice(0, -1)}${composeHangul(pParts.cho, pParts.jung, JONG_BIEUP)}다`,
+        );
+      }
+    }
     const u = jungIndex("ㅜ");
     if (u >= 0) {
       out.push(`${prefix}${composeHangul(parts.cho, u, 0)}다`);

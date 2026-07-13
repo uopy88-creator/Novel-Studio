@@ -26,7 +26,7 @@ export interface SentenceAssistantWordProps {
 export function SentenceAssistantWord({
   selectedText,
 }: SentenceAssistantWordProps) {
-  const { query, state } = useDictionaryLookup(selectedText);
+  const { query, lemma, state } = useDictionaryLookup(selectedText);
 
   return (
     <div className="flex flex-col gap-ns-5">
@@ -45,13 +45,21 @@ export function SentenceAssistantWord({
         <h3 className="text-ns-xs font-semibold uppercase tracking-wide text-ns-ink-tertiary">
           단어 뜻
         </h3>
-        <DefinitionBody state={state} />
+        <DefinitionBody state={state} selectedOriginal={query} lemma={lemma} />
       </section>
     </div>
   );
 }
 
-function DefinitionBody({ state }: { state: DictionaryLoadState }) {
+function DefinitionBody({
+  state,
+  selectedOriginal,
+  lemma,
+}: {
+  state: DictionaryLoadState;
+  selectedOriginal: string;
+  lemma: string;
+}) {
   if (state.status === "loading" || state.status === "idle") {
     return (
       <div
@@ -89,20 +97,63 @@ function DefinitionBody({ state }: { state: DictionaryLoadState }) {
     );
   }
 
-  const { word, pos, definition, link } = result.entry;
+  const { link, senses: rawSenses } = result.entry;
+  const senses =
+    rawSenses && rawSenses.length > 0
+      ? rawSenses
+      : [
+          {
+            definition: result.entry.definition,
+            pos: result.entry.pos,
+          },
+        ];
+  // 활용형 검색이어도 제목은 기본형(lemma) 우선
+  const titleWord =
+    result.matchedBy === "lemma"
+      ? result.lemma || result.entry.word || lemma
+      : result.entry.word;
+  const showSelectedHint =
+    Boolean(selectedOriginal) &&
+    Boolean(lemma) &&
+    selectedOriginal !== lemma;
+  const isPolysemous = senses.length > 1;
 
   return (
     <div className="mt-ns-2 flex flex-col gap-ns-3">
       <div>
-        <p className="text-ns-base font-semibold text-ns-ink">{word}</p>
-        {pos ? (
-          <p className="mt-ns-1 text-ns-xs text-ns-ink-tertiary">{pos}</p>
+        <p className="text-ns-base font-semibold text-ns-ink">{titleWord}</p>
+        {showSelectedHint ? (
+          <p className="mt-ns-1 text-ns-xs text-ns-ink-tertiary">
+            선택한 단어 : {selectedOriginal}
+          </p>
+        ) : null}
+        {/* 의미 1개: 기존처럼 품사를 제목 아래에 표시 */}
+        {!isPolysemous && senses[0]?.pos ? (
+          <p className="mt-ns-1 text-ns-xs text-ns-ink-tertiary">
+            {senses[0].pos}
+          </p>
         ) : null}
       </div>
 
-      <p className="text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
-        {definition}
-      </p>
+      {isPolysemous ? (
+        <ol className="flex list-none flex-col gap-ns-3 p-0">
+          {senses.map((sense, index) => (
+            <li key={`${index}-${sense.definition.slice(0, 24)}`}>
+              <p className="text-ns-xs font-medium text-ns-ink-tertiary">
+                {`①②`[index]}
+                {sense.pos ? ` ${sense.pos}` : ""}
+              </p>
+              <p className="mt-ns-1 text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
+                {sense.definition}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-ns-sm leading-ns-relaxed text-ns-ink-secondary">
+          {senses[0]?.definition}
+        </p>
+      )}
 
       {link ? (
         <a
@@ -119,3 +170,4 @@ function DefinitionBody({ state }: { state: DictionaryLoadState }) {
     </div>
   );
 }
+

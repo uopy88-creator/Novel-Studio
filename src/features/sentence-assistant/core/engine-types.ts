@@ -9,6 +9,7 @@
 
 /** Engine 식별자 */
 export type EngineId =
+  | "sentence"
   | "lemma"
   | "dictionary"
   | "synonym"

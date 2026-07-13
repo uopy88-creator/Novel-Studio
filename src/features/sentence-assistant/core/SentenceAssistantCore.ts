@@ -5,14 +5,10 @@
  * UI 는 개별 Engine 을 직접 호출하지 않는다.
  * 모든 요청은 이 Core 를 거친다.
  *
- * 파이프라인 예 (선택 단어 「걸었다」):
- *   normalize → Lemma → Dictionary / Synonym / ShowTell
+ * 파이프라인:
+ *   Selection → Sentence Engine (기본형 1회) → Dictionary / Synonym / ShowTell
  *
- * 오류 격리:
- *   Dictionary 실패해도 Synonym·ShowTell 은 계속 동작한다.
- *
- * 확장:
- *   registerEngine("grammar", engine) 으로 새 Engine 추가.
+ * Sentence Engine 이 기본형 분석의 Single Source of Truth 이다.
  * =============================================================================
  */
 
@@ -20,7 +16,10 @@ import {
   sharedCacheManager,
   type CacheManager,
 } from "@/features/sentence-assistant/cache/CacheManager";
-import type { EngineId, SentenceAssistantEngine } from "@/features/sentence-assistant/core/engine-types";
+import type {
+  EngineId,
+  SentenceAssistantEngine,
+} from "@/features/sentence-assistant/core/engine-types";
 import {
   DictionaryEngine,
   dictionaryEngine as defaultDictionaryEngine,
@@ -30,6 +29,11 @@ import {
   LemmaEngine,
   lemmaEngine as defaultLemmaEngine,
 } from "@/features/sentence-assistant/engines/lemma/LemmaEngine";
+import {
+  SentenceEngine,
+  sentenceEngine as defaultSentenceEngine,
+} from "@/features/sentence-assistant/engines/sentence/SentenceEngine";
+import type { SentenceAnalysisResult } from "@/features/sentence-assistant/engines/sentence/sentence-types";
 import {
   ShowTellEngine,
   showTellEngine as defaultShowTellEngine,
@@ -51,6 +55,8 @@ import { normalizeDictionaryQuery } from "@/features/sentence-assistant/utils/no
 export interface CoreAnalysisResult {
   query: string;
   lemma: string;
+  /** Sentence Engine 구조화 결과 (SSOT) */
+  analysis: SentenceAnalysisResult;
   dictionary: DictionaryLookupResult | null;
   dictionaryError: string | null;
   synonyms: SynonymLookupResult | null;
@@ -61,6 +67,8 @@ export interface CoreAnalysisResult {
 
 export interface SentenceAssistantCoreOptions {
   cache?: CacheManager;
+  sentence?: SentenceEngine;
+  /** @deprecated SentenceEngine 내부 규칙용. 직접 쓰지 말 것. */
   lemma?: LemmaEngine;
   dictionary?: DictionaryEngine;
   synonym?: SynonymEngine;
@@ -83,7 +91,6 @@ async function safeAsync<T>(
   try {
     return { ok: true, value: await fn() };
   } catch (error) {
-    // Abort 는 상위로 전달 (탭 전환 등)
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
@@ -103,36 +110,38 @@ async function safeAsync<T>(
 
 export class SentenceAssistantCore {
   readonly cache: CacheManager;
+  readonly sentence: SentenceEngine;
+  /** 규칙 엔진 — SentenceEngine 전용. 외부 기능은 sentence 를 사용. */
   readonly lemma: LemmaEngine;
   readonly dictionary: DictionaryEngine;
   readonly synonym: SynonymEngine;
   readonly showTell: ShowTellEngine;
 
-  /** 확장 Engine 레지스트리 */
   private readonly registry = new Map<EngineId, SentenceAssistantEngine>();
 
   constructor(options: SentenceAssistantCoreOptions = {}) {
     this.cache = options.cache ?? sharedCacheManager;
     this.lemma = options.lemma ?? defaultLemmaEngine;
+    this.sentence =
+      options.sentence ??
+      (options.lemma
+        ? new SentenceEngine(options.lemma, this.cache)
+        : defaultSentenceEngine);
     this.dictionary = options.dictionary ?? defaultDictionaryEngine;
     this.synonym = options.synonym ?? defaultSynonymEngine;
     this.showTell = options.showTell ?? defaultShowTellEngine;
 
+    this.registerEngine("sentence", this.sentence as unknown as SentenceAssistantEngine);
     this.registerEngine("lemma", this.lemma as unknown as SentenceAssistantEngine);
     this.registerEngine("dictionary", this.dictionary as unknown as SentenceAssistantEngine);
     this.registerEngine("synonym", this.synonym as unknown as SentenceAssistantEngine);
     this.registerEngine("showTell", this.showTell as unknown as SentenceAssistantEngine);
   }
 
-  /** 검색어 정규화 — UI·Engine 공통 */
   normalizeQuery(raw: string): string {
     return normalizeDictionaryQuery(raw);
   }
 
-  /**
-   * 새 Engine 등록 (Grammar / Style / ReadingTime 등).
-   * 동일 id 는 덮어쓴다.
-   */
   registerEngine(id: EngineId, engine: SentenceAssistantEngine): void {
     this.registry.set(id, engine);
   }
@@ -142,73 +151,139 @@ export class SentenceAssistantCore {
   }
 
   /**
-   * 공통 Lemma — Dictionary / Synonym / 향후 Engine 이 동일 경로를 쓴다.
-   * 형태 규칙만으로 분석한다 (표제어 인덱스 무관).
-   * 실패 시 원문 반환.
+   * Sentence Engine — 기본형·품사 구조화 분석 (SSOT).
+   * 동일 단어는 캐시로 재분석하지 않는다.
    */
-  resolveLemma(rawWord: string): string {
-    const query = this.normalizeQuery(rawWord);
-    if (!query) return "";
-    const result = safeSync(() => this.lemma.analyze(query));
-    return result.ok ? result.value : query;
+  analyzeWord(rawWord: string): SentenceAnalysisResult {
+    const result = safeSync(() => this.sentence.analyze(rawWord));
+    if (result.ok) return result.value;
+    const original = (rawWord ?? "").trim();
+    const normalized = this.normalizeQuery(original);
+    return {
+      original,
+      lemma: normalized || original,
+      normalized,
+      pos: "기타",
+    };
   }
 
   /**
-   * Dictionary Engine — 뜻 조회
-   * 반드시 Lemma Engine 결과(기본형)로 API 를 호출한다.
-   * 예) 걸었다 → 걷다 → 국립국어원 검색
+   * 기본형 문자열만 필요할 때. 내부적으로 analyzeWord 를 사용한다.
+   */
+  resolveLemma(rawWord: string): string {
+    return this.analyzeWord(rawWord).lemma;
+  }
+
+  /**
+   * Dictionary — Sentence Engine lemma 우선 검색.
+   * lemma 결과 없음 → original 한 번 더. 오류는 throw 하지 않는다.
    */
   async lookupDefinition(
     rawQuery: string,
     signal?: AbortSignal,
   ): Promise<DictionaryLookupResult> {
-    const surface = this.normalizeQuery(rawQuery);
-    if (!surface) {
-      return { status: "not_found", query: "" };
-    }
-
-    const lemma = this.resolveLemma(surface);
-    const result = await safeAsync(() =>
-      this.dictionary.lookup(lemma, signal),
-    );
-    if (result.ok) {
-      // query 필드는 실제 검색에 쓴 기본형으로 통일
-      return { ...result.value, query: lemma };
-    }
-    return {
-      status: "error",
-      query: lemma,
-    };
+    const analysis = this.analyzeWord(rawQuery);
+    return this.lookupDefinitionFromAnalysis(analysis, signal);
   }
 
   /**
-   * Synonym Engine — 유의어 조회
-   * 동일한 Lemma Engine 결과(기본형)를 사용한다.
-   * SynonymEngine 내부에서도 lemma.resolve(인덱스 우선)를 호출한다.
+   * 이미 분석된 Sentence Engine 결과로 사전 검색 (재분석 없음).
+   * 순서: lemma → (없으면) original → not_found
    */
-  lookupSynonyms(rawQuery: string): SynonymLookupResult {
-    const result = safeSync(() => this.synonym.lookup(rawQuery));
-    if (result.ok) return result.value;
-    const query = this.normalizeQuery(rawQuery);
-    const lemma = this.resolveLemma(query);
-    return { query, lemma, synonyms: [] };
+  async lookupDefinitionFromAnalysis(
+    analysis: SentenceAnalysisResult,
+    signal?: AbortSignal,
+  ): Promise<DictionaryLookupResult> {
+    if (!analysis.normalized) {
+      return { status: "not_found", query: "" };
+    }
+
+    const original = analysis.normalized;
+    const lemma = analysis.lemma || original;
+
+    const lemmaLookup = await safeAsync(() =>
+      this.dictionary.lookup(lemma, signal),
+    );
+    if (!lemmaLookup.ok) {
+      return { status: "error", query: lemma, lemma, original };
+    }
+
+    if (lemmaLookup.value.status === "found" && lemmaLookup.value.entry) {
+      const entry = lemmaLookup.value.entry;
+      return {
+        status: "found",
+        query: lemma,
+        lemma,
+        original,
+        matchedBy: "lemma",
+        entry: {
+          ...entry,
+          // 활용형 선택 시에도 제목은 기본형으로 표시
+          query: lemma,
+          word: entry.word?.trim() || lemma,
+        },
+      };
+    }
+
+    if (lemmaLookup.value.status === "error") {
+      return { status: "error", query: lemma, lemma, original };
+    }
+
+    // lemma not_found → original 폴백 (다를 때만)
+    if (original !== lemma) {
+      const originalLookup = await safeAsync(() =>
+        this.dictionary.lookup(original, signal),
+      );
+      if (!originalLookup.ok) {
+        return { status: "error", query: lemma, lemma, original };
+      }
+      if (
+        originalLookup.value.status === "found" &&
+        originalLookup.value.entry
+      ) {
+        const entry = originalLookup.value.entry;
+        return {
+          status: "found",
+          query: entry.word?.trim() || original,
+          lemma,
+          original,
+          matchedBy: "original",
+          entry,
+        };
+      }
+      if (originalLookup.value.status === "error") {
+        return { status: "error", query: lemma, lemma, original };
+      }
+    }
+
+    return { status: "not_found", query: lemma, lemma, original };
   }
 
-  /** 기존 ExpressionService API 이름 호환 */
+  /**
+   * Synonym — Sentence Engine 결과(lemma)를 재사용.
+   * SynonymEngine 은 별도 형태소 분석을 하지 않는다.
+   */
+  lookupSynonyms(rawQuery: string): SynonymLookupResult {
+    const analysis = this.analyzeWord(rawQuery);
+    const result = safeSync(() => this.synonym.lookupWithAnalysis(analysis));
+    if (result.ok) return result.value;
+    return {
+      query: analysis.normalized,
+      lemma: analysis.lemma,
+      synonyms: [],
+    };
+  }
+
   lookupExpressions(rawQuery: string): SynonymLookupResult {
     return this.lookupSynonyms(rawQuery);
   }
 
-  /** ShowTell Engine — 분석 */
   analyzeShowTell(raw: string): ShowTellAnalysis | null {
+    // 문장 단위 분석. 단어 lemma 가 필요하면 analyzeWord 결과를 함께 쓸 수 있다.
     const result = safeSync(() => this.showTell.analyze(raw));
     return result.ok ? result.value : null;
   }
 
-  /**
-   * ShowTell Engine — Tell → Show 작법 방향의 독립 예시(여러 개).
-   * 선택 문장을 재작성하지 않는다.
-   */
   getShowTellCraftExamples(
     sentence: string,
     style: ShowTellStyleId,
@@ -221,7 +296,6 @@ export class SentenceAssistantCore {
 
   /**
    * @deprecated getShowTellCraftExamples 사용.
-   * targetKind 는 무시한다 (Tell 전용 작법 예시만 제공).
    */
   getShowTellExample(
     sentence: string,
@@ -233,31 +307,39 @@ export class SentenceAssistantCore {
   }
 
   /**
-   * 선택 텍스트에 대한 통합 파이프라인.
-   * 한 Engine 실패가 다른 Engine 결과를 막지 않는다.
+   * 선택 텍스트 통합 파이프라인.
+   * Sentence Engine 은 한 번만 호출하고, 하위 기능이 lemma 를 공유한다.
    */
   async analyzeSelection(
     raw: string,
     signal?: AbortSignal,
   ): Promise<CoreAnalysisResult> {
-    const query = this.normalizeQuery(raw);
-    const lemma = this.resolveLemma(query);
+    const analysis = this.analyzeWord(raw);
+    const query = analysis.normalized;
+    const lemma = analysis.lemma || query;
 
     const [dictionaryResult, synonymResult, showTellResult] =
       await Promise.all([
-        // Dictionary 도 기본형으로 검색
-        safeAsync(() => this.dictionary.lookup(lemma, signal)),
-        Promise.resolve(safeSync(() => this.synonym.lookup(query))),
+        // lemma → original 폴백은 lookupDefinitionFromAnalysis 안에서 처리
+        this.lookupDefinitionFromAnalysis(analysis, signal).then((value) => ({
+          ok: true as const,
+          value,
+        })),
+        Promise.resolve(
+          safeSync(() => this.synonym.lookupWithAnalysis(analysis)),
+        ),
         Promise.resolve(safeSync(() => this.showTell.analyze(raw))),
       ]);
 
     return {
       query,
       lemma,
-      dictionary: dictionaryResult.ok
-        ? { ...dictionaryResult.value, query: lemma }
-        : null,
-      dictionaryError: dictionaryResult.ok ? null : dictionaryResult.error,
+      analysis,
+      dictionary: dictionaryResult.value,
+      dictionaryError:
+        dictionaryResult.value.status === "error"
+          ? "dictionary lookup failed"
+          : null,
       synonyms: synonymResult.ok ? synonymResult.value : null,
       synonymError: synonymResult.ok ? null : synonymResult.error,
       showTell: showTellResult.ok ? showTellResult.value : null,
@@ -265,11 +347,9 @@ export class SentenceAssistantCore {
     };
   }
 
-  /** 공통 캐시 전체 비우기 (테스트·개발) */
   clearAllCaches(): void {
     this.cache.clear();
   }
 }
 
-/** 앱 전역 Core 인스턴스 — UI 는 이것만 호출한다. */
 export const sentenceAssistantCore = new SentenceAssistantCore();

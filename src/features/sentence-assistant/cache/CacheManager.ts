@@ -82,6 +82,8 @@ export const sharedCacheManager = new CacheManager();
 /** Cache 네임스페이스 상수 — 오타 방지 */
 export const CACHE_NS = {
   lemma: "lemma",
+  /** Sentence Engine 구조화 결과 { original, lemma, normalized, pos } */
+  sentence: "sentence",
   dictionary: "dictionary",
   synonym: "synonym",
 } as const;
