@@ -19,13 +19,13 @@ import {
 } from "react";
 import { ExpressionChip } from "@/features/sentence-assistant/components/ExpressionChip";
 import { ExpressionToast } from "@/features/sentence-assistant/components/ExpressionToast";
-import { sentenceAssistantCore } from "@/features/sentence-assistant/core";
 import {
   EXPRESSION_NO_SELECTION_MESSAGE,
   EXPRESSION_NOT_FOUND_MESSAGE,
   EXPRESSION_REPLACED_TOAST_MESSAGE,
 } from "@/features/sentence-assistant/engines/synonym/synonym-types";
 import { useSynonymLookup } from "@/features/sentence-assistant/hooks/useSynonymLookup";
+import { normalizeDictionaryQuery } from "@/features/sentence-assistant/utils/normalize-query";
 
 export interface SentenceAssistantExpressionProps {
   selectedText: string;
@@ -40,7 +40,6 @@ export function SentenceAssistantExpression({
   onReplaceWith,
 }: SentenceAssistantExpressionProps) {
   const { query, hasSelection, synonyms } = useSynonymLookup(selectedText);
-  const normalizeQuery = sentenceAssistantCore.normalizeQuery;
 
   const listId = useId();
   const listRef = useRef<HTMLDivElement>(null);
@@ -74,7 +73,7 @@ export function SentenceAssistantExpression({
     if (!hasSelection || synonyms.length === 0) return;
     // 활성 칩으로 포커스 이동 (비활성만 있으면 스킵)
     const firstEnabled = synonyms.findIndex(
-      (s) => normalizeQuery(s) !== query,
+      (s) => normalizeDictionaryQuery(s) !== query,
     );
     if (firstEnabled >= 0) {
       setFocusIndex(firstEnabled);
@@ -86,11 +85,11 @@ export function SentenceAssistantExpression({
   const selectSynonym = useCallback(
     (synonym: string) => {
       if (!hasSelection) return;
-      if (normalizeQuery(synonym) === query) return;
+      if (normalizeDictionaryQuery(synonym) === query) return;
       onReplaceWith?.(synonym);
       setToastOpen(true);
     },
-    [hasSelection, normalizeQuery, onReplaceWith, query],
+    [hasSelection, onReplaceWith, query],
   );
 
   /** 칩 그리드에서 열 수 추정 (↑↓ 이동용) */
@@ -117,14 +116,14 @@ export function SentenceAssistantExpression({
       for (let step = 0; step < synonyms.length; step += 1) {
         next = (next + delta + synonyms.length) % synonyms.length;
         // 비활성(현재 단어와 동일) 칩은 건너뜀
-        if (normalizeQuery(synonyms[next]) !== query) {
+        if (normalizeDictionaryQuery(synonyms[next]) !== query) {
           setFocusIndex(next);
           focusChipAt(next);
           return;
         }
       }
     },
-    [focusIndex, focusChipAt, normalizeQuery, query, synonyms],
+    [focusIndex, focusChipAt, query, synonyms],
   );
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -209,7 +208,8 @@ export function SentenceAssistantExpression({
               onKeyDown={handleListKeyDown}
             >
               {synonyms.map((item, index) => {
-                const sameAsCurrent = normalizeQuery(item) === query;
+                const sameAsCurrent =
+                  normalizeDictionaryQuery(item) === query;
                 return (
                   <ExpressionChip
                     key={item}
