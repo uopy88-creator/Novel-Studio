@@ -49,6 +49,22 @@ node scripts/build-action-synonyms.mjs
 node scripts/build-speech-synonyms.mjs
 ```
 
+## Gaze Pack
+
+`gaze.json` — 시선·보기 표제어 250개 이상.
+
+- 단어당 유의어 최대 5개
+- 가나다순 정렬
+- 목록 내 중복 없음
+- 현대 소설에서 자연스러운 표현만 (사투리·고어·비속어·전문용어 제외)
+
+원본: `scripts/data/gaze-raw.json`  
+재생성:
+
+```bash
+node scripts/build-gaze-synonyms.mjs
+```
+
 ## 파일 추가 방법
 
 1. 이 폴더에 `category-name.json` 을 추가합니다.
