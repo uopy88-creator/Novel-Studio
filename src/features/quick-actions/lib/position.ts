@@ -2,15 +2,16 @@
  * =============================================================================
  * Selection Action Menu 위치 계산
  * -----------------------------------------------------------------------------
- * - 기본: 선택 영역 **위** (간격 20~24px), 선택 중앙 정렬
- * - 상단 공간 부족 시: 선택 영역 **아래**
- * - Viewport 밖으로 잘리지 않게 clamp
- * - 브라우저 우클릭 메뉴와 겹침 최소화 (위쪽 우선 — 컨텍스트 메뉴는 보통 커서 아래·오른쪽)
+ * - 기본: 선택 영역 **바로 위** (간격 6~8px), 선택 중앙 정렬
+ * - 화면 상단으로 메뉴가 잘릴 때만 선택 영역 **아래**
+ * - Viewport 좌우·하단에 완전히 벗어나지 않게 clamp
  *
  * textarea 는 Range.getBoundingClientRect 가 동작하지 않으므로
  * 스타일 미러 div 로 Selection BoundingClientRect 를 구한다.
+ * (contenteditable 등 Range 가 있으면 동일 rect 기준 로직을 재사용)
  *
  * 반환 좌표는 `position:absolute` 부모(textarea 래퍼) 기준.
+ * PC / 모바일 공통.
  * =============================================================================
  */
 
@@ -22,11 +23,11 @@ export interface QuickActionsPosition {
   placement?: "above" | "below";
 }
 
-/** 선택 텍스트와 메뉴 사이 간격 (px) */
-export const SELECTION_MENU_GAP_PX = 22;
+/** 선택 텍스트와 메뉴 사이 간격 (px) — 약 6~8px */
+export const SELECTION_MENU_GAP_PX = 7;
 
 /** 메뉴가 viewport 가장자리에서 유지할 여백 */
-const VIEWPORT_PAD = 8;
+export const SELECTION_MENU_VIEWPORT_PAD_PX = 8;
 
 /**
  * textarea 선택 구간의 viewport BoundingClientRect.
@@ -101,6 +102,36 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
+ * 선택 rect 기준 placement 결정 (순수 함수 — 테스트·PC/모바일 공용).
+ * 기본은 위. 상단에 메뉴가 잘릴 때만 아래.
+ */
+export function decideSelectionMenuPlacement(params: {
+  selectionTop: number;
+  selectionBottom: number;
+  menuHeight: number;
+  viewportH: number;
+  gap?: number;
+  viewportPad?: number;
+}): { placement: "above" | "below"; menuTopViewport: number } {
+  const gap = params.gap ?? SELECTION_MENU_GAP_PX;
+  const pad = params.viewportPad ?? SELECTION_MENU_VIEWPORT_PAD_PX;
+  const aboveTop = params.selectionTop - gap - params.menuHeight;
+
+  // 상단으로 완전히(또는 pad 기준) 잘리는 경우에만 아래
+  if (aboveTop < pad) {
+    return {
+      placement: "below",
+      menuTopViewport: params.selectionBottom + gap,
+    };
+  }
+
+  return {
+    placement: "above",
+    menuTopViewport: aboveTop,
+  };
+}
+
+/**
  * Selection BoundingClientRect 기준으로 메뉴 위치를 계산한다.
  * absolute 부모(textarea 래퍼) 기준 top/left 를 반환한다.
  */
@@ -122,40 +153,33 @@ export function estimateQuickActionsPosition(
   );
 
   const gap = SELECTION_MENU_GAP_PX;
+  const pad = SELECTION_MENU_VIEWPORT_PAD_PX;
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
 
-  const selectionCenterX = selectionRect.left + selectionRect.width / 2;
+  const { placement, menuTopViewport: rawTop } = decideSelectionMenuPlacement({
+    selectionTop: selectionRect.top,
+    selectionBottom: selectionRect.bottom,
+    menuHeight,
+    viewportH,
+    gap,
+    viewportPad: pad,
+  });
 
-  // 기본: 선택 위쪽 (컨텍스트 메뉴는 보통 커서 아래·오른쪽에 열려 겹침 감소)
-  let placement: "above" | "below" = "above";
-  let menuTopViewport = selectionRect.top - gap - menuHeight;
-
-  const spaceAbove = selectionRect.top - VIEWPORT_PAD;
-  const spaceBelow = viewportH - selectionRect.bottom - VIEWPORT_PAD;
-
-  if (menuTopViewport < VIEWPORT_PAD) {
-    if (spaceBelow >= menuHeight + gap || spaceBelow >= spaceAbove) {
-      placement = "below";
-      menuTopViewport = selectionRect.bottom + gap;
-    } else {
-      placement = "above";
-      menuTopViewport = VIEWPORT_PAD;
-    }
-  }
-
-  menuTopViewport = clamp(
-    menuTopViewport,
-    VIEWPORT_PAD,
-    Math.max(VIEWPORT_PAD, viewportH - menuHeight - VIEWPORT_PAD),
+  // 하단으로 완전히 벗어나지 않도록만 clamp (기본 placement 는 유지)
+  const menuTopViewport = clamp(
+    rawTop,
+    pad,
+    Math.max(pad, viewportH - menuHeight - pad),
   );
 
-  // 수평: 선택 중앙. 우클릭 메뉴(주로 오른쪽)와 겹침을 줄이려 약간 왼쪽.
-  let menuLeftViewport = selectionCenterX - menuWidth / 2 - 12;
+  // 수평: 선택 중앙 정렬
+  const selectionCenterX = selectionRect.left + selectionRect.width / 2;
+  let menuLeftViewport = selectionCenterX - menuWidth / 2;
   menuLeftViewport = clamp(
     menuLeftViewport,
-    VIEWPORT_PAD,
-    Math.max(VIEWPORT_PAD, viewportW - menuWidth - VIEWPORT_PAD),
+    pad,
+    Math.max(pad, viewportW - menuWidth - pad),
   );
 
   return {
