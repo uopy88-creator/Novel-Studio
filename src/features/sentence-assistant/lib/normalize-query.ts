@@ -1,15 +1,2 @@
-/**
- * =============================================================================
- * 선택 텍스트 → 사전 검색어 정규화
- * =============================================================================
- */
-
-/** 따옴표·공백을 걷어내고 사전 검색어로 만든다. */
-export function normalizeDictionaryQuery(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^["'“”‘’「」『』]+/, "")
-    .replace(/["'“”‘’「」『』]+$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+/** @deprecated re-export — utils/normalize-query */
+export { normalizeDictionaryQuery } from "@/features/sentence-assistant/utils/normalize-query";

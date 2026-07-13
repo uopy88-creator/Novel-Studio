@@ -1,0 +1,29 @@
+/**
+ * =============================================================================
+ * Synonym — 타입 (표현 바꾸기)
+ * -----------------------------------------------------------------------------
+ * 유의어 Chip 만 다룬다. 문장 생성·관용구·AI 추천은 포함하지 않는다.
+ * =============================================================================
+ */
+
+export interface SynonymLookupResult {
+  /** 작가가 선택한 원문(정규화) */
+  query: string;
+  /**
+   * 검색에 사용한 기본형.
+   * 활용형이면 lemma 로 해석된 값 (원문과 같을 수 있음).
+   */
+  lemma: string;
+  /** 가나다순 · 최대 5개 */
+  synonyms: string[];
+}
+
+/** @deprecated ExpressionLookupResult 별칭 — 기존 UI/테스트 호환 */
+export type ExpressionLookupResult = SynonymLookupResult;
+
+export const EXPRESSION_NOT_FOUND_MESSAGE = "등록된 유의어가 없습니다.";
+
+export const EXPRESSION_NO_SELECTION_MESSAGE =
+  "먼저 원고에서 단어를 선택해주세요.";
+
+export const EXPRESSION_REPLACED_TOAST_MESSAGE = "표현이 변경되었습니다.";

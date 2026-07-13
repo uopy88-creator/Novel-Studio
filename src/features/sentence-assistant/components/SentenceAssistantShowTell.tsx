@@ -10,14 +10,15 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { ShowTellService } from "@/features/sentence-assistant/lib/ShowTellService";
+import { sentenceAssistantCore } from "@/features/sentence-assistant/core";
 import {
   SHOW_TELL_DISCLAIMER,
   SHOW_TELL_EMPTY_SELECTION,
   SHOW_TELL_STYLES,
   type ShowTellKind,
   type ShowTellStyleId,
-} from "@/features/sentence-assistant/lib/show-tell-types";
+} from "@/features/sentence-assistant/engines/show-tell/show-tell-types";
+import { useShowTellAnalysis } from "@/features/sentence-assistant/hooks/useShowTellAnalysis";
 import { cn } from "@/lib/utils/cn";
 
 export interface SentenceAssistantShowTellProps {
@@ -27,10 +28,7 @@ export interface SentenceAssistantShowTellProps {
 export function SentenceAssistantShowTell({
   selectedText,
 }: SentenceAssistantShowTellProps) {
-  const analysis = useMemo(
-    () => ShowTellService.analyzeSentence(selectedText),
-    [selectedText],
-  );
+  const analysis = useShowTellAnalysis(selectedText);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [style, setStyle] = useState<ShowTellStyleId | null>(null);
@@ -40,6 +38,17 @@ export function SentenceAssistantShowTell({
     setPickerOpen(false);
     setStyle(null);
   }, [selectedText]);
+
+  const example = useMemo(() => {
+    if (!analysis || style == null) return null;
+    const targetKind: ShowTellKind =
+      analysis.kind === "tell" ? "show" : "tell";
+    return sentenceAssistantCore.getShowTellExample(
+      analysis.sentence,
+      targetKind,
+      style,
+    );
+  }, [analysis, style]);
 
   if (!analysis) {
     return (
@@ -51,21 +60,11 @@ export function SentenceAssistantShowTell({
     );
   }
 
-  const targetKind: ShowTellKind =
-    analysis.kind === "tell" ? "show" : "tell";
   const buttonLabel =
     analysis.kind === "tell"
       ? "Show 방식 예시 보기"
       : "Tell 방식 예시 보기";
 
-  const example =
-    style != null
-      ? ShowTellService.getReferenceExample(
-          analysis.sentence,
-          targetKind,
-          style,
-        )
-      : null;
 
   return (
     <div className="flex flex-col gap-ns-5">

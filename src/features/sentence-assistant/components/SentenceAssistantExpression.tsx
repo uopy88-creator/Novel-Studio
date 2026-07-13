@@ -13,20 +13,19 @@ import {
   useCallback,
   useEffect,
   useId,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { ExpressionChip } from "@/features/sentence-assistant/components/ExpressionChip";
 import { ExpressionToast } from "@/features/sentence-assistant/components/ExpressionToast";
-import { ExpressionService } from "@/features/sentence-assistant/lib/ExpressionService";
+import { sentenceAssistantCore } from "@/features/sentence-assistant/core";
 import {
   EXPRESSION_NO_SELECTION_MESSAGE,
   EXPRESSION_NOT_FOUND_MESSAGE,
   EXPRESSION_REPLACED_TOAST_MESSAGE,
-} from "@/features/sentence-assistant/lib/expression-types";
-import { normalizeDictionaryQuery } from "@/features/sentence-assistant/lib/normalize-query";
+} from "@/features/sentence-assistant/engines/synonym/synonym-types";
+import { useSynonymLookup } from "@/features/sentence-assistant/hooks/useSynonymLookup";
 
 export interface SentenceAssistantExpressionProps {
   selectedText: string;
@@ -40,17 +39,8 @@ export function SentenceAssistantExpression({
   selectedText,
   onReplaceWith,
 }: SentenceAssistantExpressionProps) {
-  const query = normalizeDictionaryQuery(selectedText);
-  const hasSelection = Boolean(query);
-
-  const result = useMemo(
-    () => (hasSelection ? ExpressionService.lookupExpressions(query) : null),
-    [hasSelection, query],
-  );
-  const synonyms = useMemo(
-    () => result?.synonyms ?? [],
-    [result],
-  );
+  const { query, hasSelection, synonyms } = useSynonymLookup(selectedText);
+  const normalizeQuery = sentenceAssistantCore.normalizeQuery;
 
   const listId = useId();
   const listRef = useRef<HTMLDivElement>(null);
@@ -84,7 +74,7 @@ export function SentenceAssistantExpression({
     if (!hasSelection || synonyms.length === 0) return;
     // 활성 칩으로 포커스 이동 (비활성만 있으면 스킵)
     const firstEnabled = synonyms.findIndex(
-      (s) => normalizeDictionaryQuery(s) !== query,
+      (s) => normalizeQuery(s) !== query,
     );
     if (firstEnabled >= 0) {
       setFocusIndex(firstEnabled);
@@ -96,11 +86,11 @@ export function SentenceAssistantExpression({
   const selectSynonym = useCallback(
     (synonym: string) => {
       if (!hasSelection) return;
-      if (normalizeDictionaryQuery(synonym) === query) return;
+      if (normalizeQuery(synonym) === query) return;
       onReplaceWith?.(synonym);
       setToastOpen(true);
     },
-    [hasSelection, onReplaceWith, query],
+    [hasSelection, normalizeQuery, onReplaceWith, query],
   );
 
   /** 칩 그리드에서 열 수 추정 (↑↓ 이동용) */
@@ -127,14 +117,14 @@ export function SentenceAssistantExpression({
       for (let step = 0; step < synonyms.length; step += 1) {
         next = (next + delta + synonyms.length) % synonyms.length;
         // 비활성(현재 단어와 동일) 칩은 건너뜀
-        if (normalizeDictionaryQuery(synonyms[next]) !== query) {
+        if (normalizeQuery(synonyms[next]) !== query) {
           setFocusIndex(next);
           focusChipAt(next);
           return;
         }
       }
     },
-    [focusIndex, focusChipAt, query, synonyms],
+    [focusIndex, focusChipAt, normalizeQuery, query, synonyms],
   );
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -219,8 +209,7 @@ export function SentenceAssistantExpression({
               onKeyDown={handleListKeyDown}
             >
               {synonyms.map((item, index) => {
-                const sameAsCurrent =
-                  normalizeDictionaryQuery(item) === query;
+                const sameAsCurrent = normalizeQuery(item) === query;
                 return (
                   <ExpressionChip
                     key={item}

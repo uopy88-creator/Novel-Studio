@@ -482,8 +482,17 @@ function normalize(list, head) {
   return sortKo(cleaned).slice(0, 5);
 }
 
+/** Expression Pack 이 담당하는 표정 표제어는 Emotion 에서 제외한다. */
+function loadExpressionKeys() {
+  const p = path.join(__dirname, "../src/data/synonyms/expression.json");
+  if (!fs.existsSync(p)) return new Set();
+  return new Set(Object.keys(JSON.parse(fs.readFileSync(p, "utf8"))));
+}
+
+const expressionKeys = loadExpressionKeys();
 const out = {};
 for (const key of Object.keys(RAW).sort((a, b) => a.localeCompare(b, "ko"))) {
+  if (expressionKeys.has(key)) continue;
   const list = normalize(RAW[key], key);
   if (list.length === 0) continue;
   out[key] = list;

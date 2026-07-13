@@ -1,28 +1,30 @@
 /**
- * Action Pack 생성기
+ * Expression Pack 생성기 (표정)
  * -----------------------------------------------------------------------------
- * `scripts/data/action-raw.json` 을 읽어 정규화한 뒤
- * `src/data/synonyms/action.json` 에 UTF-8 로 기록한다.
+ * `scripts/data/expression-raw.json` 을 읽어 정규화한 뒤
+ * `src/data/synonyms/expression.json` 에 UTF-8 로 기록한다.
  *
  * 규칙 (로더·Sentence Assistant 검색과 동일):
- * - 표제어 300개 이상
+ * - 표제어 250개 이상 (표정·얼굴 표정 관련)
  * - 단어당 유의어 최대 5개
  * - 가나다순 정렬 (표제어 · 유의어 목록)
  * - 중복·자기참조 제거
+ * - 현대 소설에서 자연스러운 표현만 (사투리·고어·비속어·전문용어 제외)
  *
- * 실행: node scripts/build-action-synonyms.mjs
+ * 실행: node scripts/build-expression-synonyms.mjs
  *
  * 주의: AI를 사용하지 않는 로컬 유의어 DB 이다.
- * Sentence Assistant 는 `src/data/synonyms/index.ts` 의 action 카탈로그로 조회한다.
+ * Sentence Assistant 는 `src/data/synonyms/index.ts` 의 expression 카탈로그로 조회한다.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const RAW_PATH = path.join(__dirname, "data/action-raw.json");
-const OUT_PATH = path.join(__dirname, "../src/data/synonyms/action.json");
+const RAW_PATH = path.join(__dirname, "data/expression-raw.json");
+const OUT_PATH = path.join(__dirname, "../src/data/synonyms/expression.json");
 const MAX_SYNONYMS = 5;
+const MIN_HEADWORDS = 250;
 
 /** 한국어 가나다순 */
 const sortKo = (items) => [...items].sort((a, b) => a.localeCompare(b, "ko"));
@@ -46,11 +48,10 @@ function normalizeSynonyms(headword, list) {
   return sortKo(cleaned).slice(0, MAX_SYNONYMS);
 }
 
-const raw = JSON.parse(fs.readFileSync(RAW_PATH, "utf8"));
-
 /**
  * 표제어는 카테고리 간에 중복되면 안 된다 (validate:synonyms).
- * Action 보다 우선·전담 카테고리(Emotion / Speech / Gaze)에 있는 키는 제외한다.
+ * Expression 이 가져가지 않을 Speech / Gaze 키만 예약한다.
+ * (Emotion·Action 쪽 표정 표제어는 Expression 이 담당한다.)
  */
 function loadOwnedKeys(relativeJsonPath) {
   const full = path.join(__dirname, relativeJsonPath);
@@ -58,28 +59,32 @@ function loadOwnedKeys(relativeJsonPath) {
   return new Set(Object.keys(JSON.parse(fs.readFileSync(full, "utf8"))));
 }
 
+const raw = JSON.parse(fs.readFileSync(RAW_PATH, "utf8"));
 const reserved = new Set([
-  ...loadOwnedKeys("../src/data/synonyms/emotion.json"),
   ...loadOwnedKeys("../src/data/synonyms/speech.json"),
   ...loadOwnedKeys("../src/data/synonyms/gaze.json"),
-  ...loadOwnedKeys("../src/data/synonyms/expression.json"),
 ]);
 
 const output = {};
 
-for (const headword of sortKo(Object.keys(raw).map((key) => key.trim()).filter(Boolean))) {
+for (const headword of sortKo(
+  Object.keys(raw)
+    .map((key) => key.trim())
+    .filter(Boolean),
+)) {
   if (reserved.has(headword)) continue;
   const synonyms = Array.isArray(raw[headword]) ? raw[headword] : [];
   const normalized = normalizeSynonyms(headword, synonyms);
-  // 빈 목록은 검색에 쓸모없으므로 제외
   if (normalized.length === 0) continue;
   output[headword] = normalized;
 }
 
 const headwords = Object.keys(output);
 
-if (headwords.length < 300) {
-  throw new Error(`Expected at least 300 headwords, got ${headwords.length}`);
+if (headwords.length < MIN_HEADWORDS) {
+  throw new Error(
+    `Expected at least ${MIN_HEADWORDS} headwords, got ${headwords.length}`,
+  );
 }
 
 if (JSON.stringify(headwords) !== JSON.stringify(sortKo(headwords))) {
@@ -102,4 +107,4 @@ for (const [headword, synonyms] of Object.entries(output)) {
 }
 
 fs.writeFileSync(OUT_PATH, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-console.log(`Wrote ${headwords.length} action headwords → ${OUT_PATH}`);
+console.log(`Wrote ${headwords.length} expression headwords → ${OUT_PATH}`);

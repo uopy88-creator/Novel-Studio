@@ -65,6 +65,22 @@ node scripts/build-speech-synonyms.mjs
 node scripts/build-gaze-synonyms.mjs
 ```
 
+## Expression Pack
+
+`expression.json` — 표정 표제어 250개 이상.
+
+- 단어당 유의어 최대 5개
+- 가나다순 정렬
+- 목록 내 중복 없음
+- 현대 소설에서 자연스러운 표현만 (사투리·고어·비속어·전문용어 제외)
+
+원본: `scripts/data/expression-raw.json`  
+재생성:
+
+```bash
+node scripts/build-expression-synonyms.mjs
+```
+
 ## 파일 추가 방법
 
 1. 이 폴더에 `category-name.json` 을 추가합니다.

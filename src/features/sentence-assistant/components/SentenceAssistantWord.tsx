@@ -5,68 +5,28 @@
  * SentenceAssistantWord
  * -----------------------------------------------------------------------------
  * 📖 단어 탭 — 국립국어원 표준국어대사전으로 「단어 뜻」을 표시한다.
- * AI·유의어·예문 추천은 다루지 않는다.
- *
- * 표시: 단어 · 품사 · 뜻풀이 · 출처 링크
+ * 조회는 Core Engine → Dictionary Engine 경로만 사용한다.
  * =============================================================================
  */
 
-import { useEffect, useState } from "react";
 import {
   DICTIONARY_ERROR_MESSAGE,
   DICTIONARY_NOT_FOUND_MESSAGE,
-  type DictionaryLookupResult,
-} from "@/features/sentence-assistant/lib/dictionary-types";
-import { DictionaryService } from "@/features/sentence-assistant/lib/DictionaryService";
-import { normalizeDictionaryQuery } from "@/features/sentence-assistant/lib/normalize-query";
+} from "@/features/sentence-assistant/engines/dictionary/dictionary-types";
+import {
+  useDictionaryLookup,
+  type DictionaryLoadState,
+} from "@/features/sentence-assistant/hooks/useDictionaryLookup";
 import { cn } from "@/lib/utils/cn";
 
 export interface SentenceAssistantWordProps {
   selectedText: string;
 }
 
-type LoadState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "ready"; result: DictionaryLookupResult };
-
 export function SentenceAssistantWord({
   selectedText,
 }: SentenceAssistantWordProps) {
-  const [state, setState] = useState<LoadState>({ status: "idle" });
-  const query = normalizeDictionaryQuery(selectedText);
-
-  useEffect(() => {
-    if (!query) {
-      setState({
-        status: "ready",
-        result: { status: "not_found", query: "" },
-      });
-      return;
-    }
-
-    const controller = new AbortController();
-    setState({ status: "loading" });
-
-    void (async () => {
-      try {
-        const result = await DictionaryService.lookupDefinition(
-          query,
-          controller.signal,
-        );
-        if (controller.signal.aborted) return;
-        setState({ status: "ready", result });
-      } catch {
-        if (controller.signal.aborted) return;
-        setState({
-          status: "ready",
-          result: { status: "error", query },
-        });
-      }
-    })();
-
-    return () => controller.abort();
-  }, [query]);
+  const { query, state } = useDictionaryLookup(selectedText);
 
   return (
     <div className="flex flex-col gap-ns-5">
@@ -91,7 +51,7 @@ export function SentenceAssistantWord({
   );
 }
 
-function DefinitionBody({ state }: { state: LoadState }) {
+function DefinitionBody({ state }: { state: DictionaryLoadState }) {
   if (state.status === "loading" || state.status === "idle") {
     return (
       <div

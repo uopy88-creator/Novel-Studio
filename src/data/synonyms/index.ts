@@ -19,6 +19,7 @@ import appearance from "./appearance.json";
 import nature from "./nature.json";
 import time from "./time.json";
 import gaze from "./gaze.json";
+import expression from "./expression.json";
 
 /** 카테고리 파일 한 개 = Record<headword, synonyms[]> */
 export type SynonymCatalog = Record<string, string[]>;
@@ -27,7 +28,7 @@ export type SynonymCatalog = Record<string, string[]>;
  * 등록된 모든 카테고리.
  * 같은 표제어가 여러 파일에 있으면 나중 카탈로그가 덮어쓴다.
  * 데이터 규칙: 표제어는 파일 간 중복하지 않는다 (npm run validate:synonyms).
- * Gaze Pack 은 시선 표제어를 담당한다.
+ * Gaze = 시선, Expression = 표정.
  * TODO: 새 JSON 추가 시 import 후 이 배열에 push.
  */
 export const SYNONYM_CATALOGS: readonly SynonymCatalog[] = [
@@ -39,6 +40,7 @@ export const SYNONYM_CATALOGS: readonly SynonymCatalog[] = [
   action,
   speech,
   gaze,
+  expression,
 ] as const;
 
 const MAX_SYNONYMS = 5;

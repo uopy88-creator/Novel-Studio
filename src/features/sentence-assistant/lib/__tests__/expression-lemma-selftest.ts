@@ -64,9 +64,11 @@ const good = ExpressionService.lookupExpressions("좋았다");
 assert.equal(good.lemma, "좋다");
 assert.deepEqual(good.synonyms, []);
 
+// Expression Pack 에 웃다 가 있으면 유의어가 채워진다
 const smile = ExpressionService.lookupExpressions("웃는다");
 assert.equal(smile.lemma, "웃다");
-assert.deepEqual(smile.synonyms, []);
+assert.ok(smile.synonyms.length > 0);
+assert.ok(smile.synonyms.includes("미소짓다"));
 
 console.log("expression-lemma-selftest: ok");
 console.log(

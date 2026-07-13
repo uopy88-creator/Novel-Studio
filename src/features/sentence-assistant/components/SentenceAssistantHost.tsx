@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { SentenceAssistantPanel } from "@/features/sentence-assistant/components/SentenceAssistantPanel";
 import { SentenceAssistantContextMenu } from "@/features/sentence-assistant/components/SentenceAssistantContextMenu";
-import { readTextareaSelection } from "@/features/sentence-assistant/lib/selection";
+import { readTextareaSelection } from "@/features/sentence-assistant/utils/selection";
 import type { SentenceSelection } from "@/features/sentence-assistant/types";
 
 export interface SentenceAssistantHostProps {
