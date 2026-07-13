@@ -25,8 +25,7 @@ export type SynonymCatalog = Record<string, string[]>;
 /**
  * 등록된 모든 카테고리.
  * 같은 표제어가 여러 파일에 있으면 나중 카탈로그가 덮어쓴다.
- * - action 은 movement 스텁보다 뒤
- * - speech 는 action 보다 뒤 (말하기 표제어는 Speech Pack 우선)
+ * 데이터 규칙: 표제어는 파일 간 중복하지 않는다 (npm run validate:synonyms).
  * TODO: 새 JSON 추가 시 import 후 이 배열에 push.
  */
 export const SYNONYM_CATALOGS: readonly SynonymCatalog[] = [

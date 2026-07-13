@@ -48,6 +48,18 @@ function normalizeSynonyms(headword, list) {
 }
 
 const raw = JSON.parse(fs.readFileSync(RAW_PATH, "utf8"));
+
+/**
+ * 표제어는 카테고리 간에 중복되면 안 된다 (validate:synonyms).
+ * Speech 보다 우선인 Emotion 에 이미 있는 키는 여기서 제외한다.
+ */
+function loadOwnedKeys(relativeJsonPath) {
+  const full = path.join(__dirname, relativeJsonPath);
+  if (!fs.existsSync(full)) return new Set();
+  return new Set(Object.keys(JSON.parse(fs.readFileSync(full, "utf8"))));
+}
+
+const reserved = loadOwnedKeys("../src/data/synonyms/emotion.json");
 const output = {};
 
 for (const headword of sortKo(
@@ -55,6 +67,7 @@ for (const headword of sortKo(
     .map((key) => key.trim())
     .filter(Boolean),
 )) {
+  if (reserved.has(headword)) continue;
   const synonyms = Array.isArray(raw[headword]) ? raw[headword] : [];
   const normalized = normalizeSynonyms(headword, synonyms);
   if (normalized.length === 0) continue;
