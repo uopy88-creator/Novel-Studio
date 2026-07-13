@@ -7,7 +7,6 @@
  */
 
 import { sentenceAssistantCore } from "@/features/sentence-assistant/core";
-import { dictionaryEngine } from "@/features/sentence-assistant/engines/dictionary/DictionaryEngine";
 import type { DictionaryLookupResult } from "@/features/sentence-assistant/engines/dictionary/dictionary-types";
 import { normalizeDictionaryQuery } from "@/features/sentence-assistant/utils/normalize-query";
 
@@ -19,7 +18,7 @@ export async function lookupDefinition(
 }
 
 export function clearDictionaryCache(): void {
-  dictionaryEngine.clearCache();
+  sentenceAssistantCore.dictionaryResultCache.clear();
 }
 
 export const DictionaryService = {

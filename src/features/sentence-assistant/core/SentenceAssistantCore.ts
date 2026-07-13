@@ -16,6 +16,11 @@ import {
   sharedCacheManager,
   type CacheManager,
 } from "@/features/sentence-assistant/cache/CacheManager";
+import {
+  DictionaryResultCache,
+  dictionaryResultCache as defaultDictionaryResultCache,
+  fromDictionaryCacheRecord,
+} from "@/features/sentence-assistant/cache/dictionary-result-cache";
 import type {
   EngineId,
   SentenceAssistantEngine,
@@ -71,6 +76,8 @@ export interface SentenceAssistantCoreOptions {
   /** @deprecated SentenceEngine 내부 규칙용. 직접 쓰지 말 것. */
   lemma?: LemmaEngine;
   dictionary?: DictionaryEngine;
+  /** 국립국어원 결과 캐시 (lemma 키). 미지정 시 cache 기반 인스턴스 */
+  dictionaryResultCache?: DictionaryResultCache;
   synonym?: SynonymEngine;
   showTell?: ShowTellEngine;
 }
@@ -114,10 +121,17 @@ export class SentenceAssistantCore {
   /** 규칙 엔진 — SentenceEngine 전용. 외부 기능은 sentence 를 사용. */
   readonly lemma: LemmaEngine;
   readonly dictionary: DictionaryEngine;
+  /** 국립국어원 검색 결과 캐시 (key = lemma) */
+  readonly dictionaryResultCache: DictionaryResultCache;
   readonly synonym: SynonymEngine;
   readonly showTell: ShowTellEngine;
 
   private readonly registry = new Map<EngineId, SentenceAssistantEngine>();
+  /** 동일 lemma 동시 요청 → API 1회 */
+  private readonly dictionaryInflight = new Map<
+    string,
+    Promise<DictionaryLookupResult>
+  >();
 
   constructor(options: SentenceAssistantCoreOptions = {}) {
     this.cache = options.cache ?? sharedCacheManager;
@@ -128,6 +142,11 @@ export class SentenceAssistantCore {
         ? new SentenceEngine(options.lemma, this.cache)
         : defaultSentenceEngine);
     this.dictionary = options.dictionary ?? defaultDictionaryEngine;
+    this.dictionaryResultCache =
+      options.dictionaryResultCache ??
+      (options.cache
+        ? new DictionaryResultCache(options.cache)
+        : defaultDictionaryResultCache);
     this.synonym = options.synonym ?? defaultSynonymEngine;
     this.showTell = options.showTell ?? defaultShowTellEngine;
 
@@ -175,8 +194,9 @@ export class SentenceAssistantCore {
   }
 
   /**
-   * Dictionary — Sentence Engine lemma 우선 검색.
-   * lemma 결과 없음 → original 한 번 더. 오류는 throw 하지 않는다.
+   * Dictionary — Sentence Engine lemma 우선 검색 + lemma 키 캐시.
+   * Cache 확인 → (miss) lemma API → (없음) original API → Cache 저장.
+   * 오류는 throw / 캐시하지 않는다.
    */
   async lookupDefinition(
     rawQuery: string,
@@ -188,7 +208,7 @@ export class SentenceAssistantCore {
 
   /**
    * 이미 분석된 Sentence Engine 결과로 사전 검색 (재분석 없음).
-   * 순서: lemma → (없으면) original → not_found
+   * 캐시 키는 항상 lemma.
    */
   async lookupDefinitionFromAnalysis(
     analysis: SentenceAnalysisResult,
@@ -201,6 +221,37 @@ export class SentenceAssistantCore {
     const original = analysis.normalized;
     const lemma = analysis.lemma || original;
 
+    const cached = this.dictionaryResultCache.get(lemma);
+    if (cached) {
+      return fromDictionaryCacheRecord(cached, { original });
+    }
+
+    const inflight = this.dictionaryInflight.get(lemma);
+    if (inflight) {
+      const shared = await inflight;
+      // original 은 호출마다 다를 수 있음 (걷다 / 걸었다)
+      return {
+        ...shared,
+        original,
+        lemma,
+      };
+    }
+
+    const pending = this.fetchAndCacheDefinition(lemma, original, signal);
+    this.dictionaryInflight.set(lemma, pending);
+    try {
+      return await pending;
+    } finally {
+      this.dictionaryInflight.delete(lemma);
+    }
+  }
+
+  /** lemma 캐시 miss 시 API 조회 후 최소 데이터만 저장 */
+  private async fetchAndCacheDefinition(
+    lemma: string,
+    original: string,
+    signal?: AbortSignal,
+  ): Promise<DictionaryLookupResult> {
     const lemmaLookup = await safeAsync(() =>
       this.dictionary.lookup(lemma, signal),
     );
@@ -210,7 +261,7 @@ export class SentenceAssistantCore {
 
     if (lemmaLookup.value.status === "found" && lemmaLookup.value.entry) {
       const entry = lemmaLookup.value.entry;
-      return {
+      const result: DictionaryLookupResult = {
         status: "found",
         query: lemma,
         lemma,
@@ -218,11 +269,12 @@ export class SentenceAssistantCore {
         matchedBy: "lemma",
         entry: {
           ...entry,
-          // 활용형 선택 시에도 제목은 기본형으로 표시
           query: lemma,
           word: entry.word?.trim() || lemma,
         },
       };
+      this.dictionaryResultCache.setFromLookup(lemma, result);
+      return result;
     }
 
     if (lemmaLookup.value.status === "error") {
@@ -242,7 +294,7 @@ export class SentenceAssistantCore {
         originalLookup.value.entry
       ) {
         const entry = originalLookup.value.entry;
-        return {
+        const result: DictionaryLookupResult = {
           status: "found",
           query: entry.word?.trim() || original,
           lemma,
@@ -250,13 +302,23 @@ export class SentenceAssistantCore {
           matchedBy: "original",
           entry,
         };
+        // 캐시 키는 항상 lemma — 같은 기본형 재선택 시 API 생략
+        this.dictionaryResultCache.setFromLookup(lemma, result);
+        return result;
       }
       if (originalLookup.value.status === "error") {
         return { status: "error", query: lemma, lemma, original };
       }
     }
 
-    return { status: "not_found", query: lemma, lemma, original };
+    const notFound: DictionaryLookupResult = {
+      status: "not_found",
+      query: lemma,
+      lemma,
+      original,
+    };
+    this.dictionaryResultCache.setFromLookup(lemma, notFound);
+    return notFound;
   }
 
   /**

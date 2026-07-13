@@ -2,19 +2,12 @@
  * =============================================================================
  * Dictionary Engine — 국립국어원 표준국어대사전
  * -----------------------------------------------------------------------------
- * /api/dictionary 호출. 오류는 캐시하지 않아 재시도 가능하다.
- * 캐시는 CacheManager (namespace: dictionary) 만 사용한다.
- *
- * 형태소 분석은 하지 않는다.
- * Core 가 Sentence Engine 의 lemma(필요 시 original)를 넘긴 뒤 호출한다.
+ * /api/dictionary 호출만 담당한다 (형태소 분석·lemma 캐시 없음).
+ * 결과 캐시는 Core 가 DictionaryResultCache(lemma 키)로 관리한다.
+ * error 는 캐시하지 않아 재시도 가능하다.
  * =============================================================================
  */
 
-import {
-  CACHE_NS,
-  type CacheManager,
-  sharedCacheManager,
-} from "@/features/sentence-assistant/cache/CacheManager";
 import type {
   DictionaryEntry,
   DictionaryLookupResult,
@@ -29,11 +22,9 @@ interface ApiPayload {
 }
 
 export class DictionaryEngine {
-  constructor(private readonly cache: CacheManager = sharedCacheManager) {}
-
   /**
    * 주어진 검색어(q)로 API 조회.
-   * Core 가 lemma / original 순으로 이 메서드를 호출한다.
+   * Core 가 lemma / original 순으로 호출하며, 캐시는 Core 쪽에서 처리한다.
    */
   async lookup(
     rawQuery: string,
@@ -43,12 +34,6 @@ export class DictionaryEngine {
     if (!query) {
       return { status: "not_found", query: "" };
     }
-
-    const cached = this.cache.get<DictionaryLookupResult>(
-      CACHE_NS.dictionary,
-      query,
-    );
-    if (cached) return cached;
 
     const url = `/api/dictionary?q=${encodeURIComponent(query)}`;
 
@@ -63,12 +48,10 @@ export class DictionaryEngine {
       const data = (await response.json()) as ApiPayload;
 
       if (data.status === "not_found" || response.status === 404) {
-        const result: DictionaryLookupResult = {
+        return {
           status: "not_found",
           query: data.query?.trim() || query,
         };
-        this.cache.set(CACHE_NS.dictionary, query, result);
-        return result;
       }
 
       if (
@@ -81,7 +64,6 @@ export class DictionaryEngine {
           httpStatus: response.status,
           body: data,
         });
-        // 오류는 캐시하지 않음 — 재시도 가능
         return { status: "error", query };
       }
 
@@ -99,7 +81,7 @@ export class DictionaryEngine {
               },
             ];
 
-      const result: DictionaryLookupResult = {
+      return {
         status: "found",
         query: data.query?.trim() || query,
         entry: {
@@ -111,8 +93,6 @@ export class DictionaryEngine {
           senses,
         },
       };
-      this.cache.set(CACHE_NS.dictionary, query, result);
-      return result;
     } catch (error) {
       if (signal?.aborted) {
         throw error;
@@ -122,8 +102,9 @@ export class DictionaryEngine {
     }
   }
 
+  /** @deprecated Core / DictionaryResultCache.clear 사용 */
   clearCache(): void {
-    this.cache.clearNamespace(CACHE_NS.dictionary);
+    // no-op — 캐시는 DictionaryResultCache 가 소유
   }
 }
 

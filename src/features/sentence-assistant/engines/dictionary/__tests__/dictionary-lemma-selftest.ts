@@ -21,17 +21,12 @@ class MockDictionaryEngine extends DictionaryEngine {
   readonly calls: string[] = [];
   private readonly table: Map<string, DictionaryLookupResult>;
 
-  constructor(
-    entries: Record<string, DictionaryLookupResult>,
-    cache: CacheManager,
-  ) {
-    super(cache);
+  constructor(entries: Record<string, DictionaryLookupResult>) {
+    super();
     this.table = new Map(Object.entries(entries));
   }
 
-  override async lookup(
-    rawQuery: string,
-  ): Promise<DictionaryLookupResult> {
+  override async lookup(rawQuery: string): Promise<DictionaryLookupResult> {
     const q = rawQuery.trim();
     this.calls.push(q);
     const hit = this.table.get(q);
@@ -73,10 +68,8 @@ const mockDict = new MockDictionaryEngine(
     달리다: found("달리다"),
     웃다: found("웃다"),
     소설: found("소설", "이야기 문학."),
-    // 원문만 있는 가짜 표제어 (lemma 실패 폴백용)
     특수원문만: found("특수원문만", "원문 폴백 테스트"),
   },
-  cache,
 );
 
 const core = new SentenceAssistantCore({
@@ -130,12 +123,9 @@ async function main() {
     const sparseCache = new CacheManager();
     const sparseLemma = new LemmaEngine(sparseCache);
     const sparseSentence = new SentenceEngine(sparseLemma, sparseCache);
-    const sparseMock = new MockDictionaryEngine(
-      {
-        걸었다: found("걸었다", "원문으로만 등록"),
-      },
-      sparseCache,
-    );
+    const sparseMock = new MockDictionaryEngine({
+      걸었다: found("걸었다", "원문으로만 등록"),
+    });
     const sparseCore = new SentenceAssistantCore({
       cache: sparseCache,
       lemma: sparseLemma,
@@ -168,12 +158,18 @@ async function main() {
     assert.equal(mockDict.calls[0], surface);
   }
 
-  // 동일 단어 반복 — Sentence Engine 캐시로 재분석 없음
+  // 동일 단어 반복 — lemma 캐시로 API 재호출 없음
   {
+    core.dictionaryResultCache.clear();
     mockDict.calls.length = 0;
-    await core.lookupDefinition("먹었다");
-    assert.equal(core.analyzeWord("먹었다").lemma, "먹다");
-    assert.ok(mockDict.calls.length >= 1);
+    await core.lookupDefinition("예뻤다");
+    assert.equal(mockDict.calls.length, 1);
+    assert.equal(mockDict.calls[0], "예쁘다");
+    mockDict.calls.length = 0;
+    await core.lookupDefinition("예뻤다");
+    await core.lookupDefinition("예쁘다");
+    assert.equal(mockDict.calls.length, 0, "lemma cache should skip API");
+    assert.equal(core.analyzeWord("예뻤다").lemma, "예쁘다");
   }
 
   // API 오류 격리
@@ -188,7 +184,7 @@ async function main() {
       cache: errCache,
       lemma: new LemmaEngine(errCache),
       sentence: new SentenceEngine(new LemmaEngine(errCache), errCache),
-      dictionary: new ErrorDict(errCache),
+      dictionary: new ErrorDict(),
     });
     const result = await errCore.lookupDefinition("걸었다");
     assert.equal(result.status, "error");

@@ -18,6 +18,7 @@
     "test:lemma": "npx --yes tsx ./src/features/sentence-assistant/engines/lemma/__tests__/lemma-engine-selftest.ts",
     "test:dictionary-lemma": "npx --yes tsx ./src/features/sentence-assistant/engines/dictionary/__tests__/dictionary-lemma-selftest.ts",
     "test:dictionary-senses": "npx --yes tsx ./src/features/sentence-assistant/engines/dictionary/__tests__/dictionary-senses-selftest.ts",
+    "test:dictionary-cache": "npx --yes tsx ./src/features/sentence-assistant/engines/dictionary/__tests__/dictionary-cache-selftest.ts",
     "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
   },
   "dependencies": {

@@ -84,6 +84,12 @@ export const CACHE_NS = {
   lemma: "lemma",
   /** Sentence Engine 구조화 결과 { original, lemma, normalized, pos } */
   sentence: "sentence",
+  /**
+   * @deprecated DictionaryResultCache (dictionaryResult) 사용.
+   * 하위 호환을 위해 남겨 둔다.
+   */
   dictionary: "dictionary",
+  /** 국립국어원 검색 최소 결과 — key = Sentence Engine lemma */
+  dictionaryResult: "dictionaryResult",
   synonym: "synonym",
 } as const;
