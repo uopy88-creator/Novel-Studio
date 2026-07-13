@@ -19,22 +19,35 @@ export function analyzeSentence(raw: string): ShowTellAnalysis | null {
   return sentenceAssistantCore.analyzeShowTell(raw);
 }
 
+/** Tell → Show 작법 방향 독립 예시 (여러 개) */
+export function getCraftExamples(
+  sentence: string,
+  style: ShowTellStyleId,
+): ShowTellExampleResult {
+  return (
+    sentenceAssistantCore.getShowTellCraftExamples(sentence, style) ?? {
+      style,
+      examples: [],
+    }
+  );
+}
+
+/**
+ * @deprecated getCraftExamples 사용. targetKind 무시.
+ */
 export function getReferenceExample(
   sentence: string,
   targetKind: ShowTellKind,
   style: ShowTellStyleId,
 ): ShowTellExampleResult {
-  return (
-    sentenceAssistantCore.getShowTellExample(sentence, targetKind, style) ?? {
-      style,
-      example: "",
-    }
-  );
+  void targetKind;
+  return getCraftExamples(sentence, style);
 }
 
 export const ShowTellService = {
   analyze: analyzeSentence,
   analyzeSentence,
+  getCraftExamples,
   getReferenceExample,
   detectTheme: (sentence: string) => showTellEngine.detectTheme(sentence),
 };

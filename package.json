@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "validate:synonyms": "node ./scripts/validate-synonyms.mjs",
+    "test:show-tell": "npx --yes tsx ./scripts/test-show-tell.ts",
     "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
   },
   "dependencies": {

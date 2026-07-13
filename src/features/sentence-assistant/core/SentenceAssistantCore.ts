@@ -205,16 +205,31 @@ export class SentenceAssistantCore {
     return result.ok ? result.value : null;
   }
 
-  /** ShowTell Engine — 참고 예시 */
+  /**
+   * ShowTell Engine — Tell → Show 작법 방향의 독립 예시(여러 개).
+   * 선택 문장을 재작성하지 않는다.
+   */
+  getShowTellCraftExamples(
+    sentence: string,
+    style: ShowTellStyleId,
+  ): ShowTellExampleResult | null {
+    const result = safeSync(() =>
+      this.showTell.getCraftExamples(sentence, style),
+    );
+    return result.ok ? result.value : null;
+  }
+
+  /**
+   * @deprecated getShowTellCraftExamples 사용.
+   * targetKind 는 무시한다 (Tell 전용 작법 예시만 제공).
+   */
   getShowTellExample(
     sentence: string,
     targetKind: ShowTellKind,
     style: ShowTellStyleId,
   ): ShowTellExampleResult | null {
-    const result = safeSync(() =>
-      this.showTell.getReferenceExample(sentence, targetKind, style),
-    );
-    return result.ok ? result.value : null;
+    void targetKind;
+    return this.getShowTellCraftExamples(sentence, style);
   }
 
   /**

@@ -2,12 +2,13 @@
  * =============================================================================
  * Show / Tell — 타입
  * -----------------------------------------------------------------------------
- * 분석·참고 예시만 제공한다. 원고 수정·자동 적용·복사는 하지 않는다.
+ * 작법 이해용 분석 도구. 문장 생성·원고 수정·AI 작성은 하지 않는다.
  * =============================================================================
  */
 
 export type ShowTellKind = "show" | "tell";
 
+/** Tell → Show 작법 방향 */
 export type ShowTellStyleId =
   | "action"
   | "expression"
@@ -27,17 +28,26 @@ export const SHOW_TELL_STYLES: ShowTellStyleOption[] = [
 ];
 
 export interface ShowTellAnalysis {
+  /** 정규화된 선택 문장 (표시용) */
   sentence: string;
+  /** 판정: Show | Tell */
   kind: ShowTellKind;
 }
 
+/**
+ * 독립 작법 예시 묶음.
+ * 선택 문장을 고치지 않는다. AI가 문장을 만들지 않는다.
+ */
 export interface ShowTellExampleResult {
   style: ShowTellStyleId;
-  example: string;
+  /** 작법 방향 안내용 예시 (여러 개) */
+  examples: string[];
 }
 
 export const SHOW_TELL_EMPTY_SELECTION =
   "문장 전체를 선택하면 Show / Tell 분석을 볼 수 있습니다.";
 
 export const SHOW_TELL_DISCLAIMER =
-  "참고용 예시입니다.\n그대로 사용할 필요는 없습니다.";
+  "참고용 작법 예시입니다.\n선택하신 문장을 고치지 않으며, 그대로 쓸 필요는 없습니다.";
+
+export const SHOW_TELL_JUDGMENT_LABEL = "판정";
