@@ -23,9 +23,13 @@ import { SentenceAssistantPanel } from "@/features/sentence-assistant/components
 import { SentenceAssistantContextMenu } from "@/features/sentence-assistant/components/SentenceAssistantContextMenu";
 import { readTextareaSelection } from "@/features/sentence-assistant/utils/selection";
 import type { SentenceSelection } from "@/features/sentence-assistant/types";
+import type { ProjectId } from "@/types/ids";
+import { useSectionRegistry } from "@/features/sections";
 
 export interface SentenceAssistantHostProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  /** Section Registry 구독용 — Manuscript 가 관리하는 SSOT 와 동기화 */
+  projectId?: ProjectId;
   enabled?: boolean;
   /**
    * 유의어 교체 적용.
@@ -52,9 +56,12 @@ export const SentenceAssistantHost = forwardRef<
   SentenceAssistantHostHandle,
   SentenceAssistantHostProps
 >(function SentenceAssistantHost(
-  { textareaRef, enabled = true, onReplaceSelection },
+  { textareaRef, projectId, enabled = true, onReplaceSelection },
   ref,
 ) {
+  // Section Registry 구독 — Manuscript SSOT 와 동일 데이터 (읽기 전용)
+  useSectionRegistry((projectId ?? "") as ProjectId);
+
   const [panelOpen, setPanelOpen] = useState(false);
   const [selection, setSelection] = useState<SentenceSelection | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);

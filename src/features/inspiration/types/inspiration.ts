@@ -26,8 +26,14 @@ export type { InspirationId };
 export interface Inspiration {
   id: InspirationId;
   projectId: ProjectId;
-  /** Document(Chapter) ID */
+  /** Document(Chapter) ID — 숨은 Manuscript 컨테이너 (딥링크용) */
   documentId: DocumentId;
+
+  /**
+   * 선택 구간이 속한 Section 안정 ID.
+   * 번호가 바뀌어도 연결 유지. 라벨은 Section Registry 로 해석.
+   */
+  sectionStableId?: string;
 
   /** 원고에서 선택한 문장/단어 */
   selectedText: string;

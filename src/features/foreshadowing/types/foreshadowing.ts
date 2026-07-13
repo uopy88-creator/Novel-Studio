@@ -11,7 +11,8 @@
  *   paid_off       → 회수 완료
  *
  * 향후 확장 (UI에는 아직 노출하지 않음)
- * - plantedChapterId / payoffChapterId → Section·원고 연결
+ * - plantedSectionStableId / payoffSectionStableId → Section ID 연결
+ * - plantedChapterId / payoffChapterId → 레거시 Document 링크 (더 이상 Section 소스가 아님)
  * - relatedCharacterIds → Character 연결
  * =============================================================================
  */
@@ -71,14 +72,24 @@ export interface Foreshadowing extends Timestamps {
   status: ForeshadowingStatus;
 
   /**
-   * 복선을 심은(또는 심을) 챕터.
-   * 향후 Section·원고 연결용 — 현재 UI에서는 편집하지 않음.
+   * 복선을 심은 Section 안정 ID (section_001).
+   * 번호가 아니라 ID 로 연결한다. Section Registry 로 라벨을 해석한다.
+   */
+  plantedSectionStableId?: string;
+
+  /**
+   * 복선을 회수한 Section 안정 ID.
+   */
+  payoffSectionStableId?: string;
+
+  /**
+   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
+   * 딥링크 호환용으로만 유지.
    */
   plantedChapterId?: ChapterId;
 
   /**
-   * 복선을 회수한(또는 회수할) 챕터.
-   * 향후 Section·원고 연결용 — 현재 UI에서는 편집하지 않음.
+   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
    */
   payoffChapterId?: ChapterId;
 

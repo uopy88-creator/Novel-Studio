@@ -28,6 +28,7 @@ import { CharacterFormModal } from "@/features/characters/components/CharacterFo
 import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
 import { InspirationGutter } from "@/features/inspiration/components/InspirationGutter";
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
+import { findSectionStableIdAtOffset } from "@/features/sections";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { SearchBar } from "@/features/manuscript/components/SearchBar";
@@ -504,6 +505,7 @@ export function ManuscriptWorkspace({
               <SentenceAssistantHost
                 ref={sentenceAssistantRef}
                 textareaRef={editorRef}
+                projectId={projectId}
                 enabled={Boolean(primaryDocumentId)}
                 onReplaceSelection={(nextContent, caretStart, caretEnd) => {
                   // 한 번의 transactional 편집 → Undo/Redo · 기존 autosave 경로
@@ -567,6 +569,11 @@ export function ManuscriptWorkspace({
               selectedText: pendingSelection.text,
               startOffset: pendingSelection.start,
               endOffset: pendingSelection.end,
+              sectionStableId:
+                findSectionStableIdAtOffset(
+                  content,
+                  pendingSelection.start,
+                ) ?? undefined,
               workTitle: input.workTitle,
               author: input.author,
               memo: input.memo,

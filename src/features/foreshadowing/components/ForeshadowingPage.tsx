@@ -16,6 +16,7 @@ import { ForeshadowingList } from "@/features/foreshadowing/components/Foreshado
 import { ForeshadowingToolbar } from "@/features/foreshadowing/components/ForeshadowingToolbar";
 import { ForeshadowingFormModal } from "@/features/foreshadowing/components/ForeshadowingFormModal";
 import { ForeshadowingDeleteDialog } from "@/features/foreshadowing/components/ForeshadowingDeleteDialog";
+import { useSectionRegistry } from "@/features/sections";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -35,6 +36,9 @@ export function ForeshadowingPage({
   projectId,
   initialForeshadowingId,
 }: ForeshadowingPageProps) {
+  // Section Registry 구독 — planted/payoff Section 라벨이 제목 변경 시 즉시 갱신
+  useSectionRegistry(projectId);
+
   const {
     items,
     filtered,

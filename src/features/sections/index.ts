@@ -22,3 +22,15 @@ export {
 export { hydrateSectionRegistry } from "./hydrate-section-registry";
 export { SectionRegistryProvider } from "./SectionRegistryProvider";
 export { useSectionRegistry } from "./hooks/useSectionRegistry";
+export { useSectionOptions } from "./hooks/useSectionOptions";
+export { useSectionLabel } from "./hooks/useSectionLabel";
+export {
+  sectionOptionsFromRefs,
+  type SectionOption,
+} from "./section-options";
+export {
+  findSectionRefById,
+  findSectionStableIdAtOffset,
+  mergeSectionBodiesById,
+  resolveSectionLabel,
+} from "./resolve-section";

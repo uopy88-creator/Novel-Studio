@@ -40,11 +40,13 @@ export interface ForeshadowingInput {
   title: string;
   description?: string;
   status?: Foreshadowing["status"];
-  /** 향후 Section 연결용 — 현재 UI에서 사용하지 않음 */
+  /** Section 안정 ID — Registry 로 라벨 해석 */
+  plantedSectionStableId?: Foreshadowing["plantedSectionStableId"];
+  payoffSectionStableId?: Foreshadowing["payoffSectionStableId"];
+  /** @deprecated Document 링크 — Section 목록 소스 아님 */
   plantedChapterId?: Foreshadowing["plantedChapterId"];
-  /** 향후 Section 연결용 — 현재 UI에서 사용하지 않음 */
+  /** @deprecated Document 링크 — Section 목록 소스 아님 */
   payoffChapterId?: Foreshadowing["payoffChapterId"];
-  /** 향후 Character 연결용 — 현재 UI에서 사용하지 않음 */
   relatedCharacterIds?: Foreshadowing["relatedCharacterIds"];
   importance?: Foreshadowing["importance"];
 }
@@ -116,6 +118,8 @@ export async function createForeshadowing(
     description: input.description?.trim() || undefined,
     // 기본 상태: 심음
     status: input.status ?? DEFAULT_FORESHADOWING_STATUS,
+    plantedSectionStableId: input.plantedSectionStableId,
+    payoffSectionStableId: input.payoffSectionStableId,
     plantedChapterId: input.plantedChapterId,
     payoffChapterId: input.payoffChapterId,
     relatedCharacterIds: input.relatedCharacterIds ?? [],
@@ -157,6 +161,14 @@ export async function updateForeshadowing(
           ? patch.description.trim() || undefined
           : all[index].description,
       status: patch.status ?? all[index].status,
+      plantedSectionStableId:
+        patch.plantedSectionStableId !== undefined
+          ? patch.plantedSectionStableId
+          : all[index].plantedSectionStableId,
+      payoffSectionStableId:
+        patch.payoffSectionStableId !== undefined
+          ? patch.payoffSectionStableId
+          : all[index].payoffSectionStableId,
       plantedChapterId:
         patch.plantedChapterId !== undefined
           ? patch.plantedChapterId
@@ -191,6 +203,14 @@ export async function updateForeshadowing(
         ? patch.description.trim() || undefined
         : all[index].description,
     status: patch.status ?? all[index].status,
+    plantedSectionStableId:
+      patch.plantedSectionStableId !== undefined
+        ? patch.plantedSectionStableId
+        : all[index].plantedSectionStableId,
+    payoffSectionStableId:
+      patch.payoffSectionStableId !== undefined
+        ? patch.payoffSectionStableId
+        : all[index].payoffSectionStableId,
     plantedChapterId:
       patch.plantedChapterId !== undefined
         ? patch.plantedChapterId

@@ -34,6 +34,7 @@ export interface MemoInput {
   kind?: Memo["kind"];
   isPinned?: boolean;
   isResolved?: boolean;
+  sectionStableId?: Memo["sectionStableId"];
   chapterId?: Memo["chapterId"];
   characterId?: Memo["characterId"];
   foreshadowingId?: Memo["foreshadowingId"];
@@ -95,6 +96,7 @@ export async function createMemo(
     kind: input.kind ?? "note",
     isPinned: Boolean(input.isPinned),
     isResolved: Boolean(input.isResolved),
+    sectionStableId: input.sectionStableId,
     chapterId: input.chapterId,
     characterId: input.characterId,
     foreshadowingId: input.foreshadowingId,
@@ -134,6 +136,10 @@ export async function updateMemo(
       kind: patch.kind ?? all[index].kind,
       isPinned: patch.isPinned ?? all[index].isPinned,
       isResolved: patch.isResolved ?? all[index].isResolved,
+      sectionStableId:
+        patch.sectionStableId !== undefined
+          ? patch.sectionStableId
+          : all[index].sectionStableId,
       chapterId:
         patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
       characterId:
@@ -166,6 +172,10 @@ export async function updateMemo(
     kind: patch.kind ?? all[index].kind,
     isPinned: patch.isPinned ?? all[index].isPinned,
     isResolved: patch.isResolved ?? all[index].isResolved,
+    sectionStableId:
+      patch.sectionStableId !== undefined
+        ? patch.sectionStableId
+        : all[index].sectionStableId,
     chapterId:
       patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
     characterId:

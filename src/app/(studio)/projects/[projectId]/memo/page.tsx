@@ -1,8 +1,9 @@
 /**
- * Memo — 기능 미구현, Context Help 제공
+ * Memo — Context Help + Section Registry 구독 (UI ComingSoon 유지)
  */
 
-import { ComingSoon } from "@/components/layout";
+import { MemoPageClient } from "@/features/memo/components/MemoPageClient";
+import type { ProjectId } from "@/types/ids";
 
 interface MemoPageProps {
   params: Promise<{ projectId: string }>;
@@ -10,11 +11,5 @@ interface MemoPageProps {
 
 export default async function MemoPage({ params }: MemoPageProps) {
   const { projectId } = await params;
-  return (
-    <ComingSoon
-      featureName="Memo"
-      helpTopic="memo"
-      projectId={projectId}
-    />
-  );
+  return <MemoPageClient projectId={projectId as ProjectId} />;
 }

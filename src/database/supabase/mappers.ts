@@ -281,6 +281,7 @@ export function inspirationToRow(
     memo: inspiration.memo,
     start_offset: inspiration.startOffset,
     end_offset: inspiration.endOffset,
+    section_stable_id: inspiration.sectionStableId ?? null,
     created_at: inspiration.createdAt,
     updated_at: inspiration.updatedAt,
   };
@@ -297,6 +298,7 @@ export function rowToInspiration(row: DbInspirationRow): Inspiration {
     memo: row.memo ?? "",
     startOffset: row.start_offset ?? 0,
     endOffset: row.end_offset ?? 0,
+    sectionStableId: row.section_stable_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -314,6 +316,7 @@ export function memoToRow(memo: Memo, userId: string): DbMemoRow {
     document_id: memo.chapterId ?? null,
     character_id: memo.characterId ?? null,
     foreshadowing_id: memo.foreshadowingId ?? null,
+    section_stable_id: memo.sectionStableId ?? null,
     tags: memo.tags ?? [],
     created_at: memo.createdAt,
     updated_at: memo.updatedAt,
@@ -332,6 +335,7 @@ export function rowToMemo(row: DbMemoRow): Memo {
     characterId: (row.character_id as CharacterId | null) ?? undefined,
     foreshadowingId:
       (row.foreshadowing_id as ForeshadowingId | null) ?? undefined,
+    sectionStableId: row.section_stable_id ?? undefined,
     tags: row.tags ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -394,6 +398,8 @@ export function foreshadowingToRow(
     status: item.status,
     planted_document_id: item.plantedChapterId ?? null,
     payoff_document_id: item.payoffChapterId ?? null,
+    planted_section_stable_id: item.plantedSectionStableId ?? null,
+    payoff_section_stable_id: item.payoffSectionStableId ?? null,
     related_character_ids: item.relatedCharacterIds ?? [],
     importance: item.importance,
     created_at: item.createdAt,
@@ -409,6 +415,8 @@ export function rowToForeshadowing(row: DbForeshadowingRow): Foreshadowing {
     description: row.description ?? undefined,
     // 구 상태(planned/dropped)도 새 상태(planted 등)로 정규화
     status: normalizeForeshadowingStatus(row.status),
+    plantedSectionStableId: row.planted_section_stable_id ?? undefined,
+    payoffSectionStableId: row.payoff_section_stable_id ?? undefined,
     plantedChapterId:
       (row.planted_document_id as ChapterId | null) ?? undefined,
     payoffChapterId: (row.payoff_document_id as ChapterId | null) ?? undefined,

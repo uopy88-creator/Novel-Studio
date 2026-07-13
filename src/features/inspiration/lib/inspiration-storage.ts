@@ -38,6 +38,8 @@ export interface InspirationCreateParams extends InspirationInput {
   selectedText: string;
   startOffset: number;
   endOffset: number;
+  /** Section Registry ID — 오프셋에서 해석해 저장 */
+  sectionStableId?: string;
 }
 
 function normalizeInspiration(raw: unknown): Inspiration | null {
@@ -64,6 +66,10 @@ function normalizeInspiration(raw: unknown): Inspiration | null {
     memo: typeof item.memo === "string" ? item.memo : "",
     startOffset: typeof item.startOffset === "number" ? item.startOffset : 0,
     endOffset: typeof item.endOffset === "number" ? item.endOffset : 0,
+    sectionStableId:
+      typeof item.sectionStableId === "string" && item.sectionStableId
+        ? item.sectionStableId
+        : undefined,
     createdAt,
     updatedAt:
       typeof item.updatedAt === "string" ? item.updatedAt : createdAt,
@@ -185,6 +191,7 @@ export async function createInspiration(
     memo: params.memo.trim(),
     startOffset: params.startOffset,
     endOffset: params.endOffset,
+    sectionStableId: params.sectionStableId,
     createdAt: timestamp,
     updatedAt: timestamp,
   };

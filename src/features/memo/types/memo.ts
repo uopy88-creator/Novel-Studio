@@ -9,8 +9,8 @@
  * - "어디에 붙일지 몰라도" 일단 적을 수 있어야 한다.
  *
  * 연결은 모두 optional
- * - chapterId / characterId / foreshadowingId 중 0개 이상
- * - 여러 곳에 동시에 연결할 수도 있다 (예: 특정 인물의 특정 장 메모)
+ * - sectionStableId / chapterId / characterId / foreshadowingId 중 0개 이상
+ * - Section 연결은 번호가 아니라 안정 ID 를 저장한다 (Section Registry 로 라벨 해석)
  * =============================================================================
  */
 
@@ -55,6 +55,15 @@ export interface Memo extends Timestamps {
   /** 해결됨 (todo/question에 특히 유용) */
   isResolved: boolean;
 
+  /**
+   * 관련 Section 안정 ID (section_001).
+   * Section Registry 로 `#N 제목` 을 해석한다.
+   */
+  sectionStableId?: string;
+
+  /**
+   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
+   */
   chapterId?: ChapterId;
   characterId?: CharacterId;
   foreshadowingId?: ForeshadowingId;

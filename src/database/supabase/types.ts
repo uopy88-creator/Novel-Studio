@@ -105,6 +105,8 @@ export interface DbInspirationRow {
   memo: string;
   start_offset: number;
   end_offset: number;
+  /** Section 안정 ID — 마이그레이션 전 null 가능 */
+  section_stable_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +123,8 @@ export interface DbMemoRow {
   document_id: string | null;
   character_id: string | null;
   foreshadowing_id: string | null;
+  /** Section 안정 ID — 마이그레이션 전 null 가능 */
+  section_stable_id?: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -151,6 +155,9 @@ export interface DbForeshadowingRow {
   status: string;
   planted_document_id: string | null;
   payoff_document_id: string | null;
+  /** Section 안정 ID — 마이그레이션 전 null 가능 */
+  planted_section_stable_id?: string | null;
+  payoff_section_stable_id?: string | null;
   related_character_ids: string[];
   importance: number;
   created_at: string;

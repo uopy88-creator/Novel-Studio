@@ -2,8 +2,8 @@
  * =============================================================================
  * SearchIndex
  * -----------------------------------------------------------------------------
- * 프로젝트 데이터를 검색 가능한 SearchDocument[] 로 정규화한다.
- * 새 도메인을 추가할 때는 이 파일에 수집 로직만 붙이면 된다.
+ * Section 목록은 Section Registry(SSOT) 를 우선 사용한다.
+ * 본문 미리보기·오프셋만 Manuscript content 파싱으로 보강한다.
  * =============================================================================
  */
 
@@ -18,7 +18,6 @@ import {
   writingVaultSearchHref,
 } from "@/features/global-search/lib/search-href";
 import { loadProjectManuscript } from "@/features/manuscript/lib/project-manuscript";
-import { parseSections } from "@/features/manuscript/lib/section-parser";
 import { findManuscriptMatches } from "@/features/manuscript/lib/search-manuscript";
 import { readCharactersByProject } from "@/features/characters/lib/character-storage";
 import { readMemosByProject } from "@/features/memo/lib/memo-storage";
@@ -26,6 +25,12 @@ import { readDialoguesByProject } from "@/features/dialogue-vault/lib/dialogue-s
 import { readForeshadowingsByProject } from "@/features/foreshadowing/lib/foreshadowing-storage";
 import { foreshadowingStatusLabel } from "@/features/foreshadowing/lib/foreshadowing-service";
 import { readInspirationsByProject } from "@/features/inspiration/lib/inspiration-storage";
+import {
+  formatSectionRefLabel,
+  getSectionRegistrySnapshot,
+  mergeSectionBodiesById,
+  sectionRefsFromContent,
+} from "@/features/sections";
 
 const MAX_MATCHES_PER_DOCUMENT = 4;
 
@@ -97,19 +102,24 @@ export async function buildSearchIndex(
       }
     }
 
-    const sections = parseSections(content);
-    for (const section of sections) {
-      const title = section.title.trim()
-        ? `#${section.number} ${section.title.trim()}`
-        : `#${section.number}`;
+    // Section 목록 = Registry(SSOT). 미준비 시에만 content 에서 보조.
+    const registry = getSectionRegistrySnapshot(projectId);
+    const sectionRefs = registry.ready
+      ? registry.sections
+      : sectionRefsFromContent(content);
+    const documentIdForHref =
+      registry.primaryDocumentId ?? primaryDocumentId;
+
+    const sectionsWithBody = mergeSectionBodiesById(sectionRefs, content);
+    for (const section of sectionsWithBody) {
       docs.push({
-        id: `sc-${primaryDocumentId}-${section.id}`,
+        id: `sc-${documentIdForHref}-${section.id}`,
         kind: "section",
-        title,
-        body: joinFields(docTitle, section.body?.slice(0, 200)),
+        title: formatSectionRefLabel(section),
+        body: joinFields(docTitle, section.body.slice(0, 200)),
         projectId,
         projectName,
-        href: manuscriptSearchHref(projectId, primaryDocumentId, {
+        href: manuscriptSearchHref(projectId, documentIdForHref, {
           sectionId: section.id,
           offset: section.startOffset,
         }),
@@ -139,11 +149,26 @@ export async function buildSearchIndex(
   }
 
   for (const memo of memos) {
+    const sectionLabel = memo.sectionStableId
+      ? (() => {
+          const registry = getSectionRegistrySnapshot(projectId);
+          const ref = registry.sections.find(
+            (s) => s.id === memo.sectionStableId,
+          );
+          return ref ? formatSectionRefLabel(ref) : null;
+        })()
+      : null;
+
     docs.push({
       id: `mm-${memo.id}`,
       kind: "memo",
       title: memo.body.trim().slice(0, 48) || "빈 메모",
-      body: joinFields(memo.body, memo.kind, ...(memo.tags ?? [])),
+      body: joinFields(
+        memo.body,
+        memo.kind,
+        sectionLabel,
+        ...(memo.tags ?? []),
+      ),
       projectId,
       projectName,
       href: memoSearchHref(projectId, memo.id),
@@ -170,6 +195,14 @@ export async function buildSearchIndex(
   }
 
   for (const item of foreshadowings) {
+    const registry = getSectionRegistrySnapshot(projectId);
+    const plantedLabel = item.plantedSectionStableId
+      ? registry.sections.find((s) => s.id === item.plantedSectionStableId)
+      : null;
+    const payoffLabel = item.payoffSectionStableId
+      ? registry.sections.find((s) => s.id === item.payoffSectionStableId)
+      : null;
+
     docs.push({
       id: `fs-${item.id}`,
       kind: "foreshadowing",
@@ -178,6 +211,8 @@ export async function buildSearchIndex(
         item.title,
         item.description,
         foreshadowingStatusLabel(item.status),
+        plantedLabel ? formatSectionRefLabel(plantedLabel) : null,
+        payoffLabel ? formatSectionRefLabel(payoffLabel) : null,
       ),
       projectId,
       projectName,
@@ -186,6 +221,16 @@ export async function buildSearchIndex(
   }
 
   for (const insp of inspirations) {
+    const sectionLabel = insp.sectionStableId
+      ? (() => {
+          const registry = getSectionRegistrySnapshot(projectId);
+          const ref = registry.sections.find(
+            (s) => s.id === insp.sectionStableId,
+          );
+          return ref ? formatSectionRefLabel(ref) : null;
+        })()
+      : null;
+
     docs.push({
       id: `rf-insp-${insp.id}`,
       kind: "reference",
@@ -195,6 +240,7 @@ export async function buildSearchIndex(
         insp.author,
         insp.memo,
         insp.selectedText,
+        sectionLabel,
       ),
       projectId,
       projectName,
