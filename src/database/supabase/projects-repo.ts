@@ -91,50 +91,21 @@ export async function cloudUpsertProject(project: Project): Promise<void> {
   const userId = await requireCloudUserId();
   const base = projectToRow(project, userId);
 
-  // 최신 스키마: type + deleted_at
+  // 최신 스키마: type 포함. deleted_at 은 일반 upsert 에서 건드리지 않는다
+  // (soft-hide 된 작품을 실수로 복원하지 않기 위함)
   const full: DbProjectRow = {
     ...base,
     type: projectTypeForRow(project),
-    deleted_at: null,
   };
 
   const first = await client.from(DB_TABLES.projects).upsert(full);
   if (!first.error) return;
 
-  // type 미적용 — type 없이 재시도 (deleted_at 은 유지)
+  // type 미적용 — type 없이 재시도
   if (isMissingProjectsColumnError(first.error, "type")) {
-    const withoutType: DbProjectRow = {
-      ...base,
-      deleted_at: null,
-    };
+    const withoutType: DbProjectRow = { ...base };
     const second = await client.from(DB_TABLES.projects).upsert(withoutType);
     if (!second.error) return;
-
-    // type + deleted_at 둘 다 없는 경우
-    if (isMissingProjectsColumnError(second.error, "deleted_at")) {
-      const third = await client.from(DB_TABLES.projects).upsert(base);
-      if (!third.error) return;
-      throw toCloudError(third.error, "작품 저장에 실패했습니다.");
-    }
-
-    throw toCloudError(second.error, "작품 저장에 실패했습니다.");
-  }
-
-  // deleted_at 만 미적용 — deleted_at 없이 type 유지
-  if (isMissingProjectsColumnError(first.error, "deleted_at")) {
-    const withoutDeleted: DbProjectRow = {
-      ...base,
-      type: projectTypeForRow(project),
-    };
-    const second = await client.from(DB_TABLES.projects).upsert(withoutDeleted);
-    if (!second.error) return;
-
-    if (isMissingProjectsColumnError(second.error, "type")) {
-      const third = await client.from(DB_TABLES.projects).upsert(base);
-      if (!third.error) return;
-      throw toCloudError(third.error, "작품 저장에 실패했습니다.");
-    }
-
     throw toCloudError(second.error, "작품 저장에 실패했습니다.");
   }
 

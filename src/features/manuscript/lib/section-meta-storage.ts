@@ -133,8 +133,13 @@ function readLocalByDocument(documentId: ChapterId): SectionMeta[] {
   return readLocalAll().filter((m) => m.documentId === documentId);
 }
 
-function backupSectionMetas(list: SectionMeta[]): void {
-  writeWorkDataBackup(SECTION_METAS_STORAGE_KEY, list);
+function backupSectionMetasForDocument(
+  documentId: ChapterId,
+  list: SectionMeta[],
+): void {
+  // 문서 단위 백업이 전체 키를 덮어쓰지 않도록 다른 document 메타와 병합
+  const others = readLocalAll().filter((m) => m.documentId !== documentId);
+  writeWorkDataBackup(SECTION_METAS_STORAGE_KEY, [...others, ...list]);
 }
 
 export function createSectionMetaId(): string {
@@ -148,7 +153,7 @@ export async function readSectionMetasByDocument(
     await requireCloudDb();
     const list = await cloudListSectionMetasByDocument(documentId);
     try {
-      backupSectionMetas(list);
+      backupSectionMetasForDocument(documentId, list);
     } catch {
       // 백업 실패 무시
     }
@@ -215,7 +220,7 @@ export async function saveSectionMetasForDocument(input: {
     await requireCloudDb();
     await cloudReplaceSectionMetas(metas);
     try {
-      backupSectionMetas(metas);
+      backupSectionMetasForDocument(documentId, metas);
     } catch {
       // 백업 실패 무시
     }

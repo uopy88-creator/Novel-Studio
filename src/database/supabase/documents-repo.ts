@@ -60,6 +60,23 @@ export async function cloudUpsertDocuments(chapters: Chapter[]): Promise<void> {
   if (error) throw error;
 }
 
+export async function cloudGetDocumentById(
+  documentId: string,
+): Promise<Chapter | null> {
+  const client = requireSupabaseClient();
+  const userId = await requireCloudUserId();
+
+  const { data, error } = await client
+    .from(DB_TABLES.documents)
+    .select("*")
+    .eq("id", documentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? rowToDocument(data) : null;
+}
+
 export async function cloudDeleteDocument(documentId: string): Promise<void> {
   const client = requireSupabaseClient();
   const userId = await requireCloudUserId();

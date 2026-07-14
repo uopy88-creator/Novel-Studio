@@ -619,30 +619,28 @@ export function ManuscriptWorkspace({
         mode="edit"
         character={profileCharacter}
         onClose={() => setProfileId(null)}
-        onSubmit={(input) => {
+        onSubmit={async (input) => {
           if (!profileCharacter) return;
-          void (async () => {
-            const oldName = profileCharacter.name;
-            const newName = input.name.trim();
-            if (oldName !== newName) {
-              const nextPlain = replaceMentionNameInText(
-                plainContent,
-                oldName,
-                newName,
-              );
-              setContentTransactional(
-                applyPlainEditToHighlightedContent(
-                  contentRef.current,
-                  nextPlain,
-                ),
-              );
-            }
-            const updated = await updateCharacter(profileCharacter.id, input);
-            if (updated) {
-              setCharacters(await readCharactersByProject(projectId));
-            }
-            setProfileId(null);
-          })();
+          const oldName = profileCharacter.name;
+          const newName = input.name.trim();
+          if (oldName !== newName) {
+            const nextPlain = replaceMentionNameInText(
+              plainContent,
+              oldName,
+              newName,
+            );
+            setContentTransactional(
+              applyPlainEditToHighlightedContent(
+                contentRef.current,
+                nextPlain,
+              ),
+            );
+          }
+          const updated = await updateCharacter(profileCharacter.id, input);
+          if (!updated) {
+            throw new Error("캐릭터를 저장하지 못했습니다.");
+          }
+          setCharacters(await readCharactersByProject(projectId));
         }}
       />
 
@@ -651,26 +649,26 @@ export function ManuscriptWorkspace({
         mode="create"
         selectedText={pendingSelection?.text}
         onClose={() => setPendingSelection(null)}
-        onSubmit={(input) => {
-          if (!pendingSelection || !primaryDocumentId) return;
-          void (async () => {
-            await createInspiration({
-              documentId: primaryDocumentId,
-              selectedText: pendingSelection.text,
-              startOffset: pendingSelection.start,
-              endOffset: pendingSelection.end,
-              sectionStableId:
-                findSectionStableIdAtOffset(
-                  content,
-                  pendingSelection.start,
-                ) ?? undefined,
-              workTitle: input.workTitle,
-              author: input.author,
-              memo: input.memo,
-            });
-            setPendingSelection(null);
-            await refreshInspirations();
-          })();
+        onSubmit={async (input) => {
+          if (!pendingSelection || !primaryDocumentId) {
+            throw new Error("선택한 문장을 찾을 수 없습니다.");
+          }
+          await createInspiration({
+            documentId: primaryDocumentId,
+            selectedText: pendingSelection.text,
+            startOffset: pendingSelection.start,
+            endOffset: pendingSelection.end,
+            sectionStableId:
+              findSectionStableIdAtOffset(
+                content,
+                pendingSelection.start,
+              ) ?? undefined,
+            workTitle: input.workTitle,
+            author: input.author,
+            memo: input.memo,
+          });
+          setPendingSelection(null);
+          await refreshInspirations();
         }}
       />
 

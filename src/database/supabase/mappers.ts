@@ -295,7 +295,8 @@ export function inspirationToRow(
   inspiration: Inspiration,
   userId: string,
 ): DbInspirationRow {
-  return {
+  // section_stable_id 는 후속 마이그레이션 컬럼 — 값이 있을 때만 포함
+  const row: DbInspirationRow = {
     id: inspiration.id,
     project_id: inspiration.projectId,
     document_id: inspiration.documentId,
@@ -306,10 +307,13 @@ export function inspirationToRow(
     memo: inspiration.memo,
     start_offset: inspiration.startOffset,
     end_offset: inspiration.endOffset,
-    section_stable_id: inspiration.sectionStableId ?? null,
     created_at: inspiration.createdAt,
     updated_at: inspiration.updatedAt,
   };
+  if (inspiration.sectionStableId) {
+    row.section_stable_id = inspiration.sectionStableId;
+  }
+  return row;
 }
 
 export function rowToInspiration(row: DbInspirationRow): Inspiration {
@@ -430,7 +434,8 @@ export function foreshadowingToRow(
   item: Foreshadowing,
   userId: string,
 ): DbForeshadowingRow {
-  return {
+  // planted/payoff section_stable_id 는 후속 마이그레이션 컬럼 — 값이 있을 때만 포함
+  const row: DbForeshadowingRow = {
     id: item.id,
     project_id: item.projectId,
     user_id: userId,
@@ -439,13 +444,18 @@ export function foreshadowingToRow(
     status: item.status,
     planted_document_id: item.plantedChapterId ?? null,
     payoff_document_id: item.payoffChapterId ?? null,
-    planted_section_stable_id: item.plantedSectionStableId ?? null,
-    payoff_section_stable_id: item.payoffSectionStableId ?? null,
     related_character_ids: item.relatedCharacterIds ?? [],
     importance: item.importance,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
   };
+  if (item.plantedSectionStableId) {
+    row.planted_section_stable_id = item.plantedSectionStableId;
+  }
+  if (item.payoffSectionStableId) {
+    row.payoff_section_stable_id = item.payoffSectionStableId;
+  }
+  return row;
 }
 
 export function rowToForeshadowing(row: DbForeshadowingRow): Foreshadowing {

@@ -15,7 +15,6 @@ import { InspirationList } from "@/features/inspiration/components/InspirationLi
 import { InspirationToolbar } from "@/features/inspiration/components/InspirationToolbar";
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
-import { useSectionRegistry } from "@/features/sections";
 import { ContentContainer } from "@/components/layout";
 import { studioPath } from "@/components/layout/nav-items";
 
@@ -29,9 +28,6 @@ export function InspirationPage({
   projectId,
   initialInspirationId,
 }: InspirationPageProps) {
-  // Section Registry 구독 — sectionStableId 라벨이 제목/순서 변경 시 즉시 갱신
-  useSectionRegistry(projectId);
-
   const {
     inspirations,
     filtered,
@@ -112,9 +108,9 @@ export function InspirationPage({
         mode="edit"
         inspiration={editing}
         onClose={() => setEditing(null)}
-        onSubmit={(input) => {
+        onSubmit={async (input) => {
           if (!editing) return;
-          void update(editing.id, input);
+          await update(editing.id, input);
         }}
         onDelete={() => {
           if (!editing) return;

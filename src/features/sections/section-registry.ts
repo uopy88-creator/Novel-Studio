@@ -132,18 +132,47 @@ export function publishSections(
     return;
   }
 
+  const nextPrimary =
+    input.primaryDocumentId !== undefined
+      ? input.primaryDocumentId
+      : prev.primaryDocumentId;
+
+  // refs / primary 가 같으면 generation 을 올리지 않는다 (구독자 thrash 방지)
+  if (
+    prev.ready &&
+    prev.primaryDocumentId === nextPrimary &&
+    sectionRefsEqual(prev.sections, input.sections)
+  ) {
+    if (prev.source !== input.source) {
+      entry.snapshot = { ...prev, source: input.source };
+      // source 만 바뀌면 구독 UI 갱신 불필요
+    }
+    return;
+  }
+
   entry.snapshot = {
     projectId,
-    primaryDocumentId:
-      input.primaryDocumentId !== undefined
-        ? input.primaryDocumentId
-        : prev.primaryDocumentId,
+    primaryDocumentId: nextPrimary,
     sections: input.sections,
     ready: true,
     source: input.source,
     generation: prev.generation + 1,
   };
   notify(entry);
+}
+
+function sectionRefsEqual(a: SectionRef[], b: SectionRef[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (
+      a[i].id !== b[i].id ||
+      a[i].number !== b[i].number ||
+      a[i].title !== b[i].title
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** 테스트·프로젝트 전환 시 스토어 초기화 */

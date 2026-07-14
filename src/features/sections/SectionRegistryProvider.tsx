@@ -36,18 +36,21 @@ export function SectionRegistryProvider({
 
   // 다른 탭/창에서 Manuscript 저장 후 돌아올 때 재동기화
   useEffect(() => {
+    let inflight: Promise<void> | null = null;
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      void hydrateSectionRegistry(projectId, { force: true }).catch(
-        (error) => {
+      if (inflight) return;
+      inflight = hydrateSectionRegistry(projectId, { force: true })
+        .catch((error) => {
           console.error("[SectionRegistry] focus hydrate failed", error);
-        },
-      );
+        })
+        .finally(() => {
+          inflight = null;
+        });
     };
-    window.addEventListener("focus", onVisible);
+    // focus + visibilitychange 동시 발생 시 한 번만 hydrate
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [projectId]);

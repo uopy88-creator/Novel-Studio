@@ -19,6 +19,7 @@ import {
 } from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteDocument,
+  cloudGetDocumentById,
   cloudListDocuments,
   cloudListDocumentsByProject,
   cloudUpsertDocument,
@@ -446,17 +447,15 @@ export async function syncChapterAfterManuscriptWrite(
 ): Promise<void> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const all = await cloudListDocuments();
-    const index = all.findIndex((chapter) => chapter.id === chapterId);
-    if (index < 0) return;
+    // 핫패스: 전체 documents 스캔/백업 없이 해당 행만 갱신
+    const current = await cloudGetDocumentById(chapterId);
+    if (!current) return;
 
-    const updated: Chapter = {
-      ...all[index],
+    await cloudUpsertDocument({
+      ...current,
       wordCount,
       updatedAt: nowIso(),
-    };
-    await cloudUpsertDocument(updated);
-    void backupAllChaptersFromCloud();
+    });
     return;
   }
 

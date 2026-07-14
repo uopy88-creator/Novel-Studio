@@ -31,18 +31,27 @@ export interface SearchBarProps {
 
 export function SearchBar({ content, onJump, className }: SearchBarProps) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [mode, setMode] = useState<ManuscriptSearchMode>("word");
   /** 0-based active index; -1 = none */
   const [activeIndex, setActiveIndex] = useState(-1);
 
+  // 입력 중 매 키스트로크 스캔/점프를 피한다
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const matches = useMemo(
-    () => findManuscriptMatches(content, query, mode),
-    [content, query, mode],
+    () => findManuscriptMatches(content, debouncedQuery, mode),
+    [content, debouncedQuery, mode],
   );
 
   // 쿼리·모드 변경 시 첫 결과로 이동 (포커스는 유지 — 입력 끊김 방지)
   useEffect(() => {
-    if (!query.trim() || matches.length === 0) {
+    if (!debouncedQuery.trim() || matches.length === 0) {
       setActiveIndex(-1);
       return;
     }
@@ -50,7 +59,7 @@ export function SearchBar({ content, onJump, className }: SearchBarProps) {
     const first = matches[0];
     onJump(first.start, first.end, { focus: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- query/mode 변경 시에만
-  }, [query, mode]);
+  }, [debouncedQuery, mode]);
 
   useEffect(() => {
     if (matches.length === 0) {

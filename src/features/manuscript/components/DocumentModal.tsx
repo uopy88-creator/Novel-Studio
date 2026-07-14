@@ -22,7 +22,7 @@ export interface DocumentModalProps {
   onClose: () => void;
   mode: "create" | "edit";
   document?: Chapter | null;
-  onSubmit: (input: ChapterInput) => void;
+  onSubmit: (input: ChapterInput) => void | Promise<void>;
 }
 
 export function DocumentModal({
@@ -34,6 +34,8 @@ export function DocumentModal({
 }: DocumentModalProps) {
   const [title, setTitle] = useState(DEFAULT_DOCUMENT_TITLE);
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +46,8 @@ export function DocumentModal({
       setTitle(DEFAULT_DOCUMENT_TITLE);
     }
     setTitleError(null);
+    setSaveError(null);
+    setSaving(false);
   }, [open, mode, document]);
 
   const handleSubmit = (event: FormEvent) => {
@@ -51,12 +55,25 @@ export function DocumentModal({
 
     const trimmed = title.trim() || DEFAULT_DOCUMENT_TITLE;
 
-    onSubmit({
-      title: trimmed,
-      // 종류 UI 제거 — 생성 시 novel, 수정 시 기존 값 유지
-      kind: mode === "edit" ? (document?.kind ?? "novel") : "novel",
-    });
-    onClose();
+    void (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await onSubmit({
+          title: trimmed,
+          kind: mode === "edit" ? (document?.kind ?? "novel") : "novel",
+        });
+        onClose();
+      } catch (err) {
+        setSaveError(
+          err instanceof Error
+            ? err.message
+            : "Document를 저장하지 못했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -72,11 +89,16 @@ export function DocumentModal({
       size="md"
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
             취소
           </Button>
-          <Button type="submit" form="document-form">
-            {isEdit ? "저장" : "만들기"}
+          <Button type="submit" form="document-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "만들기"}
           </Button>
         </>
       }
@@ -86,6 +108,11 @@ export function DocumentModal({
         className="flex flex-col gap-ns-5"
         onSubmit={handleSubmit}
       >
+        {saveError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
         <Input
           label="제목"
           name="title"

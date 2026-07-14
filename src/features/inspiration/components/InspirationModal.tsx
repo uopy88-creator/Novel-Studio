@@ -21,7 +21,7 @@ export interface InspirationModalProps {
   /** 생성 시 선택된 문장 (읽기 전용 표시) */
   selectedText?: string;
   inspiration?: Inspiration | null;
-  onSubmit: (input: InspirationInput) => void;
+  onSubmit: (input: InspirationInput) => void | Promise<void>;
   /** 수정 모드에서 삭제 */
   onDelete?: () => void;
 }
@@ -39,6 +39,8 @@ export function InspirationModal({
   const [author, setAuthor] = useState("");
   const [memo, setMemo] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const displayText =
     mode === "edit" && inspiration
@@ -58,6 +60,8 @@ export function InspirationModal({
       setMemo("");
     }
     setTitleError(null);
+    setSaveError(null);
+    setSaving(false);
   }, [open, mode, inspiration]);
 
   const handleSubmit = (event: FormEvent) => {
@@ -66,12 +70,27 @@ export function InspirationModal({
       setTitleError("작품명을 입력해 주세요.");
       return;
     }
-    onSubmit({
-      workTitle: workTitle.trim(),
-      author: author.trim(),
-      memo: memo.trim(),
-    });
-    onClose();
+
+    void (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await onSubmit({
+          workTitle: workTitle.trim(),
+          author: author.trim(),
+          memo: memo.trim(),
+        });
+        onClose();
+      } catch (err) {
+        setSaveError(
+          err instanceof Error
+            ? err.message
+            : "Inspiration을 저장하지 못했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -94,6 +113,7 @@ export function InspirationModal({
               type="button"
               variant="danger-ghost"
               className="mr-auto"
+              disabled={saving}
               onClick={() => {
                 onDelete();
                 onClose();
@@ -102,11 +122,16 @@ export function InspirationModal({
               삭제
             </Button>
           ) : null}
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
             취소
           </Button>
-          <Button type="submit" form="inspiration-form">
-            {isEdit ? "저장" : "추가"}
+          <Button type="submit" form="inspiration-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "추가"}
           </Button>
         </>
       }
@@ -116,6 +141,12 @@ export function InspirationModal({
         className="flex flex-col gap-ns-5"
         onSubmit={handleSubmit}
       >
+        {saveError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
+
         <div className="rounded-ns-md border border-ns-border bg-ns-muted/50 px-ns-4 py-ns-3">
           <p className="mb-ns-1 text-ns-xs font-medium text-ns-ink-tertiary">
             선택한 문장
