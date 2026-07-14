@@ -30,6 +30,7 @@ export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { segment: "foreshadowing", label: "Foreshadowing", icon: "🎯" },
   { segment: "memo", label: "Memo", icon: "📝" },
   { segment: "settings", label: "Settings", icon: "⚙" },
+  { segment: "trash", label: "Trash", icon: "🗑" },
 ];
 
 /** 작품 작업실 경로 생성 */

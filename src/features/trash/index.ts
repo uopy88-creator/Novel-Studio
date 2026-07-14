@@ -32,4 +32,5 @@ export type {
   TrashEntityAdapter,
 } from "@/features/trash/lib/trash-manager";
 
-// adapters 등록은 파일 상단 side-effect import 로 처리
+export { TrashPage } from "@/features/trash/components/TrashPage";
+export type { TrashPageProps } from "@/features/trash/components/TrashPage";
