@@ -4,7 +4,7 @@
  * -----------------------------------------------------------------------------
  * 저장: <mark data-ns-hl="sky" ...>text</mark>
  * 편집/오프셋/워드카운트: mark 를 제거한 plain text 기준
- * TipTap 없음 — textarea + 오버레이로 표시 (현재 Editor 구조 유지)
+ * 표시: textarea(plain) + 배경 rect (본문 HTML 복제 없음)
  * =============================================================================
  */
 
@@ -23,6 +23,10 @@ export const SKY_HIGHLIGHT_CLOSE = "</mark>";
 const SKY_MARK_RE =
   /<mark\b(?=[^>]*\bdata-ns-hl\s*=\s*["']sky["'])[^>]*>([\s\S]*?)<\/mark>/gi;
 
+/** 깨진/비-sky mark 잔여물 */
+const ANY_MARK_OPEN_RE = /<mark\b[^>]*>/gi;
+const ANY_MARK_CLOSE_RE = /<\/mark>/gi;
+
 export interface HighlightRange {
   start: number;
   end: number;
@@ -33,16 +37,27 @@ export interface HighlightExtraction {
   ranges: HighlightRange[];
 }
 
+function stripResidualMarkTags(text: string): string {
+  return text.replace(ANY_MARK_OPEN_RE, "").replace(ANY_MARK_CLOSE_RE, "");
+}
+
+function hasMarkDebris(text: string): boolean {
+  return /<\/?mark\b/i.test(text);
+}
+
 /** mark 태그를 제거한 plain text (워드카운트·파서·오프셋용) */
 export function stripHighlights(content: string): string {
   return extractHighlights(content).plain;
 }
 
-/** content → plain + plain 좌표 ranges */
+/**
+ * content → plain + plain 좌표 ranges.
+ * 깨진 mark 가 남아 plain 에 태그가 보이면 태그를 제거하고 highlight 는 버린다
+ * (에디터에 HTML 문자열이 그대로 보이며 “구멍/빈칸”처럼 보이는 것 방지).
+ */
 export function extractHighlights(content: string): HighlightExtraction {
   const text = content ?? "";
-  // 빠른 경로 — mark 없으면 정규식 전체를 돌리지 않는다
-  if (!text.includes("data-ns-hl")) {
+  if (!text.includes("<mark") && !text.includes("data-ns-hl")) {
     return { plain: text, ranges: [] };
   }
 
@@ -65,7 +80,23 @@ export function extractHighlights(content: string): HighlightExtraction {
   }
   plain += text.slice(lastIndex);
 
+  // 파싱 실패·비정상 mark 잔여물이 plain 에 남으면 표시용으로 위험
+  if (hasMarkDebris(plain)) {
+    return { plain: stripResidualMarkTags(plain), ranges: [] };
+  }
+
   return { plain, ranges: mergeRanges(ranges) };
+}
+
+/**
+ * 저장된 원고의 highlight mark 를 정규화한다.
+ * - 유효 sky mark → 재직렬화
+ * - 깨진 mark → plain 만 남김
+ */
+export function normalizeHighlightContent(content: string): string {
+  const { plain, ranges } = extractHighlights(content ?? "");
+  if (ranges.length === 0) return plain;
+  return serializeHighlights(plain, ranges);
 }
 
 /** plain + ranges → mark 가 삽입된 저장 문자열 */
@@ -218,42 +249,14 @@ export function applyPlainEditToHighlightedContent(
   nextPlain: string,
 ): string {
   // Highlight 없으면 정규화 비용 없이 그대로 반환
-  if (!previousContent.includes("data-ns-hl")) {
+  // (단, 깨진 mark 잔여물은 제거)
+  if (
+    !previousContent.includes("data-ns-hl") &&
+    !previousContent.includes("<mark")
+  ) {
     return nextPlain;
   }
   const { plain: oldPlain, ranges } = extractHighlights(previousContent);
   const nextRanges = remapHighlightRanges(oldPlain, nextPlain, ranges);
   return serializeHighlights(nextPlain, nextRanges);
-}
-
-/** 오버레이용: plain 을 escape 하고 ranges 를 <mark> 로 감싼 HTML */
-export function highlightsToOverlayHtml(
-  plain: string,
-  ranges: HighlightRange[],
-): string {
-  const escape = (value: string) =>
-    value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-  const merged = mergeRanges(ranges);
-  if (merged.length === 0) {
-    return escape(plain);
-  }
-
-  let html = "";
-  let cursor = 0;
-  for (const range of merged) {
-    const start = Math.min(range.start, plain.length);
-    const end = Math.min(range.end, plain.length);
-    if (end <= start || start < cursor) continue;
-    html += escape(plain.slice(cursor, start));
-    html += `<mark data-ns-hl="sky" style="background-color:${SKY_HIGHLIGHT_COLOR}">`;
-    html += escape(plain.slice(start, end));
-    html += "</mark>";
-    cursor = end;
-  }
-  html += escape(plain.slice(cursor));
-  return html;
 }

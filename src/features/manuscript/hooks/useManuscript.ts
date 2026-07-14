@@ -20,6 +20,7 @@ import {
   loadProjectManuscript,
   saveProjectManuscript,
 } from "@/features/manuscript/lib/project-manuscript";
+import { normalizeHighlightContent } from "@/features/manuscript/lib/highlight-marks";
 import { useUserSettings } from "@/features/settings";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -99,11 +100,25 @@ export function useManuscript(
       content: joined,
       primaryDocumentId: primaryId,
     } = await loadProjectManuscript(projectId);
+    // Highlight mark 정규화 — 깨진 <mark> 가 textarea plain 에 새어
+    // 빨간 밑줄/빈 공간처럼 보이던 문제를 로드 시점에 차단
+    const normalized = normalizeHighlightContent(joined);
     setDocuments(chapters);
     setPrimaryDocumentId(primaryId);
-    setContentState(joined);
-    dirtyRef.current = false;
-    setSaveStatus("idle");
+    setContentState(normalized);
+    dirtyRef.current = normalized !== joined;
+    setSaveStatus(normalized !== joined ? "dirty" : "idle");
+    if (normalized !== joined && primaryId) {
+      // 깨진 mark 를 고친 내용을 조용히 저장
+      void saveProjectManuscript({
+        projectId,
+        chapters,
+        content: normalized,
+        primaryDocumentId: primaryId,
+      }).catch((error) => {
+        console.error("[useManuscript] highlight normalize save failed", error);
+      });
+    }
   }, [projectId]);
 
   useEffect(() => {

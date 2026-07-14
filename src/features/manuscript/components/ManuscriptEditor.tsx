@@ -6,12 +6,15 @@
  * -----------------------------------------------------------------------------
  * textarea 기반 원고 에디터 (contentEditable 아님).
  *
- * Highlight:
- * - 예전: 전체 본문 HTML 오버레이 → 줄바꿈 불일치로 본문 사이 “빈 공간”처럼 보임
- * - 현재: textarea 글자는 그대로 두고, 하이라이트 구간만 배경 rect 로 칠함
+ * Highlight (하이라이트 추가 이후 레이아웃 오류 수정):
+ * - 문제였던 방식: textarea 를 투명하게 하고 뒤에 배경/배경을 깔음
+ *   → 줄바꿈 불일치·투명 구간이 “빈 공간”처럼 보임
+ * - 현재 방식: textarea 는 항상 불투명(본문 SSOT).
+ *   하이라이트는 위쪽 반투명 배경 rect + mix-blend-mode 로만 칠함
+ *   (pointer-events: none → 선택/입력은 그대로 textarea)
  *
  * spellCheck:
- * - 한국어 원고에서 빨간 물결 밑줄이 난무하므로 끈다
+ * - 브라우저·확장 맞춤법 빨간 물결 방지
  * =============================================================================
  */
 
@@ -37,7 +40,7 @@ import { cn } from "@/lib/utils/cn";
 export interface ManuscriptEditorProps {
   value: string;
   onChange: (value: string) => void;
-  /** plain 좌표 Highlight 구간 — 있으면 하늘색 배경만 표시 */
+  /** plain 좌표 Highlight 구간 */
   highlightRanges?: readonly HighlightRange[];
   documentTitle?: string;
   disabled?: boolean;
@@ -60,7 +63,6 @@ interface HlRect {
   height: number;
 }
 
-/** 하이라이트 배경 측정용 미러 — Selection Menu 미러와 분리, 화면 밖 */
 let hlMirror: HTMLDivElement | null = null;
 
 function getHighlightMirror(): HTMLDivElement {
@@ -75,20 +77,11 @@ function getHighlightMirror(): HTMLDivElement {
   return mirror;
 }
 
-/**
- * textarea **보이는 영역** 기준 highlight 배경 rect.
- * (absolute overlay 가 textarea 와 같은 viewport 박스를 덮을 때 사용)
- */
-function measureHighlightRects(
+function applyMirrorTypography(
+  mirror: HTMLDivElement,
   el: HTMLTextAreaElement,
-  ranges: readonly HighlightRange[],
-): HlRect[] {
-  if (ranges.length === 0) return [];
-
+): void {
   const style = window.getComputedStyle(el);
-  const elRect = el.getBoundingClientRect();
-  const mirror = getHighlightMirror();
-
   mirror.style.width = `${el.clientWidth}px`;
   mirror.style.height = `${el.clientHeight}px`;
   mirror.style.overflow = "hidden";
@@ -107,33 +100,72 @@ function measureHighlightRects(
   mirror.style.textTransform = style.textTransform;
   mirror.style.direction = style.direction;
   mirror.style.tabSize = style.tabSize;
+}
+
+/**
+ * 한 번의 mirror 레이아웃으로 모든 highlight rect 측정.
+ * (range 마다 replaceChildren 하던 방식은 긴 원고에서 버벅임의 원인)
+ */
+function measureHighlightRects(
+  el: HTMLTextAreaElement,
+  ranges: readonly HighlightRange[],
+): HlRect[] {
+  if (ranges.length === 0) return [];
+
+  const elRect = el.getBoundingClientRect();
+  const mirror = getHighlightMirror();
+  applyMirrorTypography(mirror, el);
 
   const value = el.value;
-  const out: HlRect[] = [];
+  const frag = document.createDocumentFragment();
+  const marks: { el: HTMLSpanElement; rangeIndex: number; start: number; end: number }[] =
+    [];
 
-  for (let r = 0; r < ranges.length; r += 1) {
-    const start = Math.max(0, Math.min(ranges[r].start, value.length));
-    const end = Math.max(start, Math.min(ranges[r].end, value.length));
-    if (end <= start) continue;
+  let cursor = 0;
+  const sorted = [...ranges]
+    .map((r, rangeIndex) => ({
+      rangeIndex,
+      start: Math.max(0, Math.min(r.start, value.length)),
+      end: Math.max(0, Math.min(r.end, value.length)),
+    }))
+    .filter((r) => r.end > r.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
 
-    mirror.replaceChildren();
+  for (const range of sorted) {
+    if (range.start < cursor) continue;
+    if (range.start > cursor) {
+      frag.appendChild(document.createTextNode(value.slice(cursor, range.start)));
+    }
     const mark = document.createElement("span");
-    mark.textContent = value.slice(start, end) || "\u200b";
-    mirror.appendChild(document.createTextNode(value.slice(0, start)));
-    mirror.appendChild(mark);
-    mirror.appendChild(
-      document.createTextNode(value.slice(end).length > 0 ? value.slice(end) : "."),
-    );
-    mirror.scrollTop = el.scrollTop;
-    mirror.scrollLeft = el.scrollLeft;
+    mark.setAttribute("data-ns-hl-measure", String(range.rangeIndex));
+    mark.textContent = value.slice(range.start, range.end) || "\u200b";
+    frag.appendChild(mark);
+    marks.push({
+      el: mark,
+      rangeIndex: range.rangeIndex,
+      start: range.start,
+      end: range.end,
+    });
+    cursor = range.end;
+  }
+  if (cursor < value.length) {
+    frag.appendChild(document.createTextNode(value.slice(cursor)));
+  } else if (value.length === 0) {
+    frag.appendChild(document.createTextNode("\u200b"));
+  }
 
-    const clientRects = mark.getClientRects();
+  mirror.replaceChildren(frag);
+  mirror.scrollTop = el.scrollTop;
+  mirror.scrollLeft = el.scrollLeft;
+
+  const out: HlRect[] = [];
+  for (const mark of marks) {
+    const clientRects = mark.el.getClientRects();
     for (let i = 0; i < clientRects.length; i += 1) {
       const rect = clientRects[i];
       if (rect.width < 0.5 || rect.height < 0.5) continue;
-      // 보이는 textarea 박스 기준 (스크롤 반영된 client rect)
       out.push({
-        key: `${r}:${i}:${start}:${end}`,
+        key: `${mark.rangeIndex}:${i}:${mark.start}:${mark.end}`,
         top: rect.top - elRect.top,
         left: rect.left - elRect.left,
         width: rect.width,
@@ -141,7 +173,6 @@ function measureHighlightRects(
       });
     }
   }
-
   return out;
 }
 
@@ -220,30 +251,7 @@ export const ManuscriptEditor = forwardRef<
   };
 
   return (
-    <div className="relative min-h-[28rem] w-full flex-1 rounded-ns-lg bg-ns-surface">
-      {/* Highlight 배경만 — 본문 텍스트 복제 없음 */}
-      {hasHighlights && hlRects.length > 0 ? (
-        <div
-          aria-hidden
-          data-manuscript-highlight-overlay=""
-          className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-ns-lg"
-        >
-          {hlRects.map((rect) => (
-            <div
-              key={rect.key}
-              className="absolute rounded-sm"
-              style={{
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-                backgroundColor: SKY_HIGHLIGHT_COLOR,
-              }}
-            />
-          ))}
-        </div>
-      ) : null}
-
+    <div className="relative min-h-[28rem] w-full flex-1">
       <textarea
         ref={setTextareaRef}
         data-manuscript-editor=""
@@ -258,16 +266,21 @@ export const ManuscriptEditor = forwardRef<
         onCompositionEnd={onCompositionEnd}
         onMouseUp={onMouseUp}
         onScroll={onTextareaScroll}
+        // 브라우저·확장 맞춤법 빨간 물결 방지
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
+        autoComplete="off"
+        data-gramm="false"
+        data-gramm_editor="false"
+        data-enable-grammarly="false"
         aria-label={
           documentTitle ? `원고 편집: ${documentTitle}` : "원고 편집"
         }
         placeholder="여기에 원고를 작성하세요… (@로 인물 멘션)"
         className={cn(
-          "relative z-10 box-border min-h-[28rem] w-full flex-1 resize-y",
-          "rounded-ns-lg border border-ns-border",
+          "relative z-0 box-border min-h-[28rem] w-full flex-1 resize-y",
+          "rounded-ns-lg border border-ns-border bg-ns-surface",
           "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
           "whitespace-pre-wrap break-words",
           "placeholder:text-ns-ink-tertiary",
@@ -275,12 +288,39 @@ export const ManuscriptEditor = forwardRef<
           "hover:border-ns-border-strong",
           "focus-visible:border-ns-accent focus-visible:shadow-[var(--ns-ring-accent)]",
           "disabled:cursor-not-allowed disabled:bg-ns-muted",
-          // 하이라이트 배경이 글자 뒤로 비치도록 투명 (부모 bg-ns-surface 유지)
-          hasHighlights ? "bg-transparent caret-[var(--ns-color-ink)]" : "bg-ns-surface",
           className,
         )}
         style={typographyStyle}
       />
+
+      {/*
+        Highlight 는 textarea **위**에 반투명으로만 칠한다.
+        textarea 는 항상 불투명 → 투명 배경으로 생기던 “빈 공간” 제거.
+        pointer-events-none → 드래그/입력은 textarea 가 받음.
+      */}
+      {hasHighlights && hlRects.length > 0 ? (
+        <div
+          aria-hidden
+          data-manuscript-highlight-overlay=""
+          className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-ns-lg"
+        >
+          {hlRects.map((rect) => (
+            <div
+              key={rect.key}
+              className="absolute rounded-sm"
+              style={{
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+                backgroundColor: SKY_HIGHLIGHT_COLOR,
+                opacity: 0.72,
+                mixBlendMode: "multiply",
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 });
