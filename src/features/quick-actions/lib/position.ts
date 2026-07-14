@@ -133,7 +133,10 @@ export function decideSelectionMenuPlacement(params: {
 
 /**
  * Selection BoundingClientRect 기준으로 메뉴 위치를 계산한다.
- * absolute 부모(textarea 래퍼) 기준 top/left 를 반환한다.
+ * absolute 부모(Quick Actions 를 감싼 relative 래퍼) 기준 top/left 를 반환한다.
+ *
+ * positioningParent 를 넘기면 textarea.offsetParent 대신 그 요소를 기준으로 한다.
+ * (에디터 내부에 오버레이 래퍼가 생겨 offsetParent 가 어긋나는 경우 대비)
  */
 export function estimateQuickActionsPosition(
   el: HTMLTextAreaElement,
@@ -141,8 +144,10 @@ export function estimateQuickActionsPosition(
   selectionEnd: number = selectionStart,
   menuWidth = 320,
   menuHeight = 52,
+  positioningParent?: HTMLElement | null,
 ): QuickActionsPosition {
-  const parent = el.offsetParent as HTMLElement | null;
+  const parent =
+    positioningParent ?? (el.offsetParent as HTMLElement | null);
   const parentRect =
     parent?.getBoundingClientRect() ?? el.getBoundingClientRect();
 

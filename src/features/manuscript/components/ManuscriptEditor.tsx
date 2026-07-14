@@ -7,7 +7,9 @@
  * 큰 plain-text 원고 에디터.
  * - 검색 점프를 위해 ref + setSelectionRange 지원
  * - @멘션 자동완성을 위해 키보드/클릭/선택/IME 핸들러 전달 가능
- * - 하늘색 Highlight 는 선택 메뉴에서만 토글; 오버레이로 표시 (textarea 구조 유지)
+ * - 하늘색 Highlight 는 Selection Menu 토글; grid 오버레이로 표시
+ *   (position:relative 래퍼를 쓰면 textarea.offsetParent 가 바뀌어
+ *    Quick Actions 위치가 어긋나므로 grid 스택만 사용)
  * =============================================================================
  */
 
@@ -84,24 +86,19 @@ export const ManuscriptEditor = forwardRef<
     onScroll?.(event);
   };
 
-  const sharedTypeClass = cn(
-    "min-h-[28rem] w-full rounded-ns-lg border border-ns-border",
-    "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
-    "font-[inherit]",
-    className,
-  );
-
   return (
-    <div className="relative min-h-[28rem] w-full flex-1">
+    <div className="grid min-h-[28rem] w-full flex-1">
       {hasHighlights ? (
         <div
           ref={backdropRef}
           aria-hidden
           data-manuscript-highlight-overlay=""
           className={cn(
-            sharedTypeClass,
-            "pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap break-words",
-            "border-transparent bg-ns-surface text-ns-ink",
+            "pointer-events-none col-start-1 row-start-1 z-0 min-h-[28rem] w-full overflow-hidden",
+            "rounded-ns-lg border border-transparent bg-ns-surface",
+            "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
+            "whitespace-pre-wrap break-words font-[inherit]",
+            className,
           )}
           style={{ fontSize: "var(--ns-editor-font-size, 1rem)" }}
           dangerouslySetInnerHTML={{ __html: overlayHtml }}
@@ -127,8 +124,10 @@ export const ManuscriptEditor = forwardRef<
         }
         placeholder="여기에 원고를 작성하세요… (@로 인물 멘션)"
         className={cn(
-          sharedTypeClass,
-          "relative z-10 flex-1 resize-y placeholder:text-ns-ink-tertiary",
+          "col-start-1 row-start-1 z-10 min-h-[28rem] w-full flex-1 resize-y",
+          "rounded-ns-lg border border-ns-border",
+          "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
+          "placeholder:text-ns-ink-tertiary",
           "transition-[border-color,box-shadow] duration-150",
           "hover:border-ns-border-strong",
           "focus-visible:border-ns-accent focus-visible:shadow-[var(--ns-ring-accent)]",
@@ -136,6 +135,7 @@ export const ManuscriptEditor = forwardRef<
           hasHighlights
             ? "bg-transparent text-transparent selection:bg-ns-accent/25 selection:text-transparent"
             : "bg-ns-surface",
+          className,
         )}
         style={{
           fontSize: "var(--ns-editor-font-size, 1rem)",

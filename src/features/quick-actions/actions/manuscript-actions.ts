@@ -71,7 +71,8 @@ export function createHighlightAction(options: {
     id: "highlight",
     label: "Highlight",
     icon: "🖍",
-    priority: 40,
+    // Sentence Assistant 다음 — 메뉴 우측 잘림 방지로 앞쪽에 배치
+    priority: 15,
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
     execute: (ctx) => {
       options.toggleHighlight(ctx.selection);

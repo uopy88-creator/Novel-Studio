@@ -31,6 +31,11 @@ export interface QuickActionsProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   engine: ActionEngine;
   enabled?: boolean;
+  /**
+   * Quick Actions 메뉴의 position:absolute 기준 요소.
+   * 미지정 시 textarea.offsetParent 를 사용한다.
+   */
+  positionParentRef?: React.RefObject<HTMLElement | null>;
 }
 
 interface MenuState {
@@ -61,6 +66,7 @@ export function QuickActions({
   textareaRef,
   engine,
   enabled = true,
+  positionParentRef,
 }: QuickActionsProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +86,7 @@ export function QuickActions({
         selection.end,
         measuredSize?.width ?? 320,
         measuredSize?.height ?? 52,
+        positionParentRef?.current,
       );
 
       setMenu({
@@ -89,7 +96,7 @@ export function QuickActions({
         measured: Boolean(measuredSize),
       });
     },
-    [textareaRef],
+    [positionParentRef, textareaRef],
   );
 
   const syncFromSelection = useCallback(() => {
@@ -194,8 +201,8 @@ export function QuickActions({
     <div
       ref={menuRef}
       className={cn(
-        "absolute z-40 flex flex-wrap items-center gap-ns-1",
-        "rounded-ns-full border border-ns-border bg-ns-surface",
+        "absolute z-40 flex max-w-[min(100%,24rem)] flex-wrap items-center gap-ns-1",
+        "rounded-ns-lg border border-ns-border bg-ns-surface",
         "px-ns-1 py-ns-1 shadow-ns-md",
       )}
       style={{ top: menu.top, left: menu.left }}
@@ -208,8 +215,8 @@ export function QuickActions({
           type="button"
           data-quick-action={action.id}
           className={cn(
-            "inline-flex min-h-11 min-w-11 items-center justify-center gap-ns-2",
-            "rounded-ns-full px-ns-3 text-ns-sm font-medium text-ns-ink",
+            "inline-flex min-h-11 items-center justify-center gap-ns-2",
+            "rounded-ns-md px-ns-3 text-ns-sm font-medium text-ns-ink",
             "hover:bg-ns-muted",
             "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
           )}

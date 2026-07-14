@@ -158,6 +158,7 @@ export function ManuscriptWorkspace({
   } = useInspirations(projectId);
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorShellRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
   const sentenceAssistantRef = useRef<SentenceAssistantHostHandle>(null);
@@ -522,7 +523,7 @@ export function ManuscriptWorkspace({
 
             <SearchBar content={plainContent} onJump={jumpToMatch} />
 
-            <div className="relative">
+            <div ref={editorShellRef} className="relative">
               <InspirationGutter
                 content={plainContent}
                 inspirations={gutterInspirations}
@@ -548,6 +549,7 @@ export function ManuscriptWorkspace({
               />
               <QuickActions
                 textareaRef={editorRef}
+                positionParentRef={editorShellRef}
                 engine={quickActionEngine}
                 enabled={Boolean(primaryDocumentId) && !mentionActive}
               />
