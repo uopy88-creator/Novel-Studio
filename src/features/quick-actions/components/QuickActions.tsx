@@ -373,20 +373,28 @@ export function QuickActions({
     <div
       ref={menuRef}
       className={cn(
-        "fixed flex max-w-[calc(100vw-16px)] flex-nowrap items-center gap-1 overflow-x-auto",
-        "rounded-full border border-ns-border bg-ns-surface",
-        "px-1 py-1 shadow-lg",
+        "fixed flex flex-nowrap items-center gap-1 overflow-x-auto",
+        "border border-ns-border bg-ns-surface shadow-lg",
         "[-webkit-overflow-scrolling:touch]",
+        menu.docked
+          ? "left-0 right-0 max-w-none justify-center rounded-none border-x-0 border-b-0 px-2 py-2"
+          : "max-w-[calc(100vw-16px)] rounded-full px-1 py-1",
       )}
       style={{
         zIndex: 2147483000,
-        left: menu.left,
         ...(menu.docked && menu.bottom != null
-          ? { top: "auto", bottom: menu.bottom }
-          : { top: menu.top, bottom: "auto" }),
-        paddingBottom: menu.docked
-          ? "max(0px, env(safe-area-inset-bottom))"
-          : undefined,
+          ? {
+              left: 0,
+              right: 0,
+              top: "auto",
+              bottom: menu.bottom,
+              paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+            }
+          : {
+              top: menu.top,
+              left: menu.left,
+              bottom: "auto",
+            }),
       }}
       role="toolbar"
       aria-label="Quick Actions"
@@ -405,7 +413,8 @@ export function QuickActions({
               "rounded-full px-3 text-sm font-medium text-ns-ink",
               "hover:bg-ns-muted active:bg-ns-muted",
               "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
-              isHighlight && "bg-[#BFE8FF] hover:bg-[#A8DEFF] active:bg-[#A8DEFF]",
+              isHighlight &&
+                "bg-[#BFE8FF] hover:bg-[#A8DEFF] active:bg-[#A8DEFF]",
             )}
             onPointerDown={(event) => {
               event.preventDefault();

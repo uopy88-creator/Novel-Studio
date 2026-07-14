@@ -551,7 +551,7 @@ export function ManuscriptWorkspace({
                 textareaRef={editorRef}
                 positionParentRef={editorShellRef}
                 engine={quickActionEngine}
-                enabled={Boolean(primaryDocumentId) && !mentionActive}
+                enabled={Boolean(primaryDocumentId)}
               />
               <SentenceAssistantHost
                 ref={sentenceAssistantRef}

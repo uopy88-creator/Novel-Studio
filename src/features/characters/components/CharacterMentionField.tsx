@@ -145,6 +145,13 @@ export function CharacterMentionField({
     // IME 조합 중에는 쿼리 동기화를 미룬다 (조합 문자가 아직 확정 전)
     if (composingRef.current) return;
 
+    // 범위 선택 중에는 @멘션 자동완성을 열지 않음
+    // (Quick Actions / Highlight 와 충돌·비활성화 방지)
+    if (el.selectionStart !== el.selectionEnd) {
+      setMention(null);
+      return;
+    }
+
     const found = getMentionQueryAtCursor(el.value, el.selectionStart);
     if (!found) {
       setMention(null);
