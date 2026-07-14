@@ -50,10 +50,10 @@ export interface DbManuscriptRow {
 }
 
 /**
- * writing_vault — Writing Vault 통합 행
+ * writing_vault — 텍스트 금고 행 (원고 위치 컬럼 없음)
  * entry_type: sentence | word | memo | foreshadowing | inspiration
  */
-export interface DbWritingVaultRow {
+export interface DbDialogueRow {
   id: string;
   project_id: string;
   user_id: string;
@@ -65,16 +65,12 @@ export interface DbWritingVaultRow {
   reference_author: string;
   reference_memo: string;
   is_favorite: boolean;
-  is_pinned?: boolean;
-  section_stable_id?: string | null;
-  document_id?: string | null;
-  meta?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
 
-/** @deprecated DbWritingVaultRow 사용 */
-export type DbDialogueRow = DbWritingVaultRow;
+/** @deprecated DbDialogueRow 사용 */
+export type DbWritingVaultRow = DbDialogueRow;
 
 /** characters */
 export interface DbCharacterRow {

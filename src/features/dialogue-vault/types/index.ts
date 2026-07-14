@@ -2,7 +2,6 @@
  * Writing Vault 도메인 타입 진입점.
  */
 export type {
-  Dialogue,
   WritingVaultEntry,
   WritingVaultType,
   WritingVaultReference,

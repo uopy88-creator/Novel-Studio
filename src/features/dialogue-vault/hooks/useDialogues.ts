@@ -13,7 +13,7 @@ import type {
   WritingVaultEntry,
   WritingVaultType,
 } from "@/features/dialogue-vault/types/dialogue";
-import type { DialogueId, ProjectId } from "@/types/ids";
+import type { ProjectId, WritingVaultEntryId } from "@/types/ids";
 import {
   createDialogue,
   deleteDialogue,
@@ -37,11 +37,11 @@ export interface UseDialoguesResult {
   setTypeFilter: (type: WritingVaultTypeFilter) => void;
   create: (input: WritingVaultInput) => Promise<WritingVaultEntry>;
   update: (
-    id: DialogueId,
+    id: WritingVaultEntryId,
     input: WritingVaultInput,
   ) => Promise<WritingVaultEntry | null>;
-  remove: (id: DialogueId) => Promise<boolean>;
-  toggleFavorite: (id: DialogueId) => Promise<void>;
+  remove: (id: WritingVaultEntryId) => Promise<boolean>;
+  toggleFavorite: (id: WritingVaultEntryId) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -84,7 +84,7 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   );
 
   const update = useCallback(
-    async (id: DialogueId, input: WritingVaultInput) => {
+    async (id: WritingVaultEntryId, input: WritingVaultInput) => {
       const entry = await updateDialogue(id, input);
       setDialogues(await readDialoguesByProject(projectId));
       return entry;
@@ -93,7 +93,7 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   );
 
   const remove = useCallback(
-    async (id: DialogueId) => {
+    async (id: WritingVaultEntryId) => {
       const ok = await deleteDialogue(id);
       setDialogues(await readDialoguesByProject(projectId));
       return ok;
@@ -102,7 +102,7 @@ export function useDialogues(projectId: ProjectId): UseDialoguesResult {
   );
 
   const toggleFavorite = useCallback(
-    async (id: DialogueId) => {
+    async (id: WritingVaultEntryId) => {
       await toggleDialogueFavorite(id);
       setDialogues(await readDialoguesByProject(projectId));
     },

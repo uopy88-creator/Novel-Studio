@@ -1,9 +1,8 @@
 /**
  * =============================================================================
- * Writing Vault Entry — 통합 타입
+ * Writing Vault Entry — 텍스트 저장소 단일 모델
  * -----------------------------------------------------------------------------
- * sentence | word | memo | foreshadowing | inspiration
- * 모든 항목이 동일한 Storage / Repository / Mapper 를 사용한다.
+ * 원고 위치(document / section)와 연결하지 않는다.
  * =============================================================================
  */
 
@@ -34,7 +33,7 @@ export const WRITING_VAULT_TYPE_LABELS: Record<WritingVaultType, string> = {
   inspiration: "Inspiration",
 };
 
-/** 영감 출처 (sentence/word/inspiration 공통) */
+/** 영감 출처 (작품명·작가·메모) */
 export interface WritingVaultReference {
   workTitle: string;
   author: string;
@@ -46,13 +45,8 @@ export function emptyWritingVaultReference(): WritingVaultReference {
 }
 
 /**
- * 타입별 확장 필드.
- * UI·어댑터가 해석하며, DB 에는 meta jsonb 로 저장한다.
- */
-export type WritingVaultMeta = Record<string, unknown>;
-
-/**
- * Writing Vault 한 항목 — Single Source of Truth
+ * Writing Vault 한 항목.
+ * 이 필드 외에는 두지 않는다. (documentId / sectionStableId / meta 금지)
  */
 export interface WritingVaultEntry extends Timestamps {
   id: WritingVaultEntryId;
@@ -63,10 +57,6 @@ export interface WritingVaultEntry extends Timestamps {
   tags: string[];
   reference: WritingVaultReference;
   isFavorite: boolean;
-  isPinned: boolean;
-  sectionStableId?: string;
-  documentId?: string;
-  meta: WritingVaultMeta;
 }
 
 export function isWritingVaultType(value: unknown): value is WritingVaultType {
@@ -79,7 +69,7 @@ export function isWritingVaultType(value: unknown): value is WritingVaultType {
   );
 }
 
-/** 레거시/입력값을 정규화 (idea → inspiration) */
+/** 레거시 idea → inspiration */
 export function normalizeWritingVaultType(value: unknown): WritingVaultType {
   if (value === "idea") return "inspiration";
   if (isWritingVaultType(value)) return value;

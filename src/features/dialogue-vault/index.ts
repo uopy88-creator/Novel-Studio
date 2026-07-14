@@ -17,5 +17,4 @@ export type {
   WritingVaultEntry,
   WritingVaultType,
   WritingVaultReference,
-  Dialogue,
 } from "./types/dialogue";

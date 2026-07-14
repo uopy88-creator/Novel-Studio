@@ -8,15 +8,15 @@
  * =============================================================================
  */
 
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 
 export interface DialogueDeleteDialogProps {
   open: boolean;
-  dialogue: Dialogue | null;
+  dialogue: WritingVaultEntry | null;
   onClose: () => void;
-  onConfirm: (dialogue: Dialogue) => void;
+  onConfirm: (dialogue: WritingVaultEntry) => void;
 }
 
 export function DialogueDeleteDialog({

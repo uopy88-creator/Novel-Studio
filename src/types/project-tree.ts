@@ -14,7 +14,7 @@
  *  ├─ Chapters[]                   ← 원고의 뼈대 (순서 있는 장)
  *  │    └─ Manuscript (1:1)        ← 그 장의 실제 본문
  *  ├─ Characters[]                 ← 집필 중 바로 찾아보는 인물 카드
- *  ├─ Dialogues[]                  ← 대사 금고 (인물·챕터에 느슨하게 연결)
+ *  ├─ WritingVaultEntries[]        ← 텍스트 금고 (원고 위치와 연결하지 않음)
  *  ├─ Foreshadowings[]             ← 복선 추적 (심기/회수 챕터 연결)
  *  ├─ Memos[]                      ← 빠른 메모 (어디에든 붙여 둘 수 있음)
  *  └─ WritingSessions[]            ← 집필 통계의 원천 기록
@@ -25,7 +25,7 @@
  *    → "이 데이터가 어느 작품 것인가?"를 항상 알 수 있다.
  * 2. 강한 연결 vs 느슨한 연결을 구분한다.
  *    - 강함: Chapter ↔ Manuscript (장 없이 본문만 존재하면 안 됨)
- *    - 느슨: Dialogue.characterId (아직 누구 대사인지 몰라도 저장 가능)
+ *    - Writing Vault 는 원고 document/section 과 연결하지 않는다.
  * 3. 세계관(World Bible)보다 Chapter/Manuscript가 중심이다.
  *    → 설정은 글을 쓰기 위한 보조 도구로 둔다.
  *
@@ -38,7 +38,7 @@
 import type { Chapter } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
 import type { Character } from "@/features/characters/types/character";
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
 import type { Foreshadowing } from "@/features/foreshadowing/types/foreshadowing";
 import type { Memo } from "@/features/memo/types/memo";
 import type { Project } from "@/features/projects/types/project";
@@ -64,7 +64,7 @@ export interface ProjectTree {
   /** chapterId 기준으로 Chapter와 1:1 매칭 */
   manuscripts: Manuscript[];
   characters: Character[];
-  dialogues: Dialogue[];
+  writingVaultEntries: WritingVaultEntry[];
   foreshadowings: Foreshadowing[];
   memos: Memo[];
   writingSessions: WritingSession[];
