@@ -4,19 +4,30 @@
  * =============================================================================
  * MobileQuickActionsBar
  * -----------------------------------------------------------------------------
- * 모바일에서 Selection Action Menu(포털 floating) 대신 쓰는 고정 액션 바.
+ * 모바일 Selection Action Menu.
  *
- * 왜 필요한가
- * - iOS/Android textarea 는 네이티브 선택 핸들·콜아웃 때문에 floating 메뉴가
- *   자주 실패하거나 가려진다.
- * - 선택이 생기면 visualViewport 하단에 도킹된 바를 띄워 Highlight 를 바로 누른다.
- * - pointerdown / touchstart 에서 preventDefault 로 선택 해제를 막는다.
+ * - 선택(드래그)한 글자 **조금 위**에 fixed 로 띄운다
+ * - 하단 풀폭 바보다 작게 (컴팩트 칩)
+ * - pointerdown + preventDefault 로 선택 해제 방지
  * =============================================================================
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { ActionEngine } from "@/features/quick-actions/engine/ActionEngine";
+import {
+  decideSelectionMenuPlacement,
+  getTextareaSelectionBoundingClientRect,
+  SELECTION_MENU_GAP_PX,
+  SELECTION_MENU_VIEWPORT_PAD_PX,
+} from "@/features/quick-actions/lib/position";
 import type {
   QuickAction,
   QuickActionSelection,
@@ -27,6 +38,11 @@ export interface MobileQuickActionsBarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   engine: ActionEngine;
   enabled?: boolean;
+}
+
+interface MenuPos {
+  top: number;
+  left: number;
 }
 
 function readSelection(
@@ -48,12 +64,62 @@ function readSelection(
 
 function isMobileViewport(): boolean {
   if (typeof window === "undefined") return false;
-  // Tailwind `md` 와 동일 — 폰만 하단 바, 태블릿+는 데스크톱 메뉴
   try {
     return window.matchMedia("(max-width: 767px)").matches;
   } catch {
     return window.innerWidth < 768;
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** 선택 바로 위(또는 공간 없으면 아래) — viewport fixed 좌표 */
+function computeMenuPos(
+  el: HTMLTextAreaElement,
+  selection: QuickActionSelection,
+  menuWidth: number,
+  menuHeight: number,
+): MenuPos {
+  const rect = getTextareaSelectionBoundingClientRect(
+    el,
+    selection.start,
+    selection.end,
+  );
+  const vv = window.visualViewport;
+  const offsetTop = vv?.offsetTop ?? 0;
+  const offsetLeft = vv?.offsetLeft ?? 0;
+  const viewportW = vv?.width ?? window.innerWidth;
+  const viewportH = vv?.height ?? window.innerHeight;
+  const pad = SELECTION_MENU_VIEWPORT_PAD_PX;
+  // 선택과 메뉴 사이 — “조금 위”
+  const gap = Math.max(4, SELECTION_MENU_GAP_PX - 2);
+
+  const { menuTopViewport } = decideSelectionMenuPlacement({
+    selectionTop: rect.top,
+    selectionBottom: rect.bottom,
+    menuHeight,
+    viewportH: offsetTop + viewportH,
+    gap,
+    viewportPad: pad + offsetTop,
+  });
+
+  const selectionCenterX = rect.left + rect.width / 2;
+  let left = selectionCenterX - menuWidth / 2;
+  left = clamp(
+    left,
+    offsetLeft + pad,
+    offsetLeft + Math.max(pad, viewportW - menuWidth - pad),
+  );
+
+  const top = clamp(
+    menuTopViewport,
+    offsetTop + pad,
+    offsetTop + Math.max(pad, viewportH - menuHeight - pad),
+  );
+
+  return { top, left };
 }
 
 export function MobileQuickActionsBar({
@@ -64,29 +130,39 @@ export function MobileQuickActionsBar({
   const [selection, setSelection] = useState<QuickActionSelection | null>(
     null,
   );
-  const [dockBottom, setDockBottom] = useState(12);
+  const [pos, setPos] = useState<MenuPos | null>(null);
   const [mounted, setMounted] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const place = useCallback(
+    (next: QuickActionSelection) => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const measured = menuRef.current?.getBoundingClientRect();
+      // 컴팩트 메뉴 기본 추정 크기
+      const width = measured && measured.width > 8 ? measured.width : 220;
+      const height = measured && measured.height > 8 ? measured.height : 36;
+      setPos(computeMenuPos(el, next, width, height));
+    },
+    [textareaRef],
+  );
 
   const sync = useCallback(() => {
     if (!enabled || !isMobileViewport()) {
       setSelection(null);
+      setPos(null);
       return;
     }
-    setSelection(readSelection(textareaRef.current));
-  }, [enabled, textareaRef]);
-
-  const syncDock = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const vv = window.visualViewport;
-    if (!vv) {
-      setDockBottom(12);
+    const live = readSelection(textareaRef.current);
+    if (!live) {
+      setSelection(null);
+      setPos(null);
       return;
     }
-    // 키보드·브라우저 UI 위로 올리기
-    const gap = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
-    setDockBottom(gap + 12);
-  }, []);
+    setSelection(live);
+    place(live);
+  }, [enabled, place, textareaRef]);
 
   useEffect(() => {
     setMounted(true);
@@ -99,6 +175,7 @@ export function MobileQuickActionsBar({
   useEffect(() => {
     if (!enabled || !mobile) {
       setSelection(null);
+      setPos(null);
       return;
     }
 
@@ -106,11 +183,9 @@ export function MobileQuickActionsBar({
     const onAny = () => {
       window.setTimeout(sync, 0);
       window.setTimeout(sync, 80);
-      window.setTimeout(sync, 250);
-      syncDock();
+      window.setTimeout(sync, 220);
     };
 
-    // 선택 핸들 드래그 중에도 상태를 잃지 않도록 짧게 폴링
     const timer = window.setInterval(sync, 200);
     el?.addEventListener("select", onAny);
     el?.addEventListener("keyup", onAny);
@@ -122,9 +197,9 @@ export function MobileQuickActionsBar({
       capture: true,
       passive: true,
     });
-    window.visualViewport?.addEventListener("resize", syncDock);
-    window.visualViewport?.addEventListener("scroll", syncDock);
-    syncDock();
+    window.visualViewport?.addEventListener("resize", sync);
+    window.visualViewport?.addEventListener("scroll", sync);
+    window.addEventListener("scroll", sync, true);
 
     return () => {
       window.clearInterval(timer);
@@ -135,38 +210,42 @@ export function MobileQuickActionsBar({
       el?.removeEventListener("focus", onAny);
       document.removeEventListener("selectionchange", onAny);
       document.removeEventListener("touchend", onAny, true);
-      window.visualViewport?.removeEventListener("resize", syncDock);
-      window.visualViewport?.removeEventListener("scroll", syncDock);
+      window.visualViewport?.removeEventListener("resize", sync);
+      window.visualViewport?.removeEventListener("scroll", sync);
+      window.removeEventListener("scroll", sync, true);
     };
-  }, [enabled, mobile, sync, syncDock, textareaRef]);
+  }, [enabled, mobile, sync, textareaRef]);
 
   const actions: QuickAction[] = useMemo(() => {
-    const ctx = {
-      selection: selection ?? { text: " ", start: 0, end: 1 },
+    if (!selection) return [];
+    return engine.getAvailableActions({
+      selection,
       textarea: textareaRef.current,
-    };
-    return engine.getAvailableActions(ctx);
+    });
   }, [engine, selection, textareaRef]);
+
+  // 실제 렌더 크기로 위치 보정 (선택 바로 위)
+  useLayoutEffect(() => {
+    if (!selection || !menuRef.current) return;
+    place(selection);
+  }, [selection, place, actions.length]);
 
   const runAction = useCallback(
     (actionId: string) => {
       const el = textareaRef.current;
       const live = readSelection(el);
       if (!live || !el) return;
-      // 선택이 풀리기 전에 즉시 실행
       void engine.run(actionId, {
         selection: live,
         textarea: el,
       });
-      // Highlight 후 선택을 접어 하늘색 오버레이가 바로 보이게 (iOS)
       if (actionId === "highlight") {
         requestAnimationFrame(() => {
           const target = textareaRef.current;
           if (!target) return;
           try {
-            const end = live.end;
             target.focus();
-            target.setSelectionRange(end, end);
+            target.setSelectionRange(live.end, live.end);
           } catch {
             // ignore
           }
@@ -183,68 +262,63 @@ export function MobileQuickActionsBar({
   const guardPointer = (
     event: React.PointerEvent | React.TouchEvent | React.MouseEvent,
   ) => {
-    // 선택 해제 방지 — iOS 핵심
     event.preventDefault();
     event.stopPropagation();
   };
 
-  if (!enabled || !mobile || !mounted || !selection) return null;
+  if (!enabled || !mobile || !mounted || !selection || !pos || actions.length === 0) {
+    return null;
+  }
 
   const bar = (
     <div
+      ref={menuRef}
       className={cn(
-        "fixed inset-x-0 z-[100] px-3 md:hidden",
-        "pointer-events-none",
+        "fixed z-[100] md:hidden",
+        "flex max-w-[calc(100vw-16px)] flex-nowrap items-center gap-0.5",
+        "overflow-x-auto rounded-full border border-ns-border",
+        "bg-ns-surface/95 px-0.5 py-0.5 shadow-ns-sm backdrop-blur-sm",
+        "[-webkit-overflow-scrolling:touch]",
       )}
-      style={{
-        bottom: `calc(${dockBottom}px + env(safe-area-inset-bottom, 0px))`,
-      }}
+      style={{ top: pos.top, left: pos.left }}
       role="toolbar"
       aria-label="Mobile Quick Actions"
       data-mobile-quick-actions=""
     >
-      <div
-        className={cn(
-          "pointer-events-auto mx-auto flex w-full max-w-lg",
-          "flex-nowrap items-center gap-1 overflow-x-auto",
-          "rounded-2xl border border-ns-border bg-ns-surface/95 px-1.5 py-1.5",
-          "shadow-ns-md backdrop-blur-sm",
-          "[-webkit-overflow-scrolling:touch]",
-        )}
-      >
-        {actions.map((action) => {
-          const isHighlight = action.id === "highlight";
-          return (
-            <button
-              key={action.id}
-              type="button"
-              data-quick-action={action.id}
-              className={cn(
-                "inline-flex min-h-11 shrink-0 items-center justify-center gap-2",
-                "rounded-full px-3.5 text-sm font-medium text-ns-ink",
-                "active:bg-ns-muted",
-                "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
-                isHighlight && "bg-[#BFE8FF] active:bg-[#A8DEFF]",
-              )}
-              onPointerDown={(event) => {
-                guardPointer(event);
-                runAction(action.id);
-              }}
-              onTouchStart={(event) => {
-                guardPointer(event);
-              }}
-              onClick={(event) => {
-                // pointerdown 에서 이미 실행 — 이중 실행 방지
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <span aria-hidden>{action.icon}</span>
-              <span className="whitespace-nowrap">{action.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {actions.map((action) => {
+        const isHighlight = action.id === "highlight";
+        return (
+          <button
+            key={action.id}
+            type="button"
+            data-quick-action={action.id}
+            className={cn(
+              // 현재보다 작게: min-h-11(44) → 32, text-sm → xs, padding 축소
+              "inline-flex h-8 shrink-0 items-center justify-center gap-1",
+              "rounded-full px-2 text-[11px] font-medium leading-none text-ns-ink",
+              "active:bg-ns-muted",
+              "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
+              isHighlight && "bg-[#BFE8FF] active:bg-[#A8DEFF]",
+            )}
+            onPointerDown={(event) => {
+              guardPointer(event);
+              runAction(action.id);
+            }}
+            onTouchStart={(event) => {
+              guardPointer(event);
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <span aria-hidden className="text-[12px] leading-none">
+              {action.icon}
+            </span>
+            <span className="whitespace-nowrap">{action.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 
