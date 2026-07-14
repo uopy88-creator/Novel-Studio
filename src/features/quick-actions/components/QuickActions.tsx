@@ -8,6 +8,7 @@
  * - Action Registry 를 읽어 버튼을 자동 생성한다.
  * - 위치는 Selection 변경 시에만 재계산 (스크롤 중 재계산 없음 → 스크롤 시 닫음).
  * - 메뉴는 document.body 포털 + position:fixed 로 렌더해 overflow 잘림을 피한다.
+ * - 모바일: touchend 직후 selection 이 늦게 잡히므로 지연 동기화 + selectionchange.
  * =============================================================================
  */
 
@@ -48,6 +49,9 @@ interface MenuState {
   measured: boolean;
 }
 
+/** iOS/Android — touchend 직후 selection 이 비어 있을 수 있어 재시도 */
+const TOUCH_SYNC_DELAYS_MS = [0, 50, 120, 280] as const;
+
 function readSelection(
   el: HTMLTextAreaElement | null,
 ): QuickActionSelection | null {
@@ -74,9 +78,17 @@ export function QuickActions({
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const lastSelectionKeyRef = useRef<string | null>(null);
+  const touchSyncTimersRef = useRef<number[]>([]);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  const clearTouchSyncTimers = useCallback(() => {
+    for (const id of touchSyncTimersRef.current) {
+      window.clearTimeout(id);
+    }
+    touchSyncTimersRef.current = [];
   }, []);
 
   const placeMenu = useCallback(
@@ -91,7 +103,7 @@ export function QuickActions({
         el,
         selection.start,
         selection.end,
-        measuredSize?.width ?? 320,
+        measuredSize?.width ?? 360,
         measuredSize?.height ?? 52,
         positionParentRef?.current,
       );
@@ -123,12 +135,22 @@ export function QuickActions({
     }
 
     const key = selectionKey(selection);
-    if (key === lastSelectionKeyRef.current) {
+    if (key === lastSelectionKeyRef.current && menuRef.current) {
       return;
     }
     lastSelectionKeyRef.current = key;
     placeMenu(selection);
   }, [enabled, placeMenu, textareaRef]);
+
+  const syncAfterTouch = useCallback(() => {
+    clearTouchSyncTimers();
+    // 모바일에서 selection 확정이 touchend 이후인 경우가 많음
+    touchSyncTimersRef.current = TOUCH_SYNC_DELAYS_MS.map((delay) =>
+      window.setTimeout(() => {
+        syncFromSelection();
+      }, delay),
+    );
+  }, [clearTouchSyncTimers, syncFromSelection]);
 
   // 실제 메뉴 높이/너비로 1회 보정
   useLayoutEffect(() => {
@@ -142,6 +164,7 @@ export function QuickActions({
     if (!enabled) {
       setMenu(null);
       lastSelectionKeyRef.current = null;
+      clearTouchSyncTimers();
       return;
     }
 
@@ -154,6 +177,11 @@ export function QuickActions({
         requestAnimationFrame(syncFromSelection);
       };
       const onTouchEnd = () => {
+        syncAfterTouch();
+      };
+      const onPointerUp = (event: PointerEvent) => {
+        // 터치 포인터는 touchend 경로로 처리
+        if (event.pointerType === "touch") return;
         requestAnimationFrame(syncFromSelection);
       };
       const onKeyUp = (event: KeyboardEvent) => {
@@ -165,25 +193,55 @@ export function QuickActions({
         requestAnimationFrame(syncFromSelection);
       };
       const onSelect = () => {
+        // iOS 장문 선택 핸들 드래그 중/후에 발생
         requestAnimationFrame(syncFromSelection);
       };
       const onScroll = () => {
         setMenu(null);
         lastSelectionKeyRef.current = null;
+        clearTouchSyncTimers();
+      };
+
+      // document selectionchange — 모바일 선택 핸들 조작 시 textarea 이벤트만으로는 부족
+      const onSelectionChange = () => {
+        if (document.activeElement !== el) return;
+        requestAnimationFrame(syncFromSelection);
+      };
+
+      const onVisualViewportChange = () => {
+        // 키보드 열림/닫힘 — 메뉴가 있으면 위치만 다시 맞춤
+        if (!lastSelectionKeyRef.current) return;
+        const selection = readSelection(el);
+        if (!selection) return;
+        placeMenu(selection);
       };
 
       el.addEventListener("mouseup", onMouseUp);
-      el.addEventListener("touchend", onTouchEnd);
+      el.addEventListener("touchend", onTouchEnd, { passive: true });
+      el.addEventListener("pointerup", onPointerUp);
       el.addEventListener("keyup", onKeyUp);
       el.addEventListener("select", onSelect);
       el.addEventListener("scroll", onScroll);
+      document.addEventListener("selectionchange", onSelectionChange);
+      window.visualViewport?.addEventListener("resize", onVisualViewportChange);
+      window.visualViewport?.addEventListener("scroll", onVisualViewportChange);
 
       return () => {
         el.removeEventListener("mouseup", onMouseUp);
         el.removeEventListener("touchend", onTouchEnd);
+        el.removeEventListener("pointerup", onPointerUp);
         el.removeEventListener("keyup", onKeyUp);
         el.removeEventListener("select", onSelect);
         el.removeEventListener("scroll", onScroll);
+        document.removeEventListener("selectionchange", onSelectionChange);
+        window.visualViewport?.removeEventListener(
+          "resize",
+          onVisualViewportChange,
+        );
+        window.visualViewport?.removeEventListener(
+          "scroll",
+          onVisualViewportChange,
+        );
       };
     };
 
@@ -207,9 +265,28 @@ export function QuickActions({
     return () => {
       cancelled = true;
       if (retryTimer != null) window.clearInterval(retryTimer);
+      clearTouchSyncTimers();
       detach?.();
     };
-  }, [enabled, syncFromSelection, textareaRef]);
+  }, [
+    clearTouchSyncTimers,
+    enabled,
+    placeMenu,
+    syncAfterTouch,
+    syncFromSelection,
+    textareaRef,
+  ]);
+
+  const runAction = useCallback(
+    (actionId: string, ctx: QuickActionContext) => {
+      void engine.run(actionId, ctx).then(() => {
+        setMenu(null);
+        lastSelectionKeyRef.current = null;
+        clearTouchSyncTimers();
+      });
+    },
+    [clearTouchSyncTimers, engine],
+  );
 
   const ctx: QuickActionContext | null = useMemo(() => {
     if (!menu) return null;
@@ -230,9 +307,11 @@ export function QuickActions({
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-[9999] flex flex-nowrap items-center gap-1",
+        // 1열 유지 — 좁은 화면에서는 가로 스크롤 (Highlight 가 맨 앞)
+        "fixed z-[9999] flex max-w-[calc(100vw-16px)] flex-nowrap items-center gap-1 overflow-x-auto",
         "rounded-full border border-ns-border bg-ns-surface",
         "px-1 py-1 shadow-ns-md",
+        "[-webkit-overflow-scrolling:touch]",
       )}
       style={{ top: menu.top, left: menu.left }}
       role="toolbar"
@@ -253,13 +332,12 @@ export function QuickActions({
               "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
               isHighlight && "bg-[#BFE8FF] hover:bg-[#A8DEFF]",
             )}
-            onMouseDown={(event) => {
+            onPointerDown={(event) => {
+              // 선택 해제 방지 (마우스·터치 공통)
               event.preventDefault();
+              event.stopPropagation();
               if (!ctx) return;
-              void engine.run(action.id, ctx).then(() => {
-                setMenu(null);
-                lastSelectionKeyRef.current = null;
-              });
+              runAction(action.id, ctx);
             }}
           >
             <span aria-hidden>{action.icon}</span>

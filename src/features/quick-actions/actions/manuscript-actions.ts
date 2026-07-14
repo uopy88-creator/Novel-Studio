@@ -69,7 +69,7 @@ export function createHighlightAction(options: {
 }): QuickAction {
   return {
     id: "highlight",
-    label: "하이라이트",
+    label: "Highlight",
     icon: "🖍",
     // 맨 앞 — Selection Action Menu 에서 바로 보이게
     priority: 1,
