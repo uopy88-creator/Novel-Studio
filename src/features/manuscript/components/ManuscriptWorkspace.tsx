@@ -551,8 +551,8 @@ export function ManuscriptWorkspace({
               <InspirationGutter
                 content={plainContent}
                 inspirations={gutterInspirations}
+                textareaRef={editorRef}
                 onOpen={(item) => setViewingInspiration(item)}
-                className="z-20 pt-ns-5"
               />
               <CharacterMentionField
                 value={plainContent}
