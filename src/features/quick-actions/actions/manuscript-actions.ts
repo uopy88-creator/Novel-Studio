@@ -69,10 +69,10 @@ export function createHighlightAction(options: {
 }): QuickAction {
   return {
     id: "highlight",
-    label: "Highlight",
-    icon: "🖍",
-    // Sentence Assistant 다음 — 메뉴 우측 잘림 방지로 앞쪽에 배치
-    priority: 15,
+    label: "하이라이트",
+    icon: "H",
+    // 맨 앞 — Selection Action Menu 에서 바로 보이게
+    priority: 1,
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
     execute: (ctx) => {
       options.toggleHighlight(ctx.selection);

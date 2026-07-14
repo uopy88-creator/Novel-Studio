@@ -208,21 +208,6 @@ export function ManuscriptWorkspace({
   // Quick Actions: Registry 에 Action 등록 → UI 버튼 자동 생성 (하드코딩 없음)
   const quickActionEngine = useMemo(() => {
     const registry = createActionRegistry([
-      createSentenceAssistantAction({
-        openAssistant: (selection) => {
-          sentenceAssistantRef.current?.openFromSelection(selection);
-        },
-      }),
-      createInspirationSaveAction({
-        saveInspiration: (selection) => {
-          setPendingSelection(selection);
-        },
-      }),
-      createMemoSaveAction({
-        openMemo: (selection) => {
-          setPendingMemoSelection(selection);
-        },
-      }),
       createHighlightAction({
         toggleHighlight: (selection) => {
           const next = toggleHighlightInContent(
@@ -238,6 +223,21 @@ export function ManuscriptWorkspace({
             el.focus();
             el.setSelectionRange(selection.start, selection.end);
           });
+        },
+      }),
+      createSentenceAssistantAction({
+        openAssistant: (selection) => {
+          sentenceAssistantRef.current?.openFromSelection(selection);
+        },
+      }),
+      createInspirationSaveAction({
+        saveInspiration: (selection) => {
+          setPendingSelection(selection);
+        },
+      }),
+      createMemoSaveAction({
+        openMemo: (selection) => {
+          setPendingMemoSelection(selection);
         },
       }),
     ]);

@@ -18,6 +18,9 @@
 export interface QuickActionsPosition {
   top: number;
   left: number;
+  /** viewport 기준 좌표 — position:fixed 메뉴용 */
+  viewportTop: number;
+  viewportLeft: number;
   /** 테스트용 — viewport 기준 선택 rect */
   selectionRect?: DOMRect;
   placement?: "above" | "below";
@@ -190,6 +193,8 @@ export function estimateQuickActionsPosition(
   return {
     top: menuTopViewport - parentRect.top,
     left: menuLeftViewport - parentRect.left,
+    viewportTop: menuTopViewport,
+    viewportLeft: menuLeftViewport,
     selectionRect,
     placement,
   };

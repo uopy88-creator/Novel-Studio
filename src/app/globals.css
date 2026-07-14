@@ -305,3 +305,10 @@ body {
   outline: none;
   box-shadow: var(--ns-ring-accent);
 }
+
+/* Manuscript 하늘색 Highlight (단일 색) */
+mark[data-ns-hl="sky"] {
+  background-color: #bfe8ff;
+  color: inherit;
+  border-radius: 0.125rem;
+}

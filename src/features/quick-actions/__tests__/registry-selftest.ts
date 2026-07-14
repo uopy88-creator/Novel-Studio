@@ -63,7 +63,7 @@ async function main() {
   assert.equal(registry.size, 4);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "highlight", "inspiration-save", "memo-save"],
+    ["highlight", "sentence-assistant", "inspiration-save", "memo-save"],
   );
 
   await engine.run("sentence-assistant", ctx);
@@ -91,9 +91,9 @@ async function main() {
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
     [
+      "highlight",
       "dummy-action",
       "sentence-assistant",
-      "highlight",
       "inspiration-save",
       "memo-save",
     ],
@@ -113,7 +113,7 @@ async function main() {
   assert.equal(registry.has("dummy-action"), false);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "highlight", "inspiration-save", "memo-save"],
+    ["highlight", "sentence-assistant", "inspiration-save", "memo-save"],
   );
 
   console.log("quick-actions registry-selftest: ok");
