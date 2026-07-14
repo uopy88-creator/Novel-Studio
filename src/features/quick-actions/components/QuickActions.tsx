@@ -170,13 +170,28 @@ export function QuickActions({
       selectionRef.current = selection;
       lastKeyRef.current = selectionKey(selection);
       emptyTicksRef.current = 0;
-      setMenu({
-        top,
-        left,
-        bottom,
-        selection,
-        measured: Boolean(measuredSize),
-        docked,
+      setMenu((prev) => {
+        // 드래그 중 동일 선택·거의 같은 좌표면 setState 생략
+        if (
+          prev &&
+          prev.selection.start === selection.start &&
+          prev.selection.end === selection.end &&
+          prev.docked === docked &&
+          prev.measured === Boolean(measuredSize) &&
+          Math.abs(prev.top - top) < 1 &&
+          Math.abs(prev.left - left) < 1 &&
+          prev.bottom === bottom
+        ) {
+          return prev;
+        }
+        return {
+          top,
+          left,
+          bottom,
+          selection,
+          measured: Boolean(measuredSize),
+          docked,
+        };
       });
     },
     [positionParentRef, textareaRef],
@@ -193,6 +208,7 @@ export function QuickActions({
     const selection = readSelection(el);
     if (selection) {
       const key = selectionKey(selection);
+      // 같은 선택이면 위치 재계산 생략 (스크롤·리사이즈는 onViewport 가 처리)
       if (key !== lastKeyRef.current || !menuRef.current) {
         placeMenu(selection);
       }
@@ -207,15 +223,25 @@ export function QuickActions({
     }
   }, [closeMenu, enabled, placeMenu, textareaRef]);
 
-  // 핵심: focus 중 폴링 (모바일 선택 핸들·지연 selection 대응)
+  // 핵심: focus/선택 중만 폴링 — 타이핑 중 상시 폴링 제거
   useEffect(() => {
     if (!enabled) {
       closeMenu();
       return;
     }
 
+    let rafId = 0;
+    const scheduleRefresh = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        refreshFromTextarea();
+      });
+    };
+
     const onFocusIn = () => {
-      refreshFromTextarea();
+      scheduleRefresh();
+      startPoll();
     };
     const onFocusOut = () => {
       window.setTimeout(() => {
@@ -223,31 +249,39 @@ export function QuickActions({
         if (!el) return;
         if (menuRef.current?.contains(document.activeElement)) return;
         if (document.activeElement === el) return;
-        // 포커스가 완전히 떠났고 선택도 없으면 닫기
-        if (!readSelection(el)) closeMenu();
+        if (!readSelection(el)) {
+          closeMenu();
+          stopPoll();
+        }
       }, 50);
     };
 
     const onDocTouchEnd = () => {
-      // 선택 핸들 조작 직후
-      window.setTimeout(refreshFromTextarea, 0);
-      window.setTimeout(refreshFromTextarea, 100);
-      window.setTimeout(refreshFromTextarea, 300);
+      window.setTimeout(scheduleRefresh, 0);
+      window.setTimeout(scheduleRefresh, 100);
     };
 
     const onMouseUp = () => {
-      window.requestAnimationFrame(refreshFromTextarea);
+      scheduleRefresh();
     };
 
     const onSelect = () => {
-      window.requestAnimationFrame(refreshFromTextarea);
+      scheduleRefresh();
     };
 
     const onSelectionChange = () => {
       const el = textareaRef.current;
       if (!el) return;
+      // 포커스가 없고 메뉴도 없으면 무시 (타이핑 외 전역 selectionchange 폭주 방지)
       if (document.activeElement !== el && !lastKeyRef.current) return;
-      window.requestAnimationFrame(refreshFromTextarea);
+      // collapsed 선택은 메뉴를 열지 않으므로, 메뉴가 없을 때는 즉시 스킵
+      if (
+        !lastKeyRef.current &&
+        el.selectionStart === el.selectionEnd
+      ) {
+        return;
+      }
+      scheduleRefresh();
     };
 
     const onViewport = () => {
@@ -276,6 +310,8 @@ export function QuickActions({
           readSelection(el)
         ) {
           refreshFromTextarea();
+        } else {
+          stopPoll();
         }
       }, POLL_MS);
     };
@@ -286,7 +322,14 @@ export function QuickActions({
       }
     };
 
-    startPoll();
+    // 초기에는 폴링하지 않음 — focus 또는 선택이 있을 때만
+    if (
+      document.activeElement === textareaRef.current ||
+      readSelection(textareaRef.current)
+    ) {
+      startPoll();
+      scheduleRefresh();
+    }
 
     const bind = (el: HTMLTextAreaElement) => {
       el.addEventListener("focus", onFocusIn);
@@ -315,7 +358,7 @@ export function QuickActions({
       bind(el);
     };
     ensureAttached();
-    const attachTimer = window.setInterval(ensureAttached, 500);
+    const attachTimer = window.setInterval(ensureAttached, 1000);
 
     document.addEventListener("touchend", onDocTouchEnd, {
       capture: true,
@@ -327,6 +370,7 @@ export function QuickActions({
     window.addEventListener("resize", onViewport);
 
     return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
       stopPoll();
       window.clearInterval(attachTimer);
       if (attached) unbind(attached);

@@ -34,8 +34,20 @@ export const SELECTION_MENU_VIEWPORT_PAD_PX = 8;
 
 /**
  * textarea 선택 구간의 viewport BoundingClientRect.
- * 미러 div 를 textarea 와 같은 화면 위치에 올려 span 을 측정한다.
+ * 미러 div 를 재사용해 selectionchange 드래그 중 DOM 할당을 줄인다.
  */
+let sharedMirror: HTMLDivElement | null = null;
+
+function getSharedMirror(): HTMLDivElement {
+  if (sharedMirror && sharedMirror.isConnected) return sharedMirror;
+  const mirror = document.createElement("div");
+  mirror.setAttribute("data-ns-qa-mirror", "1");
+  mirror.setAttribute("aria-hidden", "true");
+  document.body.appendChild(mirror);
+  sharedMirror = mirror;
+  return mirror;
+}
+
 export function getTextareaSelectionBoundingClientRect(
   el: HTMLTextAreaElement,
   selectionStart: number,
@@ -46,8 +58,7 @@ export function getTextareaSelectionBoundingClientRect(
   const elRect = el.getBoundingClientRect();
   const style = window.getComputedStyle(el);
 
-  const mirror = document.createElement("div");
-  mirror.setAttribute("data-ns-qa-mirror", "1");
+  const mirror = getSharedMirror();
   mirror.style.cssText = [
     "position:fixed",
     `top:${elRect.top}px`,
@@ -60,6 +71,7 @@ export function getTextareaSelectionBoundingClientRect(
     "white-space:pre-wrap",
     "word-wrap:break-word",
     "overflow-wrap:break-word",
+    "z-index:-1",
     `box-sizing:${style.boxSizing}`,
     `padding:${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
     `border:${style.borderTopWidth} ${style.borderRightWidth} ${style.borderBottomWidth} ${style.borderLeftWidth}`,
@@ -78,19 +90,17 @@ export function getTextareaSelectionBoundingClientRect(
   const selected = value.slice(start, end) || "\u200b";
   const after = value.slice(end);
 
+  mirror.replaceChildren();
   const mark = document.createElement("span");
   mark.textContent = selected;
-
   mirror.appendChild(document.createTextNode(before));
   mirror.appendChild(mark);
   mirror.appendChild(document.createTextNode(after.length > 0 ? after : "."));
-  document.body.appendChild(mirror);
 
   mirror.scrollTop = el.scrollTop;
   mirror.scrollLeft = el.scrollLeft;
 
   const markRect = mark.getBoundingClientRect();
-  document.body.removeChild(mirror);
 
   return new DOMRect(
     markRect.left,

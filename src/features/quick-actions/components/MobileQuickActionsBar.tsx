@@ -160,7 +160,17 @@ export function MobileQuickActionsBar({
       setPos(null);
       return;
     }
-    setSelection(live);
+    setSelection((prev) => {
+      if (
+        prev &&
+        prev.start === live.start &&
+        prev.end === live.end &&
+        prev.text === live.text
+      ) {
+        return prev;
+      }
+      return live;
+    });
     place(live);
   }, [enabled, place, textareaRef]);
 
@@ -180,39 +190,83 @@ export function MobileQuickActionsBar({
     }
 
     const el = textareaRef.current;
-    const onAny = () => {
-      window.setTimeout(sync, 0);
-      window.setTimeout(sync, 80);
-      window.setTimeout(sync, 220);
+    let rafId = 0;
+    const scheduleSync = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        sync();
+      });
     };
 
-    const timer = window.setInterval(sync, 200);
+    const onAny = () => {
+      scheduleSync();
+      window.setTimeout(scheduleSync, 80);
+    };
+
+    // 선택이 있을 때만 폴링 — 상시 200ms 폴링 제거
+    let pollTimer: number | null = null;
+    const startPoll = () => {
+      if (pollTimer != null) return;
+      pollTimer = window.setInterval(() => {
+        const live = readSelection(textareaRef.current);
+        if (!live) {
+          if (pollTimer != null) {
+            window.clearInterval(pollTimer);
+            pollTimer = null;
+          }
+          setSelection(null);
+          setPos(null);
+          return;
+        }
+        sync();
+      }, 200);
+    };
+
+    const onSelectionChange = () => {
+      const target = textareaRef.current;
+      if (!target) return;
+      if (document.activeElement !== target && !readSelection(target)) return;
+      if (target.selectionStart === target.selectionEnd) {
+        scheduleSync();
+        return;
+      }
+      startPoll();
+      scheduleSync();
+    };
+
     el?.addEventListener("select", onAny);
     el?.addEventListener("keyup", onAny);
     el?.addEventListener("mouseup", onAny);
     el?.addEventListener("touchend", onAny, { passive: true });
     el?.addEventListener("focus", onAny);
-    document.addEventListener("selectionchange", onAny);
+    document.addEventListener("selectionchange", onSelectionChange);
     document.addEventListener("touchend", onAny, {
       capture: true,
       passive: true,
     });
-    window.visualViewport?.addEventListener("resize", sync);
-    window.visualViewport?.addEventListener("scroll", sync);
-    window.addEventListener("scroll", sync, true);
+    window.visualViewport?.addEventListener("resize", scheduleSync);
+    window.visualViewport?.addEventListener("scroll", scheduleSync);
+    window.addEventListener("scroll", scheduleSync, true);
+
+    if (readSelection(el)) {
+      startPoll();
+      scheduleSync();
+    }
 
     return () => {
-      window.clearInterval(timer);
+      if (rafId) window.cancelAnimationFrame(rafId);
+      if (pollTimer != null) window.clearInterval(pollTimer);
       el?.removeEventListener("select", onAny);
       el?.removeEventListener("keyup", onAny);
       el?.removeEventListener("mouseup", onAny);
       el?.removeEventListener("touchend", onAny);
       el?.removeEventListener("focus", onAny);
-      document.removeEventListener("selectionchange", onAny);
+      document.removeEventListener("selectionchange", onSelectionChange);
       document.removeEventListener("touchend", onAny, true);
-      window.visualViewport?.removeEventListener("resize", sync);
-      window.visualViewport?.removeEventListener("scroll", sync);
-      window.removeEventListener("scroll", sync, true);
+      window.visualViewport?.removeEventListener("resize", scheduleSync);
+      window.visualViewport?.removeEventListener("scroll", scheduleSync);
+      window.removeEventListener("scroll", scheduleSync, true);
     };
   }, [enabled, mobile, sync, textareaRef]);
 

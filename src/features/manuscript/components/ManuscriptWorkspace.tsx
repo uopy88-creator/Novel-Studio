@@ -73,6 +73,7 @@ import {
   estimateManuscriptSheets,
 } from "@/lib/stats";
 import { readInspirationsByProject } from "@/features/inspiration/lib/inspiration-storage";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 
 export interface ManuscriptWorkspaceProps {
   projectId: ProjectId;
@@ -100,6 +101,8 @@ export function ManuscriptWorkspace({
 }: ManuscriptWorkspaceProps) {
   const sectionDeepLink = initialSectionId ?? initialSceneId;
   const { settings } = useUserSettings();
+  // Selection Action Menu 는 뷰포트별로 하나만 마운트 (CSS 숨김만 하면 리스너가 이중 등록됨)
+  const isMobileViewport = useMediaQuery("(max-width: 767px)");
 
   const {
     isReady,
@@ -268,9 +271,10 @@ export function ManuscriptWorkspace({
     setProjectInspirations(await readInspirationsByProject(projectId));
   }, [projectId]);
 
+  // 키 입력마다 읽지 않는다 — 마운트·Inspiration CRUD 이후에만 갱신
   useEffect(() => {
     void refreshInspirations();
-  }, [refreshInspirations, content]);
+  }, [refreshInspirations]);
 
   /** Inspiration 오프셋은 이미 프로젝트 원고 좌표로 저장 (마이그레이션 후) */
   const gutterInspirations = useMemo(
@@ -534,12 +538,14 @@ export function ManuscriptWorkspace({
 
             <SearchBar content={plainContent} onJump={jumpToMatch} />
 
-            {/* 모바일: 선택 시 하단 고정 액션 바 (Highlight 등) */}
-            <MobileQuickActionsBar
-              textareaRef={editorRef}
-              engine={quickActionEngine}
-              enabled={Boolean(primaryDocumentId)}
-            />
+            {/* 모바일: 선택 시 선택 위 액션 바 (Highlight 등) */}
+            {isMobileViewport ? (
+              <MobileQuickActionsBar
+                textareaRef={editorRef}
+                engine={quickActionEngine}
+                enabled={Boolean(primaryDocumentId)}
+              />
+            ) : null}
 
             <div ref={editorShellRef} className="relative">
               <InspirationGutter
@@ -565,14 +571,14 @@ export function ManuscriptWorkspace({
                 }}
               />
               {/* 데스크톱 floating 메뉴 — 모바일은 MobileQuickActionsBar 사용 */}
-              <div className="hidden md:block">
+              {!isMobileViewport ? (
                 <QuickActions
                   textareaRef={editorRef}
                   positionParentRef={editorShellRef}
                   engine={quickActionEngine}
                   enabled={Boolean(primaryDocumentId)}
                 />
-              </div>
+              ) : null}
               <SentenceAssistantHost
                 ref={sentenceAssistantRef}
                 textareaRef={editorRef}
