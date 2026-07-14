@@ -3,9 +3,28 @@
 -- =============================================================================
 -- idea → inspiration
 -- memos / foreshadowings / inspirations → writing_vault 복사
+--
+-- 주의: 소스 테이블에 section_stable_id 등이 없을 수 있으므로
+--       복사 전에 선택 컬럼을 먼저 보장한다.
 -- =============================================================================
 
--- 1) 공통 컬럼
+-- 0) 소스 테이블 선택 컬럼 보장 (없으면 INSERT 가 실패함)
+alter table public.memos
+  add column if not exists section_stable_id text;
+
+alter table public.memos
+  add column if not exists source_text text;
+
+alter table public.foreshadowings
+  add column if not exists planted_section_stable_id text;
+
+alter table public.foreshadowings
+  add column if not exists payoff_section_stable_id text;
+
+alter table public.inspirations
+  add column if not exists section_stable_id text;
+
+-- 1) writing_vault 공통 컬럼
 alter table public.writing_vault
   add column if not exists meta jsonb not null default '{}'::jsonb;
 
