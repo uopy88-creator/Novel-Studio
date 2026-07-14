@@ -32,4 +32,5 @@ export {
   createSentenceAssistantAction,
   createInspirationSaveAction,
   createMemoSaveAction,
+  createHighlightAction,
 } from "@/features/quick-actions/actions/manuscript-actions";

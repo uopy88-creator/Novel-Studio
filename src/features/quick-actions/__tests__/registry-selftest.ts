@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   createActionEngine,
   createActionRegistry,
+  createHighlightAction,
   createInspirationSaveAction,
   createMemoSaveAction,
   createSentenceAssistantAction,
@@ -28,6 +29,7 @@ async function main() {
   let saOpened = false;
   let inspSaved = false;
   let memoOpened = false;
+  let highlightToggled = false;
 
   registry.register(
     createSentenceAssistantAction({
@@ -50,19 +52,28 @@ async function main() {
       },
     }),
   );
+  registry.register(
+    createHighlightAction({
+      toggleHighlight: () => {
+        highlightToggled = true;
+      },
+    }),
+  );
 
-  assert.equal(registry.size, 3);
+  assert.equal(registry.size, 4);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "inspiration-save", "memo-save"],
+    ["sentence-assistant", "inspiration-save", "memo-save", "highlight"],
   );
 
   await engine.run("sentence-assistant", ctx);
   await engine.run("inspiration-save", ctx);
   await engine.run("memo-save", ctx);
+  await engine.run("highlight", ctx);
   assert.equal(saOpened, true);
   assert.equal(inspSaved, true);
   assert.equal(memoOpened, true);
+  assert.equal(highlightToggled, true);
 
   const dummy: QuickAction = {
     id: "dummy-action",
@@ -79,7 +90,13 @@ async function main() {
   assert.ok(registry.has("dummy-action"));
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["dummy-action", "sentence-assistant", "inspiration-save", "memo-save"],
+    [
+      "dummy-action",
+      "sentence-assistant",
+      "inspiration-save",
+      "memo-save",
+      "highlight",
+    ],
   );
 
   let dummyRan = false;
@@ -96,7 +113,7 @@ async function main() {
   assert.equal(registry.has("dummy-action"), false);
   assert.deepEqual(
     engine.getAvailableActions(ctx).map((a) => a.id),
-    ["sentence-assistant", "inspiration-save", "memo-save"],
+    ["sentence-assistant", "inspiration-save", "memo-save", "highlight"],
   );
 
   console.log("quick-actions registry-selftest: ok");

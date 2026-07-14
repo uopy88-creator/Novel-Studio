@@ -27,11 +27,14 @@ import {
   insertMentionAtCursor,
 } from "@/features/characters/lib/mention";
 import { ManuscriptEditor } from "@/features/manuscript/components/ManuscriptEditor";
+import type { HighlightRange } from "@/features/manuscript/lib/highlight-marks";
 import { cn } from "@/lib/utils/cn";
 
 export interface CharacterMentionFieldProps {
   value: string;
   onChange: (value: string) => void;
+  /** 하늘색 Highlight 오버레이용 (plain 좌표) */
+  highlightRanges?: readonly HighlightRange[];
   characters: Character[];
   documentTitle?: string;
   className?: string;
@@ -86,6 +89,7 @@ function estimateCaretMenuPosition(
 export function CharacterMentionField({
   value,
   onChange,
+  highlightRanges,
   characters,
   documentTitle,
   className,
@@ -287,6 +291,7 @@ export function CharacterMentionField({
         <ManuscriptEditor
           ref={textareaRef}
           value={value}
+          highlightRanges={highlightRanges}
           onChange={(next) => {
             onChange(next);
             requestAnimationFrame(syncMentionFromCursor);

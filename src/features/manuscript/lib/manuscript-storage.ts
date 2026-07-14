@@ -25,6 +25,7 @@ import {
   cloudUpsertManuscript,
 } from "@/database/supabase/manuscripts-repo";
 import { countCharsWithoutSpaces } from "@/lib/stats";
+import { stripHighlights } from "@/features/manuscript/lib/highlight-marks";
 import { MANUSCRIPTS_STORAGE_KEY } from "@/lib/storage/keys";
 import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
@@ -186,7 +187,7 @@ export async function saveManuscriptContent(
     allowEmptyOverwrite = false,
   } = params;
   const timestamp = nowIso();
-  const plainText = content;
+  const plainText = stripHighlights(content);
   const wordCount = countCharsWithoutSpaces(plainText);
 
   // --- 안전장치: 기존 비어 있지 않은 원고 → "" 덮어쓰기 차단 ---

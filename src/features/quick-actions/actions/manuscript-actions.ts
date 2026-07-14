@@ -59,3 +59,22 @@ export function createMemoSaveAction(options: {
     },
   };
 }
+
+/**
+ * Highlight — 선택 구간 하늘색(#BFE8FF) 토글.
+ * 색상 팔레트 없음. Selection Action Menu 전용.
+ */
+export function createHighlightAction(options: {
+  toggleHighlight: (selection: QuickActionSelection) => void;
+}): QuickAction {
+  return {
+    id: "highlight",
+    label: "Highlight",
+    icon: "🖍",
+    priority: 40,
+    isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
+    execute: (ctx) => {
+      options.toggleHighlight(ctx.selection);
+    },
+  };
+}

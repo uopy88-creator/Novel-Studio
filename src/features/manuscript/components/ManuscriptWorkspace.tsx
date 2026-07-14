@@ -49,11 +49,17 @@ import {
   QuickActions,
   createActionEngine,
   createActionRegistry,
+  createHighlightAction,
   createInspirationSaveAction,
   createMemoSaveAction,
   createSentenceAssistantAction,
 } from "@/features/quick-actions";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
+import {
+  applyPlainEditToHighlightedContent,
+  extractHighlights,
+  toggleHighlightInContent,
+} from "@/features/manuscript/lib/highlight-marks";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -152,7 +158,24 @@ export function ManuscriptWorkspace({
   } = useInspirations(projectId);
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef(content);
+  contentRef.current = content;
   const sentenceAssistantRef = useRef<SentenceAssistantHostHandle>(null);
+
+  /** 편집·검색·통계·오프셋은 Highlight mark 를 제거한 plain 기준 */
+  const { plain: plainContent, ranges: highlightRanges } = useMemo(
+    () => extractHighlights(content),
+    [content],
+  );
+
+  const handlePlainContentChange = useCallback(
+    (nextPlain: string) => {
+      setContent(
+        applyPlainEditToHighlightedContent(contentRef.current, nextPlain),
+      );
+    },
+    [setContent],
+  );
   const [characters, setCharacters] = useState<Character[]>([]);
   const [profileId, setProfileId] = useState<CharacterId | null>(null);
   const [mentionActive, setMentionActive] = useState(false);
@@ -199,9 +222,26 @@ export function ManuscriptWorkspace({
           setPendingMemoSelection(selection);
         },
       }),
+      createHighlightAction({
+        toggleHighlight: (selection) => {
+          const next = toggleHighlightInContent(
+            contentRef.current,
+            selection.start,
+            selection.end,
+          );
+          setContentTransactional(next);
+          // 선택 유지 — 다시 클릭하면 제거(토글)
+          requestAnimationFrame(() => {
+            const el = editorRef.current;
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(selection.start, selection.end);
+          });
+        },
+      }),
     ]);
     return createActionEngine(registry);
-  }, []);
+  }, [setContentTransactional]);
 
   // 열린 프로필은 스냅샷이 아니라 live characters 에서 id 로 해석
   const profileCharacter = useMemo(
@@ -227,15 +267,15 @@ export function ManuscriptWorkspace({
   );
 
   const stats = useMemo(() => {
-    const totalChars = countCharsWithSpaces(content);
-    const charsWithoutSpaces = countCharsWithoutSpaces(content);
+    const totalChars = countCharsWithSpaces(plainContent);
+    const charsWithoutSpaces = countCharsWithoutSpaces(plainContent);
     return {
       totalChars,
       charsWithoutSpaces,
       manuscriptSheets: estimateManuscriptSheets(charsWithoutSpaces),
       bookPages: estimateBookPages(totalChars),
     };
-  }, [content]);
+  }, [plainContent]);
 
   const scrollToOffset = useCallback(
     (
@@ -251,13 +291,13 @@ export function ManuscriptWorkspace({
       }
       el.setSelectionRange(start, end);
 
-      const before = content.slice(0, start);
+      const before = plainContent.slice(0, start);
       const lineNumber = before.split("\n").length;
       const styles = window.getComputedStyle(el);
       const lineHeight = Number.parseFloat(styles.lineHeight) || 28;
       el.scrollTop = Math.max(0, (lineNumber - 3) * lineHeight);
     },
-    [content],
+    [plainContent],
   );
 
   const jumpToMatch = useCallback(
@@ -410,10 +450,8 @@ export function ManuscriptWorkspace({
                 </Button>
               </div>
               {/*
-               * TODO:
-               * Implement lightweight text annotations without affecting typing performance.
-               * (이전 인라인 마커+오버레이 방식은 입력 지연을 유발해 제거함.
-               *  재도입 시 본문 문자열과 분리된 경량 메타데이터를 검토할 것.)
+               * Highlight 는 Selection Action Menu 전용 (툴바 미추가).
+               * 저장: content 내 <mark data-ns-hl="sky"> · Undo/Redo 는 기존 history.
                */}
               <ContextHelp topic="manuscript" projectId={projectId} />
               {primaryDocumentId ? (
@@ -482,18 +520,19 @@ export function ManuscriptWorkspace({
               </p>
             </div>
 
-            <SearchBar content={content} onJump={jumpToMatch} />
+            <SearchBar content={plainContent} onJump={jumpToMatch} />
 
             <div className="relative">
               <InspirationGutter
-                content={content}
+                content={plainContent}
                 inspirations={gutterInspirations}
                 onOpen={(item) => setViewingInspiration(item)}
                 className="z-10 pt-ns-5"
               />
               <CharacterMentionField
-                value={content}
-                onChange={setContent}
+                value={plainContent}
+                highlightRanges={highlightRanges}
+                onChange={handlePlainContentChange}
                 characters={characters}
                 documentTitle="Manuscript"
                 editorRef={editorRef}
@@ -517,9 +556,14 @@ export function ManuscriptWorkspace({
                 textareaRef={editorRef}
                 projectId={projectId}
                 enabled={Boolean(primaryDocumentId)}
-                onReplaceSelection={(nextContent, caretStart, caretEnd) => {
-                  // 한 번의 transactional 편집 → Undo/Redo · 기존 autosave 경로
-                  setContentTransactional(nextContent);
+                onReplaceSelection={(nextPlain, caretStart, caretEnd) => {
+                  // textarea 는 plain — Highlight 보존 후 transactional 편집
+                  setContentTransactional(
+                    applyPlainEditToHighlightedContent(
+                      contentRef.current,
+                      nextPlain,
+                    ),
+                  );
                   requestAnimationFrame(() => {
                     const el = editorRef.current;
                     if (!el) return;
@@ -553,8 +597,16 @@ export function ManuscriptWorkspace({
             const oldName = profileCharacter.name;
             const newName = input.name.trim();
             if (oldName !== newName) {
+              const nextPlain = replaceMentionNameInText(
+                plainContent,
+                oldName,
+                newName,
+              );
               setContentTransactional(
-                replaceMentionNameInText(content, oldName, newName),
+                applyPlainEditToHighlightedContent(
+                  contentRef.current,
+                  nextPlain,
+                ),
               );
             }
             const updated = await updateCharacter(profileCharacter.id, input);

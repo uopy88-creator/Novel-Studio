@@ -23,6 +23,7 @@ import {
   ensureStableSectionId,
   formatStableSectionId,
 } from "@/features/manuscript/lib/section-ids";
+import { stripHighlights } from "@/features/manuscript/lib/highlight-marks";
 import { countCharsWithoutSpaces } from "@/lib/stats";
 
 /** 마커 줄에 붙는 안정 ID 태그 — section_ / scene_ 모두 수용 */
@@ -56,13 +57,13 @@ function formatMarkerTitle(title: string, stableId: string): string {
  * - 마커가 없으면 전체를 Section 1개로 본다.
  * - 마커 앞의 텍스트가 있으면 prologue 로 앞에 붙인 뒤 번호를 다시 매긴다.
  * - 안정 ID 태그가 없으면 순서 기반 section_NNN 을 부여한다.
- * - 레거시 ·ns:scene_NNN 태그는 그대로 유지한다 (데이터 손실 방지).
+ * - Highlight <mark> 는 plain 으로 제거한 뒤 오프셋을 계산한다.
  */
 export function parseSections(
   content: string,
   config: SectionDelimiterConfig = DEFAULT_SECTION_DELIMITER,
 ): Section[] {
-  const text = content ?? "";
+  const text = stripHighlights(content ?? "");
   const markerRe = buildSectionMarkerRegex(config);
   const lines = text.split("\n");
 
