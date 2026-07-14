@@ -15,12 +15,17 @@ import {
 
 /** 공통 Section 선택지 (읽기 전용) */
 export interface SectionOption {
-  /** select value = Section 안정 ID */
+  /** select value = sectionId (= SectionRef.id) */
   value: string;
   /** 딥링크용 primary Manuscript Document ID (목록 소스 아님) */
   documentId: DocumentId;
-  /** Section 안정 ID — 저장·연결에 사용 */
+  /**
+   * Section 안정 ID — 저장·연결에 사용
+   * @deprecated 신규 코드는 sectionId 사용
+   */
   sectionStableId: string;
+  /** sectionId (= SectionRef.id) — 권장 */
+  sectionId: string;
   /** 표시용 번호 (재정렬 시 변경될 수 있음) */
   sectionNumber: number;
   sectionTitle: string;
@@ -40,6 +45,7 @@ export function sectionOptionsFromRefs(
   return refs.map((ref) => ({
     value: ref.id,
     documentId,
+    sectionId: ref.id,
     sectionStableId: ref.id,
     sectionNumber: ref.number,
     sectionTitle: ref.title,

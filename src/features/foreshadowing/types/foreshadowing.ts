@@ -83,13 +83,13 @@ export interface Foreshadowing extends Timestamps {
   payoffSectionStableId?: string;
 
   /**
-   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
-   * 딥링크 호환용으로만 유지.
+   * @deprecated Document 링크. 신규 쓰기 금지.
+   * 딥링크는 Section Registry primaryDocumentId 사용.
    */
   plantedChapterId?: ChapterId;
 
   /**
-   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
+   * @deprecated Document 링크. 신규 쓰기 금지.
    */
   payoffChapterId?: ChapterId;
 

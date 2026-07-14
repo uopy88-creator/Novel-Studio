@@ -28,7 +28,7 @@ import { CharacterFormModal } from "@/features/characters/components/CharacterFo
 import { useInspirations } from "@/features/inspiration/hooks/useInspirations";
 import { InspirationGutter } from "@/features/inspiration/components/InspirationGutter";
 import { InspirationModal } from "@/features/inspiration/components/InspirationModal";
-import { findSectionStableIdAtOffset } from "@/features/sections";
+import { findSectionIdAtOffset } from "@/features/sections";
 import { InspirationDeleteDialog } from "@/features/inspiration/components/InspirationDeleteDialog";
 import type { TextSelectionRange } from "@/features/inspiration/components/InspirationSelectionMenu";
 import { createMemo } from "@/features/memo/lib/memo-storage";
@@ -580,7 +580,7 @@ export function ManuscriptWorkspace({
               startOffset: pendingSelection.start,
               endOffset: pendingSelection.end,
               sectionStableId:
-                findSectionStableIdAtOffset(
+                findSectionIdAtOffset(
                   content,
                   pendingSelection.start,
                 ) ?? undefined,
@@ -607,7 +607,7 @@ export function ManuscriptWorkspace({
             kind: "note",
             sourceText: pendingMemoSelection.text,
             sectionStableId:
-              findSectionStableIdAtOffset(
+              findSectionIdAtOffset(
                 content,
                 pendingMemoSelection.start,
               ) ?? undefined,

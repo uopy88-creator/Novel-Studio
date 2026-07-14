@@ -43,9 +43,9 @@ export interface ForeshadowingInput {
   /** Section 안정 ID — Registry 로 라벨 해석 */
   plantedSectionStableId?: Foreshadowing["plantedSectionStableId"];
   payoffSectionStableId?: Foreshadowing["payoffSectionStableId"];
-  /** @deprecated Document 링크 — Section 목록 소스 아님 */
+  /** @deprecated Document 링크 — 신규 쓰기 금지. 딥링크는 Registry.primaryDocumentId */
   plantedChapterId?: Foreshadowing["plantedChapterId"];
-  /** @deprecated Document 링크 — Section 목록 소스 아님 */
+  /** @deprecated Document 링크 — 신규 쓰기 금지 */
   payoffChapterId?: Foreshadowing["payoffChapterId"];
   relatedCharacterIds?: Foreshadowing["relatedCharacterIds"];
   importance?: Foreshadowing["importance"];

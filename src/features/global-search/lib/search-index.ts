@@ -27,8 +27,11 @@ import { foreshadowingStatusLabel } from "@/features/foreshadowing/lib/foreshado
 import { readInspirationsByProject } from "@/features/inspiration/lib/inspiration-storage";
 import {
   formatSectionRefLabel,
-  getSectionRegistrySnapshot,
+  getPrimaryDocumentId,
+  getSectionRegistry,
+  listSections,
   mergeSectionBodiesById,
+  resolveSectionLabel,
   sectionRefsFromContent,
 } from "@/features/sections";
 
@@ -102,13 +105,13 @@ export async function buildSearchIndex(
       }
     }
 
-    // Section 목록 = Registry(SSOT). 미준비 시에만 content 에서 보조.
-    const registry = getSectionRegistrySnapshot(projectId);
+    // Section 목록 = Registry Helper(SSOT). 미준비 시에만 content 보조.
+    const registry = getSectionRegistry(projectId);
     const sectionRefs = registry.ready
-      ? registry.sections
+      ? listSections(projectId)
       : sectionRefsFromContent(content);
     const documentIdForHref =
-      registry.primaryDocumentId ?? primaryDocumentId;
+      getPrimaryDocumentId(projectId) ?? primaryDocumentId;
 
     const sectionsWithBody = mergeSectionBodiesById(sectionRefs, content);
     for (const section of sectionsWithBody) {
@@ -149,15 +152,7 @@ export async function buildSearchIndex(
   }
 
   for (const memo of memos) {
-    const sectionLabel = memo.sectionStableId
-      ? (() => {
-          const registry = getSectionRegistrySnapshot(projectId);
-          const ref = registry.sections.find(
-            (s) => s.id === memo.sectionStableId,
-          );
-          return ref ? formatSectionRefLabel(ref) : null;
-        })()
-      : null;
+    const sectionLabel = resolveSectionLabel(projectId, memo.sectionStableId);
 
     docs.push({
       id: `mm-${memo.id}`,
@@ -198,14 +193,6 @@ export async function buildSearchIndex(
   }
 
   for (const item of foreshadowings) {
-    const registry = getSectionRegistrySnapshot(projectId);
-    const plantedLabel = item.plantedSectionStableId
-      ? registry.sections.find((s) => s.id === item.plantedSectionStableId)
-      : null;
-    const payoffLabel = item.payoffSectionStableId
-      ? registry.sections.find((s) => s.id === item.payoffSectionStableId)
-      : null;
-
     docs.push({
       id: `fs-${item.id}`,
       kind: "foreshadowing",
@@ -214,8 +201,8 @@ export async function buildSearchIndex(
         item.title,
         item.description,
         foreshadowingStatusLabel(item.status),
-        plantedLabel ? formatSectionRefLabel(plantedLabel) : null,
-        payoffLabel ? formatSectionRefLabel(payoffLabel) : null,
+        resolveSectionLabel(projectId, item.plantedSectionStableId),
+        resolveSectionLabel(projectId, item.payoffSectionStableId),
       ),
       projectId,
       projectName,
@@ -224,16 +211,6 @@ export async function buildSearchIndex(
   }
 
   for (const insp of inspirations) {
-    const sectionLabel = insp.sectionStableId
-      ? (() => {
-          const registry = getSectionRegistrySnapshot(projectId);
-          const ref = registry.sections.find(
-            (s) => s.id === insp.sectionStableId,
-          );
-          return ref ? formatSectionRefLabel(ref) : null;
-        })()
-      : null;
-
     docs.push({
       id: `rf-insp-${insp.id}`,
       kind: "reference",
@@ -243,7 +220,7 @@ export async function buildSearchIndex(
         insp.author,
         insp.memo,
         insp.selectedText,
-        sectionLabel,
+        resolveSectionLabel(projectId, insp.sectionStableId),
       ),
       projectId,
       projectName,
