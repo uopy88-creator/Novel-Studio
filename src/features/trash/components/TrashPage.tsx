@@ -86,7 +86,7 @@ export function TrashPage({ projectId }: TrashPageProps) {
   return (
     <ContentContainer>
       <header className="mb-ns-6">
-        <p className="ns-caption mb-ns-2">설정</p>
+        <p className="ns-caption mb-ns-2">Studio</p>
         <h2 className="ns-heading">Trash</h2>
         <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
           삭제한 항목이 여기로 이동합니다. 복원하거나 영구삭제할 수 있습니다.
