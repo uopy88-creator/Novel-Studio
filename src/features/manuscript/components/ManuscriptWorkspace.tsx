@@ -47,6 +47,7 @@ import {
 } from "@/features/sentence-assistant";
 import {
   QuickActions,
+  MobileQuickActionsBar,
   createActionEngine,
   createActionRegistry,
   createHighlightAction,
@@ -215,12 +216,21 @@ export function ManuscriptWorkspace({
             selection.end,
           );
           setContentTransactional(next);
-          // 선택 유지 — 다시 클릭하면 제거(토글)
           requestAnimationFrame(() => {
             const el = editorRef.current;
             if (!el) return;
             el.focus();
-            el.setSelectionRange(selection.start, selection.end);
+            // 데스크톱: 선택 유지(재토글 편의)
+            // 모바일: 접어서 하늘색 오버레이가 바로 보이게
+            const mobile =
+              typeof window !== "undefined" &&
+              (window.matchMedia("(max-width: 767px)").matches ||
+                window.matchMedia("(pointer: coarse)").matches);
+            if (mobile) {
+              el.setSelectionRange(selection.end, selection.end);
+            } else {
+              el.setSelectionRange(selection.start, selection.end);
+            }
           });
         },
       }),
@@ -522,6 +532,13 @@ export function ManuscriptWorkspace({
 
             <SearchBar content={plainContent} onJump={jumpToMatch} />
 
+            {/* 모바일: 선택 시 하단 고정 액션 바 (Highlight 등) */}
+            <MobileQuickActionsBar
+              textareaRef={editorRef}
+              engine={quickActionEngine}
+              enabled={Boolean(primaryDocumentId)}
+            />
+
             <div ref={editorShellRef} className="relative">
               <InspirationGutter
                 content={plainContent}
@@ -545,12 +562,15 @@ export function ManuscriptWorkspace({
                   return { caretOffset: result.caretOffset };
                 }}
               />
-              <QuickActions
-                textareaRef={editorRef}
-                positionParentRef={editorShellRef}
-                engine={quickActionEngine}
-                enabled={Boolean(primaryDocumentId)}
-              />
+              {/* 데스크톱 floating 메뉴 — 모바일은 MobileQuickActionsBar 사용 */}
+              <div className="hidden md:block">
+                <QuickActions
+                  textareaRef={editorRef}
+                  positionParentRef={editorShellRef}
+                  engine={quickActionEngine}
+                  enabled={Boolean(primaryDocumentId)}
+                />
+              </div>
               <SentenceAssistantHost
                 ref={sentenceAssistantRef}
                 textareaRef={editorRef}

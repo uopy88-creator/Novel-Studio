@@ -98,9 +98,14 @@ export const ManuscriptEditor = forwardRef<
             "rounded-ns-lg border border-transparent bg-ns-surface",
             "px-ns-5 py-ns-5 leading-ns-relaxed text-ns-ink",
             "whitespace-pre-wrap break-words font-[inherit]",
+            // mark 기본 UA 노랑을 덮고 하늘색만 보이게
+            "[&_mark[data-ns-hl=sky]]:bg-[#BFE8FF] [&_mark[data-ns-hl=sky]]:text-ns-ink [&_mark[data-ns-hl=sky]]:rounded-sm",
             className,
           )}
-          style={{ fontSize: "var(--ns-editor-font-size, 1rem)" }}
+          style={{
+            fontSize: "var(--ns-editor-font-size, 1rem)",
+            WebkitTextSizeAdjust: "100%",
+          }}
           dangerouslySetInnerHTML={{ __html: overlayHtml }}
         />
       ) : null}
@@ -133,14 +138,19 @@ export const ManuscriptEditor = forwardRef<
           "focus-visible:border-ns-accent focus-visible:shadow-[var(--ns-ring-accent)]",
           "disabled:cursor-not-allowed disabled:bg-ns-muted",
           hasHighlights
-            ? "bg-transparent text-transparent selection:bg-ns-accent/25 selection:text-transparent"
+            ? "bg-transparent text-transparent caret-[var(--ns-color-ink)] selection:bg-[#BFE8FF]/55 selection:text-transparent"
             : "bg-ns-surface",
           className,
         )}
         style={{
           fontSize: "var(--ns-editor-font-size, 1rem)",
+          // iOS Safari: color:transparent 만으로는 글자가 남을 수 있음
           ...(hasHighlights
-            ? { caretColor: "var(--ns-color-ink)" }
+            ? {
+                caretColor: "var(--ns-color-ink)",
+                color: "transparent",
+                WebkitTextFillColor: "transparent",
+              }
             : null),
         }}
       />
