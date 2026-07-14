@@ -45,17 +45,22 @@ import { DEFAULT_CHARACTER_COLOR } from "@/features/characters/types/character";
 import type { CharacterId, ChapterId, ForeshadowingId } from "@/types/ids";
 
 export function projectToRow(project: Project, userId: string): DbProjectRow {
+  // type / deleted_at 은 후속 마이그레이션 컬럼 — 값은 repo 에서 조건부로 붙인다.
   return {
     id: project.id,
     user_id: userId,
     title: project.title,
     premise: project.premise ?? null,
-    type: project.type ?? DEFAULT_PROJECT_TYPE,
     status: project.status,
     sort_order: project.sortOrder,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
   };
+}
+
+/** type 컬럼이 있는 DB용 — repo 가 붙인다 */
+export function projectTypeForRow(project: Project): string {
+  return project.type ?? DEFAULT_PROJECT_TYPE;
 }
 
 export function rowToProject(row: DbProjectRow): Project {
