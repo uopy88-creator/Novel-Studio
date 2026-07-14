@@ -37,6 +37,15 @@ import {
 } from "@/features/manuscript/lib/highlight-marks";
 import { cn } from "@/lib/utils/cn";
 
+/** #BFE8FF → rgba (글자 위 반투명 하이라이트용) */
+function skyHighlightFill(alpha = 0.55): string {
+  const hex = SKY_HIGHLIGHT_COLOR.replace("#", "");
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export interface ManuscriptEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -112,14 +121,17 @@ function measureHighlightRects(
 ): HlRect[] {
   if (ranges.length === 0) return [];
 
-  const elRect = el.getBoundingClientRect();
   const mirror = getHighlightMirror();
   applyMirrorTypography(mirror, el);
 
   const value = el.value;
   const frag = document.createDocumentFragment();
-  const marks: { el: HTMLSpanElement; rangeIndex: number; start: number; end: number }[] =
-    [];
+  const marks: {
+    el: HTMLSpanElement;
+    rangeIndex: number;
+    start: number;
+    end: number;
+  }[] = [];
 
   let cursor = 0;
   const sorted = [...ranges]
@@ -158,6 +170,11 @@ function measureHighlightRects(
   mirror.scrollTop = el.scrollTop;
   mirror.scrollLeft = el.scrollLeft;
 
+  // 미러는 화면 밖(top:0, left:-100000)에 있으므로 textarea 원점이 아니라
+  // mirror 원점 기준으로 상대 좌표를 구한다.
+  // elRect 를 빼면 수백 px 위로 밀려 overflow-hidden 에 잘림 → 하이라이트 안 보임
+  const mirrorRect = mirror.getBoundingClientRect();
+
   const out: HlRect[] = [];
   for (const mark of marks) {
     const clientRects = mark.el.getClientRects();
@@ -166,8 +183,8 @@ function measureHighlightRects(
       if (rect.width < 0.5 || rect.height < 0.5) continue;
       out.push({
         key: `${mark.rangeIndex}:${i}:${mark.start}:${mark.end}`,
-        top: rect.top - elRect.top,
-        left: rect.left - elRect.left,
+        top: rect.top - mirrorRect.top,
+        left: rect.left - mirrorRect.left,
         width: rect.width,
         height: rect.height,
       });
@@ -313,9 +330,8 @@ export const ManuscriptEditor = forwardRef<
                 left: rect.left,
                 width: rect.width,
                 height: rect.height,
-                backgroundColor: SKY_HIGHLIGHT_COLOR,
-                opacity: 0.72,
-                mixBlendMode: "multiply",
+                // 불투명 textarea 위에 올려도 글자가 보이도록 반투명
+                backgroundColor: skyHighlightFill(0.55),
               }}
             />
           ))}
