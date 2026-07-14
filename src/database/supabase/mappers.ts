@@ -216,18 +216,22 @@ export function rowToDialogue(row: DbDialogueRow): WritingVaultEntry {
   };
 }
 
+/**
+ * Character → characters 행.
+ *
+ * nickname / status / intro 는 후속 마이그레이션 컬럼이다.
+ * 빈 값이라도 키를 넣으면(미적용 DB에서) PostgREST 가 upsert 를 거부한다.
+ * → 값이 있을 때만 포함한다. (SELECT * 는 컬럼 없이도 동작함)
+ */
 export function characterToRow(
   character: Character,
   userId: string,
 ): DbCharacterRow {
-  return {
+  const row: DbCharacterRow = {
     id: character.id,
     project_id: character.projectId,
     user_id: userId,
     name: character.name,
-    nickname: character.nickname,
-    status: character.status,
-    intro: character.intro,
     role: character.role,
     age: character.age,
     gender: character.gender,
@@ -243,6 +247,18 @@ export function characterToRow(
     created_at: character.createdAt,
     updated_at: character.updatedAt,
   };
+
+  if (character.nickname.trim()) {
+    row.nickname = character.nickname;
+  }
+  if (character.status.trim()) {
+    row.status = character.status;
+  }
+  if (character.intro.trim()) {
+    row.intro = character.intro;
+  }
+
+  return row;
 }
 
 export function rowToCharacter(row: DbCharacterRow): Character {

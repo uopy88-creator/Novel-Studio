@@ -29,7 +29,7 @@ export interface CharacterFormModalProps {
   onClose: () => void;
   mode: "create" | "edit";
   character?: Character | null;
-  onSubmit: (input: CharacterInput) => void;
+  onSubmit: (input: CharacterInput) => void | Promise<void>;
 }
 
 const emptyInput = (): CharacterInput => ({
@@ -59,6 +59,8 @@ export function CharacterFormModal({
   const [form, setForm] = useState<CharacterInput>(emptyInput);
   const [nameError, setNameError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +87,8 @@ export function CharacterFormModal({
     }
     setNameError(null);
     setImageError(null);
+    setSaveError(null);
+    setSaving(false);
   }, [open, mode, character]);
 
   const setField = <K extends keyof CharacterInput>(
@@ -115,12 +119,27 @@ export function CharacterFormModal({
       setNameError("이름을 입력해 주세요.");
       return;
     }
-    onSubmit({
-      ...form,
-      name: form.name.trim(),
-      color: form.color.trim() || DEFAULT_CHARACTER_COLOR,
-    });
-    onClose();
+
+    void (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await onSubmit({
+          ...form,
+          name: form.name.trim(),
+          color: form.color.trim() || DEFAULT_CHARACTER_COLOR,
+        });
+        onClose();
+      } catch (err) {
+        setSaveError(
+          err instanceof Error
+            ? err.message
+            : "캐릭터를 저장하지 못했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -138,11 +157,16 @@ export function CharacterFormModal({
       size="lg"
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
             취소
           </Button>
-          <Button type="submit" form="character-form">
-            {isEdit ? "저장" : "추가"}
+          <Button type="submit" form="character-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "추가"}
           </Button>
         </>
       }
@@ -152,6 +176,11 @@ export function CharacterFormModal({
         className="flex flex-col gap-ns-5"
         onSubmit={handleSubmit}
       >
+        {saveError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
         {/* 이미지 + 색상 */}
         <div className="flex flex-col gap-ns-4 sm:flex-row sm:items-start">
           <div className="flex flex-col gap-ns-2">

@@ -32,7 +32,7 @@ export interface TimelineEventModalProps {
   defaultDocumentId?: string;
   defaultSectionStableId?: string;
   onClose: () => void;
-  onSubmit: (input: TimelineEventInput) => void;
+  onSubmit: (input: TimelineEventInput) => void | Promise<void>;
 }
 
 export function TimelineEventModal({
@@ -51,6 +51,8 @@ export function TimelineEventModal({
   const [sectionValue, setSectionValue] = useState("");
   const [characterId, setCharacterId] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -72,6 +74,8 @@ export function TimelineEventModal({
       setCharacterId("");
     }
     setTitleError(null);
+    setSaveError(null);
+    setSaving(false);
   }, [
     open,
     mode,
@@ -97,14 +101,31 @@ export function TimelineEventModal({
       (o) => o.sectionStableId === sectionStableId,
     );
 
-    onSubmit({
-      title: trimmed,
-      description,
-      // 항상 primary document (옵션에 담긴 id)
-      documentId: matched?.documentId ?? defaultDocumentId ?? "",
-      sectionStableId,
-      characterId: characterId || "",
-    });
+    void (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await onSubmit({
+          title: trimmed,
+          description,
+          // Section 연결이 있을 때만 document 를 붙인다
+          documentId: sectionStableId
+            ? (matched?.documentId ?? defaultDocumentId ?? "")
+            : "",
+          sectionStableId,
+          characterId: characterId || "",
+        });
+        onClose();
+      } catch (err) {
+        setSaveError(
+          err instanceof Error
+            ? err.message
+            : "사건을 저장하지 못했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   return (
@@ -116,11 +137,20 @@ export function TimelineEventModal({
       size="md"
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
             취소
           </Button>
-          <Button type="submit" form="timeline-event-form">
-            저장
+          <Button
+            type="submit"
+            form="timeline-event-form"
+            disabled={saving}
+          >
+            {saving ? "저장 중…" : "저장"}
           </Button>
         </>
       }
@@ -130,6 +160,12 @@ export function TimelineEventModal({
         className="flex flex-col gap-ns-4"
         onSubmit={handleSubmit}
       >
+        {saveError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
+
         <Input
           label="제목"
           value={title}

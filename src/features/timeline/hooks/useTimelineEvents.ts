@@ -130,9 +130,16 @@ export function useTimelineEvents(projectId: ProjectId) {
 
   const create = useCallback(
     async (input: TimelineEventInput) => {
+      // Section 연결이 있을 때만 documentId 를 붙인다.
+      // (연결 없이 primary 를 강제하면 stale FK 로 생성이 실패할 수 있음)
+      const sectionStableId = input.sectionStableId?.trim() ?? "";
+      const documentId = sectionStableId
+        ? input.documentId || primaryDocumentId || ""
+        : "";
       const created = await createTimelineEvent(projectId, {
         ...input,
-        documentId: input.documentId || primaryDocumentId || "",
+        sectionStableId,
+        documentId,
       });
       await refresh();
       return created;
@@ -142,12 +149,25 @@ export function useTimelineEvents(projectId: ProjectId) {
 
   const update = useCallback(
     async (id: TimelineEventId, input: Partial<TimelineEventInput>) => {
+      const hasSectionField = input.sectionStableId !== undefined;
+      const sectionStableId = hasSectionField
+        ? (input.sectionStableId ?? "").trim()
+        : undefined;
+
+      // Section 이 명시적으로 비었으면 document 도 함께 비운다
+      let documentId = input.documentId;
+      if (hasSectionField) {
+        documentId = sectionStableId
+          ? input.documentId || primaryDocumentId || ""
+          : "";
+      } else if (input.documentId !== undefined) {
+        documentId = input.documentId || primaryDocumentId || "";
+      }
+
       const updated = await updateTimelineEvent(id, {
         ...input,
-        documentId:
-          input.documentId !== undefined
-            ? input.documentId || primaryDocumentId || ""
-            : undefined,
+        sectionStableId,
+        documentId,
       });
       await refresh();
       return updated;
