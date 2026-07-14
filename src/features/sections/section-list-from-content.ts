@@ -10,6 +10,7 @@
 import type { Section } from "@/features/manuscript/types/section";
 import { DEFAULT_SECTION_DELIMITER } from "@/features/manuscript/types/section";
 import { parseSections } from "@/features/manuscript/lib/section-parser";
+import { stripHighlights } from "@/features/manuscript/lib/highlight-marks";
 import { readSectionDelimiterConfig } from "@/features/manuscript/lib/section-delimiter-settings";
 import type { SectionRef } from "@/features/sections/section-registry";
 
@@ -21,9 +22,10 @@ function activeDelimiterConfig() {
 /**
  * 빈 원고(공백만)는 선택 가능한 Section 이 없다.
  * parseSections("") 가 만드는 가상 Section 1개는 Timeline 목록에 올리지 않는다.
+ * Highlight mark 태그는 plain 기준으로 무시한다.
  */
 export function isEmptyManuscriptContent(content: string): boolean {
-  return !content.replace(/\s+/g, "").length;
+  return !stripHighlights(content ?? "").replace(/\s+/g, "").length;
 }
 
 /** Section[] → Registry 용 SectionRef[] */

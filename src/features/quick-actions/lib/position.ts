@@ -18,6 +18,9 @@
 export interface QuickActionsPosition {
   top: number;
   left: number;
+  /** viewport 기준 좌표 — position:fixed 메뉴용 */
+  viewportTop: number;
+  viewportLeft: number;
   /** 테스트용 — viewport 기준 선택 rect */
   selectionRect?: DOMRect;
   placement?: "above" | "below";
@@ -133,7 +136,10 @@ export function decideSelectionMenuPlacement(params: {
 
 /**
  * Selection BoundingClientRect 기준으로 메뉴 위치를 계산한다.
- * absolute 부모(textarea 래퍼) 기준 top/left 를 반환한다.
+ * absolute 부모(Quick Actions 를 감싼 relative 래퍼) 기준 top/left 를 반환한다.
+ *
+ * positioningParent 를 넘기면 textarea.offsetParent 대신 그 요소를 기준으로 한다.
+ * (에디터 내부에 오버레이 래퍼가 생겨 offsetParent 가 어긋나는 경우 대비)
  */
 export function estimateQuickActionsPosition(
   el: HTMLTextAreaElement,
@@ -141,8 +147,10 @@ export function estimateQuickActionsPosition(
   selectionEnd: number = selectionStart,
   menuWidth = 320,
   menuHeight = 52,
+  positioningParent?: HTMLElement | null,
 ): QuickActionsPosition {
-  const parent = el.offsetParent as HTMLElement | null;
+  const parent =
+    positioningParent ?? (el.offsetParent as HTMLElement | null);
   const parentRect =
     parent?.getBoundingClientRect() ?? el.getBoundingClientRect();
 
@@ -154,37 +162,50 @@ export function estimateQuickActionsPosition(
 
   const gap = SELECTION_MENU_GAP_PX;
   const pad = SELECTION_MENU_VIEWPORT_PAD_PX;
-  const viewportW = window.innerWidth;
-  const viewportH = window.innerHeight;
+  // 모바일 키보드 — visualViewport 기준으로 clamp (layout viewport 는 어긋날 수 있음)
+  const vv = window.visualViewport;
+  const viewportW = vv?.width ?? window.innerWidth;
+  const viewportH = vv?.height ?? window.innerHeight;
+  const viewportOffsetTop = vv?.offsetTop ?? 0;
+  const viewportOffsetLeft = vv?.offsetLeft ?? 0;
 
   const { placement, menuTopViewport: rawTop } = decideSelectionMenuPlacement({
     selectionTop: selectionRect.top,
     selectionBottom: selectionRect.bottom,
     menuHeight,
-    viewportH,
+    viewportH: viewportH + viewportOffsetTop,
     gap,
-    viewportPad: pad,
+    viewportPad: pad + viewportOffsetTop,
   });
 
   // 하단으로 완전히 벗어나지 않도록만 clamp (기본 placement 는 유지)
   const menuTopViewport = clamp(
     rawTop,
-    pad,
-    Math.max(pad, viewportH - menuHeight - pad),
+    pad + viewportOffsetTop,
+    Math.max(
+      pad + viewportOffsetTop,
+      viewportOffsetTop + viewportH - menuHeight - pad,
+    ),
   );
 
-  // 수평: 선택 중앙 정렬
+  // 수평: 선택 중앙 정렬 — 메뉴가 viewport 보다 넓으면 왼쪽부터 보이게
+  const usableMenuWidth = Math.min(menuWidth, viewportW - pad * 2);
   const selectionCenterX = selectionRect.left + selectionRect.width / 2;
-  let menuLeftViewport = selectionCenterX - menuWidth / 2;
+  let menuLeftViewport = selectionCenterX - usableMenuWidth / 2;
   menuLeftViewport = clamp(
     menuLeftViewport,
-    pad,
-    Math.max(pad, viewportW - menuWidth - pad),
+    pad + viewportOffsetLeft,
+    Math.max(
+      pad + viewportOffsetLeft,
+      viewportOffsetLeft + viewportW - usableMenuWidth - pad,
+    ),
   );
 
   return {
     top: menuTopViewport - parentRect.top,
     left: menuLeftViewport - parentRect.left,
+    viewportTop: menuTopViewport,
+    viewportLeft: menuLeftViewport,
     selectionRect,
     placement,
   };

@@ -36,6 +36,10 @@ import {
   reorderSections,
   type SectionDeleteMode,
 } from "@/features/manuscript/lib/section-operations";
+import {
+  applyPlainEditToHighlightedContent,
+  stripHighlights,
+} from "@/features/manuscript/lib/highlight-marks";
 import { readSectionDelimiterConfig } from "@/features/manuscript/lib/section-delimiter-settings";
 import {
   collapsedIdsFromMetas,
@@ -103,6 +107,9 @@ export function useSections(
   );
   const [metaReady, setMetaReady] = useState(false);
   const pendingCollapseNumbersRef = useRef<Set<number> | null>(null);
+  /** Highlight 보존용 — Section 직렬화는 plain 이므로 이전 content 기준 remap */
+  const contentRef = useRef(content);
+  contentRef.current = content;
 
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +255,9 @@ export function useSections(
         }
       }
 
-      setContent(applySectionsToContent(next, config));
+      // Section 직렬화는 plain — 기존 Highlight 는 plain 좌표로 재배치해 보존
+      const nextPlain = applySectionsToContent(next, config);
+      setContent(applyPlainEditToHighlightedContent(contentRef.current, nextPlain));
       syncMetaStateFromSections(next);
       setCollapsedStableIds(nextCollapsed);
       persistMetas(next, nextCollapsed);
@@ -306,7 +315,9 @@ export function useSections(
    */
   const createAtCursor = useCallback(
     (cursorOffset: number) => {
-      const result = createSectionAtCursor(content, cursorOffset, config);
+      // 커서는 textarea plain 좌표 — Highlight mark 를 제거한 뒤 파싱한다
+      const plain = stripHighlights(contentRef.current);
+      const result = createSectionAtCursor(plain, cursorOffset, config);
       if (!result) return null;
 
       // 기존 Section 메타(status/memo/icons) 보존
@@ -327,7 +338,7 @@ export function useSections(
         caretOffset: result.caretOffset,
       };
     },
-    [commitContent, config, content],
+    [commitContent, config],
   );
 
   const remove = useCallback(

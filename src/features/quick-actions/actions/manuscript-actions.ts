@@ -19,7 +19,7 @@ export function createSentenceAssistantAction(options: {
   return {
     id: "sentence-assistant",
     label: "Sentence Assistant",
-    icon: "🪄",
+    icon: "✍️",
     priority: 10,
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
     execute: (ctx) => {
@@ -56,6 +56,26 @@ export function createMemoSaveAction(options: {
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
     execute: (ctx) => {
       options.openMemo(ctx.selection);
+    },
+  };
+}
+
+/**
+ * Highlight — 선택 구간 하늘색(#BFE8FF) 토글.
+ * 색상 팔레트 없음. Selection Action Menu 전용.
+ */
+export function createHighlightAction(options: {
+  toggleHighlight: (selection: QuickActionSelection) => void;
+}): QuickAction {
+  return {
+    id: "highlight",
+    label: "Highlight",
+    icon: "🖍",
+    // 맨 앞 — Selection Action Menu 에서 바로 보이게
+    priority: 1,
+    isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
+    execute: (ctx) => {
+      options.toggleHighlight(ctx.selection);
     },
   };
 }

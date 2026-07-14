@@ -28,8 +28,12 @@ export {
 export { QuickActions } from "@/features/quick-actions/components/QuickActions";
 export type { QuickActionsProps } from "@/features/quick-actions/components/QuickActions";
 
+export { MobileQuickActionsBar } from "@/features/quick-actions/components/MobileQuickActionsBar";
+export type { MobileQuickActionsBarProps } from "@/features/quick-actions/components/MobileQuickActionsBar";
+
 export {
   createSentenceAssistantAction,
   createInspirationSaveAction,
   createMemoSaveAction,
+  createHighlightAction,
 } from "@/features/quick-actions/actions/manuscript-actions";

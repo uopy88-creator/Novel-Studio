@@ -27,11 +27,14 @@ import {
   insertMentionAtCursor,
 } from "@/features/characters/lib/mention";
 import { ManuscriptEditor } from "@/features/manuscript/components/ManuscriptEditor";
+import type { HighlightRange } from "@/features/manuscript/lib/highlight-marks";
 import { cn } from "@/lib/utils/cn";
 
 export interface CharacterMentionFieldProps {
   value: string;
   onChange: (value: string) => void;
+  /** 하늘색 Highlight 오버레이용 (plain 좌표) */
+  highlightRanges?: readonly HighlightRange[];
   characters: Character[];
   documentTitle?: string;
   className?: string;
@@ -86,6 +89,7 @@ function estimateCaretMenuPosition(
 export function CharacterMentionField({
   value,
   onChange,
+  highlightRanges,
   characters,
   documentTitle,
   className,
@@ -140,6 +144,13 @@ export function CharacterMentionField({
     }
     // IME 조합 중에는 쿼리 동기화를 미룬다 (조합 문자가 아직 확정 전)
     if (composingRef.current) return;
+
+    // 범위 선택 중에는 @멘션 자동완성을 열지 않음
+    // (Quick Actions / Highlight 와 충돌·비활성화 방지)
+    if (el.selectionStart !== el.selectionEnd) {
+      setMention(null);
+      return;
+    }
 
     const found = getMentionQueryAtCursor(el.value, el.selectionStart);
     if (!found) {
@@ -287,6 +298,7 @@ export function CharacterMentionField({
         <ManuscriptEditor
           ref={textareaRef}
           value={value}
+          highlightRanges={highlightRanges}
           onChange={(next) => {
             onChange(next);
             requestAnimationFrame(syncMentionFromCursor);
