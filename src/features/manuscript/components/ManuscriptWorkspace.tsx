@@ -179,7 +179,6 @@ export function ManuscriptWorkspace({
   );
   const [characters, setCharacters] = useState<Character[]>([]);
   const [profileId, setProfileId] = useState<CharacterId | null>(null);
-  const [mentionActive, setMentionActive] = useState(false);
   const [projectInspirations, setProjectInspirations] = useState<Inspiration[]>(
     [],
   );
@@ -539,7 +538,6 @@ export function ManuscriptWorkspace({
                 editorRef={editorRef}
                 editorClassName="pl-10 font-mono text-[length:var(--ns-editor-font-size,1rem)]"
                 onOpenCharacter={(character) => setProfileId(character.id)}
-                onMentionActiveChange={setMentionActive}
                 onSectionBreak={(cursorOffset) => {
                   // `#` + Enter → createSection 공통 로직 (번호 자동 부여)
                   const result = createAtCursor(cursorOffset);
