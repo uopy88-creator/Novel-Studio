@@ -11,6 +11,7 @@
 
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -119,9 +120,11 @@ export function CharacterMentionField({
     return filterMentionCandidates(characters, mention.query);
   }, [characters, mention]);
 
+  // 긴 원고에서 매 타자마다 전체 스캔하지 않도록 deferred
+  const deferredValue = useDeferredValue(value);
   const mentioned = useMemo(
-    () => findMentionedCharacters(value, characters),
-    [value, characters],
+    () => findMentionedCharacters(deferredValue, characters),
+    [deferredValue, characters],
   );
 
   const mentionMenuOpen = Boolean(mention && candidates.length > 0);
@@ -164,6 +167,21 @@ export function CharacterMentionField({
     }));
     updateMenuPosition(found.start);
   }, [textareaRef, updateMenuPosition]);
+
+  /** @ 근처이거나 멘션 메뉴가 열려 있을 때만 동기화 — 일반 타이핑 비용 감소 */
+  const maybeSyncMentionFromCursor = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (mention) {
+      syncMentionFromCursor();
+      return;
+    }
+    if (el.selectionStart !== el.selectionEnd) return;
+    const from = Math.max(0, el.selectionStart - 64);
+    const windowText = el.value.slice(from, el.selectionStart + 1);
+    if (!windowText.includes("@")) return;
+    syncMentionFromCursor();
+  }, [mention, syncMentionFromCursor, textareaRef]);
 
   const applyMention = useCallback(
     (character: Character) => {
@@ -301,21 +319,21 @@ export function CharacterMentionField({
           highlightRanges={highlightRanges}
           onChange={(next) => {
             onChange(next);
-            requestAnimationFrame(syncMentionFromCursor);
+            requestAnimationFrame(maybeSyncMentionFromCursor);
           }}
           documentTitle={documentTitle}
           className={cn("min-h-[32rem]", editorClassName)}
           onKeyDown={handleKeyDown}
           onClick={handlePointerOpenOrSync}
           onMouseUp={handlePointerOpenOrSync}
-          onKeyUp={syncMentionFromCursor}
-          onSelect={syncMentionFromCursor}
+          onKeyUp={maybeSyncMentionFromCursor}
+          onSelect={maybeSyncMentionFromCursor}
           onCompositionStart={() => {
             composingRef.current = true;
           }}
           onCompositionEnd={() => {
             composingRef.current = false;
-            requestAnimationFrame(syncMentionFromCursor);
+            requestAnimationFrame(maybeSyncMentionFromCursor);
           }}
           onScroll={() => {
             if (mention) updateMenuPosition(mention.start);

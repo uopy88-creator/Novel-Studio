@@ -41,6 +41,11 @@ export function stripHighlights(content: string): string {
 /** content → plain + plain 좌표 ranges */
 export function extractHighlights(content: string): HighlightExtraction {
   const text = content ?? "";
+  // 빠른 경로 — mark 없으면 정규식 전체를 돌리지 않는다
+  if (!text.includes("data-ns-hl")) {
+    return { plain: text, ranges: [] };
+  }
+
   const ranges: HighlightRange[] = [];
   let plain = "";
   let lastIndex = 0;
@@ -212,6 +217,10 @@ export function applyPlainEditToHighlightedContent(
   previousContent: string,
   nextPlain: string,
 ): string {
+  // Highlight 없으면 정규화 비용 없이 그대로 반환
+  if (!previousContent.includes("data-ns-hl")) {
+    return nextPlain;
+  }
   const { plain: oldPlain, ranges } = extractHighlights(previousContent);
   const nextRanges = remapHighlightRanges(oldPlain, nextPlain, ranges);
   return serializeHighlights(nextPlain, nextRanges);
