@@ -19,7 +19,7 @@ import {
   loadProjectManuscript,
   saveProjectManuscript,
 } from "@/features/manuscript/lib/project-manuscript";
-import { getSectionRegistrySnapshot, useSectionRegistry } from "@/features/sections";
+import { getPrimaryDocumentId, useSectionRegistry } from "@/features/sections";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -42,8 +42,8 @@ async function syncMentionNamesInManuscript(
 ): Promise<void> {
   if (!oldName.trim() || oldName.trim() === newName.trim()) return;
 
-  // Section 목록은 Registry 가 SSOT — 여기서는 원고 본문만 수정한다.
-  const registry = getSectionRegistrySnapshot(projectId);
+  // Section 목록은 Registry Helper 가 SSOT — 여기서는 원고 본문만 수정
+  const primaryFromRegistry = getPrimaryDocumentId(projectId);
 
   const { chapters, content, primaryDocumentId } =
     await loadProjectManuscript(projectId);
@@ -54,7 +54,7 @@ async function syncMentionNamesInManuscript(
     projectId,
     chapters,
     content: next,
-    primaryDocumentId: registry.primaryDocumentId ?? primaryDocumentId,
+    primaryDocumentId: primaryFromRegistry ?? primaryDocumentId,
   });
 }
 

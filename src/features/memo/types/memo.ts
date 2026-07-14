@@ -9,8 +9,9 @@
  * - "어디에 붙일지 몰라도" 일단 적을 수 있어야 한다.
  *
  * 연결은 모두 optional
- * - sectionStableId / chapterId / characterId / foreshadowingId 중 0개 이상
- * - Section 연결은 번호가 아니라 안정 ID 를 저장한다 (Section Registry 로 라벨 해석)
+ * - sectionStableId(= sectionId) / characterId / foreshadowingId
+ * - Section 연결은 번호가 아니라 ID 를 저장한다 (Section Registry 로 라벨 해석)
+ * - chapterId 는 레거시 Document 링크 — 신규 쓰기 금지, 딥링크는 Registry.primaryDocumentId
  * =============================================================================
  */
 
@@ -56,7 +57,7 @@ export interface Memo extends Timestamps {
   isResolved: boolean;
 
   /**
-   * 관련 Section 안정 ID (section_001).
+   * 관련 Section ID (section_001 = SectionRef.id).
    * Section Registry 로 `#N 제목` 을 해석한다.
    */
   sectionStableId?: string;
@@ -69,7 +70,8 @@ export interface Memo extends Timestamps {
   sourceText?: string;
 
   /**
-   * @deprecated Document 링크. Section 목록 소스로 쓰지 말 것.
+   * @deprecated Document 링크. 신규 쓰기 금지.
+   * 딥링크는 Section Registry 의 primaryDocumentId 를 사용한다.
    */
   chapterId?: ChapterId;
   characterId?: CharacterId;

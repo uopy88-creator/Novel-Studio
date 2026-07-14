@@ -1,6 +1,8 @@
 /**
  * Section Registry SSOT — 교차 기능 회귀 테스트
  * Run: npx --yes tsx src/features/sections/__tests__/section-registry-ssot-selftest.ts
+ *
+ * hydrate / Provider 는 import 하지 않는다 (Supabase 의존 회피).
  */
 
 import assert from "node:assert/strict";
@@ -9,11 +11,27 @@ import {
   getSectionRegistrySnapshot,
   publishSections,
   resetSectionRegistry,
+} from "@/features/sections/section-registry";
+import {
+  getPrimaryDocumentId,
+  getProjectSectionContext,
+  getSection,
+  getSectionRegistry,
+  listSectionOptions,
+  listSections,
+  findSectionIdAtOffset,
+  resolveSectionLabel,
+} from "@/features/sections/section-helpers";
+import {
   sectionOptionsFromRefs,
+} from "@/features/sections/section-options";
+import {
   sectionRefsFromContent,
-  mergeSectionBodiesById,
+} from "@/features/sections/section-list-from-content";
+import {
   findSectionStableIdAtOffset,
-} from "@/features/sections";
+  mergeSectionBodiesById,
+} from "@/features/sections/resolve-section";
 import type { ProjectId, DocumentId } from "@/types/ids";
 
 const projectId = "proj-ssot" as ProjectId;
@@ -40,17 +58,31 @@ publishSections(projectId, {
   source: "live",
 });
 
-// 모든 소비자가 동일 스냅샷
-const snap = getSectionRegistrySnapshot(projectId);
+const snap = getSectionRegistry(projectId);
 assert.equal(snap.sections.length, 3);
 assert.equal(snap.primaryDocumentId, primary);
+assert.equal(getSectionRegistrySnapshot(projectId).generation, snap.generation);
 
-const options = sectionOptionsFromRefs(snap.sections, snap.primaryDocumentId);
+assert.equal(listSections(projectId).length, 3);
+assert.equal(getPrimaryDocumentId(projectId), primary);
+assert.equal(getSection(projectId, "section_002")?.title, "첫 만남");
+assert.equal(resolveSectionLabel(projectId, "section_002"), "#2 첫 만남");
+assert.equal(resolveSectionLabel(projectId, "missing"), null);
+
+const options = listSectionOptions(projectId);
 assert.equal(options[1].label, "#2 첫 만남");
+assert.equal(options[1].sectionId, "section_002");
 assert.equal(options[1].sectionStableId, "section_002");
 assert.equal(options[1].value, "section_002");
 
-// 재번호 시뮬레이션 — ID 유지
+const legacyOptions = sectionOptionsFromRefs(snap.sections, snap.primaryDocumentId);
+assert.equal(legacyOptions[0].sectionId, options[0].sectionId);
+
+const ctx = getProjectSectionContext(projectId);
+assert.equal(ctx.sections.length, 3);
+assert.equal(ctx.primaryDocumentId, primary);
+assert.equal(ctx.ready, true);
+
 publishSections(projectId, {
   sections: [
     { id: "section_002", number: 1, title: "첫 만남" },
@@ -60,28 +92,19 @@ publishSections(projectId, {
   primaryDocumentId: primary,
   source: "live",
 });
-const afterReorder = getSectionRegistrySnapshot(projectId);
-assert.equal(
-  afterReorder.sections.find((s) => s.id === "section_001")?.number,
-  2,
-);
-assert.equal(
-  formatSectionRefLabel(
-    afterReorder.sections.find((s) => s.id === "section_001")!,
-  ),
-  "#2 프롤로그",
-);
+assert.equal(resolveSectionLabel(projectId, "section_001"), "#2 프롤로그");
 
-// Search 병합: Registry 순서 + body
 const merged = mergeSectionBodiesById(refs, content);
 assert.ok(merged[0].body.includes("Once"));
 assert.equal(merged[0].id, "section_001");
 
-// Inspiration 오프셋 → Section ID
-const idAt = findSectionStableIdAtOffset(content, content.indexOf("Hello"));
+const idAt = findSectionIdAtOffset(content, content.indexOf("Hello"));
 assert.equal(idAt, "section_002");
+assert.equal(
+  findSectionStableIdAtOffset(content, content.indexOf("Hello")),
+  idAt,
+);
 
-// 빈 원고
 assert.deepEqual(sectionRefsFromContent(""), []);
 
 resetSectionRegistry(projectId);

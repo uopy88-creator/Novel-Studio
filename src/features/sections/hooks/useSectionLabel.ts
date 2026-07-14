@@ -15,13 +15,13 @@ import { formatSectionRefLabel } from "@/features/sections/section-registry";
 
 export function useSectionLabel(
   projectId: ProjectId,
-  sectionStableId: string | null | undefined,
+  sectionId: string | null | undefined,
 ): string | null {
   const registry = useSectionRegistry(projectId);
 
   return useMemo(() => {
-    if (!sectionStableId) return null;
-    const ref = registry.sections.find((s) => s.id === sectionStableId);
+    if (!sectionId) return null;
+    const ref = registry.sections.find((s) => s.id === sectionId);
     return ref ? formatSectionRefLabel(ref) : null;
-  }, [registry.sections, sectionStableId]);
+  }, [registry.sections, sectionId]);
 }

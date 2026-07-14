@@ -1,20 +1,21 @@
 /**
  * =============================================================================
- * Timeline ↔ Section 옵션 (Registry 어댑터)
+ * Timeline ↔ Section 옵션 (Registry 어댑터 — thin)
  * -----------------------------------------------------------------------------
- * 공통 SectionOption 을 Timeline 타입 별칭으로 재노출한다.
- * Documents(Chapter) 를 조회하지 않는다.
+ * 목록은 useSectionOptions / listSectionOptions 를 쓴다.
+ * 이 파일은 Timeline 타입 별칭·레거시 encode/decode 만 남긴다.
  * =============================================================================
  */
 
 import type { DocumentId } from "@/types/ids";
 import {
+  listSectionOptions,
   sectionOptionsFromRefs,
   type SectionOption,
-} from "@/features/sections/section-options";
-import type { SectionRef } from "@/features/sections/section-registry";
+} from "@/features/sections";
+import type { SectionRef } from "@/features/sections";
 
-/** @deprecated SectionOption 사용 — Timeline 전용 목록을 만들지 말 것 */
+/** @deprecated SectionOption 사용 */
 export type TimelineSectionOption = SectionOption;
 
 /** @deprecated */
@@ -22,10 +23,10 @@ export type TimelineSceneOption = TimelineSectionOption;
 
 export function encodeSectionOptionValue(
   documentId: string,
-  sectionStableId: string,
+  sectionId: string,
 ): string {
   void documentId;
-  return sectionStableId;
+  return sectionId;
 }
 
 /** @deprecated */
@@ -51,7 +52,7 @@ export function decodeSectionOptionValue(
 /** @deprecated */
 export const decodeSceneOptionValue = decodeSectionOptionValue;
 
-/** Registry → Timeline 옵션 (공통 어댑터 위임) */
+/** @deprecated listSectionOptions(projectId) / useSectionOptions 사용 */
 export function timelineOptionsFromSectionRefs(
   refs: SectionRef[],
   primaryDocumentId: DocumentId | null,
@@ -59,14 +60,17 @@ export function timelineOptionsFromSectionRefs(
   return sectionOptionsFromRefs(refs, primaryDocumentId);
 }
 
-/** @deprecated useSectionOptions / Section Registry */
-export async function loadTimelineSectionOptions(): Promise<
-  TimelineSectionOption[]
-> {
-  console.warn(
-    "[timeline-section-options] deprecated; use Section Registry / useSectionOptions",
-  );
-  return [];
+/** @deprecated useSectionOptions / listSectionOptions */
+export async function loadTimelineSectionOptions(
+  projectId?: string,
+): Promise<TimelineSectionOption[]> {
+  if (!projectId) {
+    console.warn(
+      "[timeline-section-options] deprecated; pass projectId or use useSectionOptions",
+    );
+    return [];
+  }
+  return listSectionOptions(projectId as import("@/types/ids").ProjectId);
 }
 
 /** @deprecated */

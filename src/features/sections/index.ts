@@ -1,5 +1,15 @@
 /**
+ * =============================================================================
  * sections feature — Project-wide Section Registry (SSOT)
+ * -----------------------------------------------------------------------------
+ * 권장 진입점 (신규 코드):
+ *   getSectionRegistry / getSection / listSections / listSectionOptions
+ *   getPrimaryDocumentId / resolveSectionLabel / findSectionIdAtOffset
+ *   getProjectSectionContext / useSectionOptions / useSectionLabel
+ *
+ * Manuscript 만 publishSections 로 목록을 발행한다.
+ * 다른 기능은 위 Helper·훅으로만 읽는다.
+ * =============================================================================
  */
 
 export type {
@@ -14,6 +24,18 @@ export {
   resetSectionRegistry,
   subscribeSectionRegistry,
 } from "./section-registry";
+
+export type { ProjectSectionContext } from "./section-helpers";
+export {
+  getSectionRegistry,
+  getSection,
+  listSections,
+  listSectionOptions,
+  getPrimaryDocumentId,
+  findSectionIdAtOffset,
+  getProjectSectionContext,
+} from "./section-helpers";
+
 export {
   isEmptyManuscriptContent,
   sectionRefsFromContent,

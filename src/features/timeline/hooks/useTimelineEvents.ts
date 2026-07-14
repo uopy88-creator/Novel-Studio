@@ -9,9 +9,9 @@
  * =============================================================================
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
-import type { DocumentId, ProjectId, TimelineEventId } from "@/types/ids";
+import type { ProjectId, TimelineEventId } from "@/types/ids";
 import {
   createTimelineEvent,
   deleteTimelineEvent,
@@ -21,17 +21,20 @@ import {
   type TimelineEventInput,
 } from "@/features/timeline/lib/timeline-event-storage";
 import { syncTimelineEventsWithSectionRegistry } from "@/features/timeline/lib/timeline-section-sync";
+import type { TimelineSectionOption } from "@/features/timeline/lib/timeline-section-options";
 import {
-  timelineOptionsFromSectionRefs,
-  type TimelineSectionOption,
-} from "@/features/timeline/lib/timeline-section-options";
-import {
-  getSectionRegistrySnapshot,
-  useSectionRegistry,
+  getSectionRegistry,
+  useSectionOptions,
 } from "@/features/sections";
 
 export function useTimelineEvents(projectId: ProjectId) {
-  const registry = useSectionRegistry(projectId);
+  // Section 목록 = Registry Helper 만 (별도 목록 생성 금지)
+  const {
+    options: sectionOptions,
+    ready: sectionsReady,
+    primaryDocumentId,
+    generation: registryGeneration,
+  } = useSectionOptions(projectId);
 
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [isReady, setIsReady] = useState(false);
@@ -39,21 +42,9 @@ export function useTimelineEvents(projectId: ProjectId) {
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  // Registry → 옵션 (Manuscript 와 동일한 SSOT, 추가 조회 없음)
-  const sectionOptions: TimelineSectionOption[] = useMemo(
-    () =>
-      timelineOptionsFromSectionRefs(
-        registry.sections,
-        registry.primaryDocumentId,
-      ),
-    [registry.sections, registry.primaryDocumentId],
-  );
-
-  const primaryDocumentId: DocumentId | null = registry.primaryDocumentId;
-
   const normalizeWithRegistry = useCallback(
     async (list: TimelineEvent[]) => {
-      const snap = getSectionRegistrySnapshot(projectId);
+      const snap = getSectionRegistry(projectId);
       if (!snap.ready) return list;
       const synced = await syncTimelineEventsWithSectionRegistry(list, snap);
       return synced.events;
@@ -95,7 +86,7 @@ export function useTimelineEvents(projectId: ProjectId) {
 
   // Section 추가/삭제/이름변경/재정렬 → Registry generation 변경 시 링크만 재정규화
   useEffect(() => {
-    if (!registry.ready || !isReady) return;
+    if (!sectionsReady || !isReady) return;
 
     let cancelled = false;
     void (async () => {
@@ -107,12 +98,7 @@ export function useTimelineEvents(projectId: ProjectId) {
     return () => {
       cancelled = true;
     };
-  }, [
-    registry.ready,
-    registry.generation,
-    isReady,
-    normalizeWithRegistry,
-  ]);
+  }, [sectionsReady, registryGeneration, isReady, normalizeWithRegistry]);
 
   const refresh = useCallback(async () => {
     try {
@@ -190,9 +176,9 @@ export function useTimelineEvents(projectId: ProjectId) {
 
   return {
     events,
-    sectionOptions,
+    sectionOptions: sectionOptions as TimelineSectionOption[],
     primaryDocumentId,
-    sectionsReady: registry.ready,
+    sectionsReady,
     isReady,
     error,
     refresh,

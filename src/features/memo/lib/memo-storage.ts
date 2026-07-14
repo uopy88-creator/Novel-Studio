@@ -34,8 +34,10 @@ export interface MemoInput {
   kind?: Memo["kind"];
   isPinned?: boolean;
   isResolved?: boolean;
+  /** sectionId (= SectionRef.id) — 저장 필드명은 sectionStableId */
   sectionStableId?: Memo["sectionStableId"];
   sourceText?: Memo["sourceText"];
+  /** @deprecated 신규 쓰기 금지 — Registry.primaryDocumentId 사용 */
   chapterId?: Memo["chapterId"];
   characterId?: Memo["characterId"];
   foreshadowingId?: Memo["foreshadowingId"];

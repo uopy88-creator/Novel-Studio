@@ -24,11 +24,10 @@ import { SentenceAssistantContextMenu } from "@/features/sentence-assistant/comp
 import { readTextareaSelection } from "@/features/sentence-assistant/utils/selection";
 import type { SentenceSelection } from "@/features/sentence-assistant/types";
 import type { ProjectId } from "@/types/ids";
-import { useSectionRegistry } from "@/features/sections";
 
 export interface SentenceAssistantHostProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  /** Section Registry 구독용 — Manuscript 가 관리하는 SSOT 와 동기화 */
+  /** 향후 Section 연결용 — 현재 Host 는 선택 텍스트만 사용 */
   projectId?: ProjectId;
   enabled?: boolean;
   /**
@@ -56,11 +55,10 @@ export const SentenceAssistantHost = forwardRef<
   SentenceAssistantHostHandle,
   SentenceAssistantHostProps
 >(function SentenceAssistantHost(
-  { textareaRef, projectId, enabled = true, onReplaceSelection },
+  { textareaRef, projectId: _projectId, enabled = true, onReplaceSelection },
   ref,
 ) {
-  // Section Registry 구독 — Manuscript SSOT 와 동일 데이터 (읽기 전용)
-  useSectionRegistry((projectId ?? "") as ProjectId);
+  void _projectId;
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [selection, setSelection] = useState<SentenceSelection | null>(null);
