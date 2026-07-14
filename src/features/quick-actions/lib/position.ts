@@ -61,8 +61,8 @@ export function getTextareaSelectionBoundingClientRect(
   const mirror = getSharedMirror();
   mirror.style.cssText = [
     "position:fixed",
-    `top:${elRect.top}px`,
-    `left:${elRect.left}px`,
+    "left:-100000px",
+    "top:0",
     `width:${el.clientWidth}px`,
     `height:${el.clientHeight}px`,
     "visibility:hidden",
@@ -85,6 +85,9 @@ export function getTextareaSelectionBoundingClientRect(
     `direction:${style.direction}`,
   ].join(";");
 
+  // 실제 textarea 위치에 맞춰 측정 (좌표만 쓰고 화면에는 안 보이게 위에서 치움)
+  // left:-100000 이므로 getBoundingClientRect 는 화면 밖 — 선택 메뉴용으로는
+  // textarea 와 같은 폭/폰트로 상대 측정 후 elRect 기준으로 환산한다.
   const value = el.value;
   const before = value.slice(0, start);
   const selected = value.slice(start, end) || "\u200b";
@@ -100,11 +103,12 @@ export function getTextareaSelectionBoundingClientRect(
   mirror.scrollTop = el.scrollTop;
   mirror.scrollLeft = el.scrollLeft;
 
+  const mirrorRect = mirror.getBoundingClientRect();
   const markRect = mark.getBoundingClientRect();
 
   return new DOMRect(
-    markRect.left,
-    markRect.top,
+    elRect.left + (markRect.left - mirrorRect.left),
+    elRect.top + (markRect.top - mirrorRect.top),
     Math.max(markRect.width, 1),
     Math.max(markRect.height, 1),
   );
