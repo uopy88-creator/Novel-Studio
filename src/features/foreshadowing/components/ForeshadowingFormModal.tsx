@@ -27,7 +27,7 @@ export interface ForeshadowingFormModalProps {
   onClose: () => void;
   mode: "create" | "edit";
   foreshadowing?: Foreshadowing | null;
-  onSubmit: (input: ForeshadowingInput) => void;
+  onSubmit: (input: ForeshadowingInput) => void | Promise<void>;
 }
 
 interface FormState {
@@ -51,6 +51,8 @@ export function ForeshadowingFormModal({
 }: ForeshadowingFormModalProps) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +67,8 @@ export function ForeshadowingFormModal({
       setForm(emptyForm());
     }
     setTitleError(null);
+    setSaveError(null);
+    setSaving(false);
   }, [open, mode, foreshadowing]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -77,12 +81,25 @@ export function ForeshadowingFormModal({
       setTitleError("제목을 입력해 주세요.");
       return;
     }
-    onSubmit({
-      title: form.title.trim(),
-      description: form.description.trim() || undefined,
-      status: form.status,
-    });
-    onClose();
+
+    void (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await onSubmit({
+          title: form.title.trim(),
+          description: form.description.trim() || undefined,
+          status: form.status,
+        });
+        onClose();
+      } catch (err) {
+        setSaveError(
+          err instanceof Error ? err.message : "복선을 저장하지 못했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -100,11 +117,16 @@ export function ForeshadowingFormModal({
       size="md"
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
             취소
           </Button>
-          <Button type="submit" form="foreshadowing-form">
-            {isEdit ? "저장" : "추가"}
+          <Button type="submit" form="foreshadowing-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "추가"}
           </Button>
         </>
       }
@@ -114,6 +136,12 @@ export function ForeshadowingFormModal({
         className="flex flex-col gap-ns-5"
         onSubmit={handleSubmit}
       >
+        {saveError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
+
         <Input
           label="제목"
           value={form.title}
@@ -152,7 +180,6 @@ export function ForeshadowingFormModal({
           <p className="ns-caption">선택 사항</p>
         </div>
 
-        {/* 상태 선택 — 심음 / 회수 예정 / 회수 완료 */}
         <div className="flex flex-col gap-ns-2">
           <span className="text-ns-sm font-medium text-ns-ink">상태</span>
           <div

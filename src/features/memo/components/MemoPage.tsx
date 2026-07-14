@@ -15,7 +15,6 @@ import { useMemos } from "@/features/memo/hooks/useMemos";
 import { MemoCard } from "@/features/memo/components/MemoCard";
 import { MemoModal } from "@/features/memo/components/MemoModal";
 import { MemoDeleteDialog } from "@/features/memo/components/MemoDeleteDialog";
-import { useSectionRegistry } from "@/features/sections";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -33,8 +32,6 @@ export interface MemoPageProps {
 }
 
 export function MemoPage({ projectId, initialMemoId }: MemoPageProps) {
-  useSectionRegistry(projectId);
-
   const {
     memos,
     filtered,

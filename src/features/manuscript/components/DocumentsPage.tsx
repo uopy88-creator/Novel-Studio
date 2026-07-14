@@ -92,14 +92,12 @@ export function DocumentsPage({ projectId }: DocumentsPageProps) {
         mode={modal.type === "edit" ? "edit" : "create"}
         document={modal.type === "edit" ? modal.document : null}
         onClose={closeModal}
-        onSubmit={(input) => {
-          void (async () => {
-            if (modal.type === "edit") {
-              await update(modal.document.id, input);
-            } else {
-              await create(input);
-            }
-          })();
+        onSubmit={async (input) => {
+          if (modal.type === "edit") {
+            await update(modal.document.id, input);
+            return;
+          }
+          await create(input);
         }}
       />
 

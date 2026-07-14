@@ -19,7 +19,7 @@ import {
   loadProjectManuscript,
   saveProjectManuscript,
 } from "@/features/manuscript/lib/project-manuscript";
-import { getSectionRegistrySnapshot, useSectionRegistry } from "@/features/sections";
+import { getSectionRegistrySnapshot } from "@/features/sections";
 import { ContentContainer } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
 import { ContextHelp } from "@/features/help";
@@ -62,9 +62,6 @@ export function CharactersPage({
   projectId,
   initialCharacterId,
 }: CharactersPageProps) {
-  // Section Registry 구독 — 제목/순서 변경 시 동일 SSOT 로 즉시 반영 가능
-  useSectionRegistry(projectId);
-
   const {
     characters,
     filtered,

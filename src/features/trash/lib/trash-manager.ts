@@ -77,7 +77,9 @@ export async function softDelete(
   const captured = await adapter.capture(entityId);
   if (!captured) return false;
 
-  await addTrashItem({
+  // trash 항목을 먼저 넣은 뒤 live 를 제거한다.
+  // removeLive 가 실패하면 trash 행을 롤백해 "휴지통+본문 동시 존재" 를 막는다.
+  const trashItem = await addTrashItem({
     projectId: captured.projectId,
     entityType,
     entityId: captured.entityId,
@@ -85,7 +87,24 @@ export async function softDelete(
     payload: captured.payload,
   });
 
-  return adapter.removeLive(entityId);
+  try {
+    const removed = await adapter.removeLive(entityId);
+    if (!removed) {
+      await removeTrashItem(trashItem.id);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    try {
+      await removeTrashItem(trashItem.id);
+    } catch (rollbackError) {
+      console.error(
+        "[TrashManager] softDelete rollback failed",
+        rollbackError,
+      );
+    }
+    throw error;
+  }
 }
 
 /** 복원 — payload 로 live 복구 후 trash 항목 제거 */
