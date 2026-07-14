@@ -4,14 +4,13 @@
  * =============================================================================
  * Quick Actions UI (Selection Action Menu)
  * -----------------------------------------------------------------------------
- * - UI 만 담당. Action 을 직접 실행하지 않는다.
- * - Action Registry 를 읽어 버튼을 자동 생성한다.
- * - 메뉴는 document.body 포털 + position:fixed.
+ * - Registry → 버튼 자동 생성
+ * - body 포털 + position:fixed
  *
- * 모바일 주의:
- * - 선택 핸들은 textarea 밖에서 조작되므로 document 단 touch/pointer 를 본다.
- * - 선택 직후 OS 가 textarea/viewport 를 스크롤해도 메뉴를 닫지 않고 위치를 갱신한다.
- * - 좁은 화면·터치 환경에서는 선택 위 대신 visualViewport 하단에 1열 고정.
+ * 모바일:
+ * - textarea 이벤트만으로는 선택 핸들/스크롤 타이밍을 놓치기 쉬움
+ * - focus 중 짧은 폴링으로 selection 을 SSOT 로 본다
+ * - 터치·좁은 화면은 visualViewport 하단(safe-area)에 1열 도킹
  * =============================================================================
  */
 
@@ -43,54 +42,70 @@ export interface QuickActionsProps {
 interface MenuState {
   top: number;
   left: number;
+  /** docked 일 때 layout viewport 기준 bottom (keyboard 대응) */
+  bottom: number | null;
   selection: QuickActionSelection;
   measured: boolean;
-  /** 하단 고정 (모바일) */
   docked: boolean;
 }
 
-const TOUCH_SYNC_DELAYS_MS = [0, 32, 80, 160, 320, 500] as const;
-const CLEAR_SELECTION_DELAY_MS = 180;
+const POLL_MS = 200;
+const EMPTY_TICKS_BEFORE_CLOSE = 2;
 
 function readSelection(
   el: HTMLTextAreaElement | null,
 ): QuickActionSelection | null {
   if (!el) return null;
-  const start = el.selectionStart;
-  const end = el.selectionEnd;
-  if (start === end) return null;
-  const text = el.value.slice(start, end);
-  if (!text.trim()) return null;
-  return { text, start, end };
+  try {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (typeof start !== "number" || typeof end !== "number") return null;
+    if (start === end) return null;
+    const text = el.value.slice(start, end);
+    if (!text.trim()) return null;
+    return { text, start, end };
+  } catch {
+    return null;
+  }
 }
 
 function selectionKey(selection: QuickActionSelection): string {
   return `${selection.start}:${selection.end}`;
 }
 
-/** 터치·좁은 화면 → 하단 도킹 */
 function shouldDockToBottom(): boolean {
   if (typeof window === "undefined") return false;
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
-  const noHover = window.matchMedia("(hover: none)").matches;
-  return coarse || noHover || window.innerWidth < 768;
+  try {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const noHover = window.matchMedia("(hover: none)").matches;
+    return coarse || noHover || window.innerWidth < 768;
+  } catch {
+    return window.innerWidth < 768;
+  }
 }
 
-function estimateDockedPosition(menuWidth: number, menuHeight: number): {
-  top: number;
-  left: number;
-} {
+function measureMenuBox(menuWidth: number, menuHeight: number, docked: boolean) {
   const vv = window.visualViewport;
   const width = vv?.width ?? window.innerWidth;
   const height = vv?.height ?? window.innerHeight;
   const offsetTop = vv?.offsetTop ?? 0;
   const offsetLeft = vv?.offsetLeft ?? 0;
-  const pad = 10;
-  const usableWidth = Math.min(menuWidth, width - pad * 2);
-  const left =
-    offsetLeft + Math.max(pad, (width - usableWidth) / 2);
-  const top = offsetTop + height - menuHeight - pad;
-  return { top: Math.max(offsetTop + pad, top), left };
+  const pad = 12;
+  const usableWidth = Math.min(menuWidth, Math.max(120, width - pad * 2));
+  const left = offsetLeft + Math.max(pad, (width - usableWidth) / 2);
+
+  if (docked) {
+    // layout viewport 하단에서의 거리 = 키보드 등에 가려지지 않게
+    const bottom =
+      Math.max(0, window.innerHeight - (offsetTop + height)) + pad;
+    return {
+      top: offsetTop + height - menuHeight - pad,
+      left,
+      bottom,
+    };
+  }
+
+  return { top: 0, left, bottom: null as number | null };
 }
 
 export function QuickActions({
@@ -102,36 +117,20 @@ export function QuickActions({
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const lastSelectionKeyRef = useRef<string | null>(null);
-  const touchSyncTimersRef = useRef<number[]>([]);
-  const clearTimerRef = useRef<number | null>(null);
-  const menuSelectionRef = useRef<QuickActionSelection | null>(null);
+  const lastKeyRef = useRef<string | null>(null);
+  const emptyTicksRef = useRef(0);
+  const selectionRef = useRef<QuickActionSelection | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const clearTouchSyncTimers = useCallback(() => {
-    for (const id of touchSyncTimersRef.current) {
-      window.clearTimeout(id);
-    }
-    touchSyncTimersRef.current = [];
-  }, []);
-
-  const clearClearTimer = useCallback(() => {
-    if (clearTimerRef.current != null) {
-      window.clearTimeout(clearTimerRef.current);
-      clearTimerRef.current = null;
-    }
-  }, []);
-
   const closeMenu = useCallback(() => {
     setMenu(null);
-    menuSelectionRef.current = null;
-    lastSelectionKeyRef.current = null;
-    clearTouchSyncTimers();
-    clearClearTimer();
-  }, [clearClearTimer, clearTouchSyncTimers]);
+    lastKeyRef.current = null;
+    selectionRef.current = null;
+    emptyTicksRef.current = 0;
+  }, []);
 
   const placeMenu = useCallback(
     (
@@ -142,16 +141,18 @@ export function QuickActions({
       if (!el) return;
 
       const docked = shouldDockToBottom();
-      const menuWidth = measuredSize?.width ?? (docked ? 360 : 360);
-      const menuHeight = measuredSize?.height ?? 52;
+      const menuWidth = measuredSize?.width ?? 360;
+      const menuHeight = measuredSize?.height ?? 56;
 
       let top: number;
       let left: number;
+      let bottom: number | null;
 
       if (docked) {
-        const dockedPos = estimateDockedPosition(menuWidth, menuHeight);
-        top = dockedPos.top;
-        left = dockedPos.left;
+        const box = measureMenuBox(menuWidth, menuHeight, true);
+        top = box.top;
+        left = box.left;
+        bottom = box.bottom;
       } else {
         const pos = estimateQuickActionsPosition(
           el,
@@ -163,13 +164,16 @@ export function QuickActions({
         );
         top = pos.viewportTop;
         left = pos.viewportLeft;
+        bottom = null;
       }
 
-      menuSelectionRef.current = selection;
-      lastSelectionKeyRef.current = selectionKey(selection);
+      selectionRef.current = selection;
+      lastKeyRef.current = selectionKey(selection);
+      emptyTicksRef.current = 0;
       setMenu({
         top,
         left,
+        bottom,
         selection,
         measured: Boolean(measuredSize),
         docked,
@@ -178,216 +182,168 @@ export function QuickActions({
     [positionParentRef, textareaRef],
   );
 
-  const syncFromSelection = useCallback(
-    (options?: { allowClear?: boolean }) => {
-      const allowClear = options?.allowClear !== false;
-      const el = textareaRef.current;
-      if (!enabled || !el) {
-        closeMenu();
-        return;
-      }
+  const refreshFromTextarea = useCallback(() => {
+    if (!enabled) {
+      closeMenu();
+      return;
+    }
+    const el = textareaRef.current;
+    if (!el) return;
 
-      const selection = readSelection(el);
-      if (!selection) {
-        // 모바일에서 selection 이 잠깐 비는 프레임이 있어 즉시 닫지 않는다
-        if (!allowClear) return;
-        clearClearTimer();
-        clearTimerRef.current = window.setTimeout(() => {
-          const stillEmpty = !readSelection(textareaRef.current);
-          if (stillEmpty) closeMenu();
-        }, CLEAR_SELECTION_DELAY_MS);
-        return;
-      }
-
-      clearClearTimer();
+    const selection = readSelection(el);
+    if (selection) {
       const key = selectionKey(selection);
-      // 같은 선택이면 메뉴 유지 (위치 갱신은 scroll / visualViewport 핸들러가 담당)
-      if (key === lastSelectionKeyRef.current && menuRef.current) {
-        return;
+      if (key !== lastKeyRef.current || !menuRef.current) {
+        placeMenu(selection);
       }
-      placeMenu(selection);
-    },
-    [clearClearTimer, closeMenu, enabled, placeMenu, textareaRef],
-  );
+      return;
+    }
 
-  const syncAfterTouch = useCallback(() => {
-    clearTouchSyncTimers();
-    touchSyncTimersRef.current = TOUCH_SYNC_DELAYS_MS.map((delay) =>
-      window.setTimeout(() => {
-        syncFromSelection({ allowClear: delay > 100 });
-      }, delay),
-    );
-  }, [clearTouchSyncTimers, syncFromSelection]);
+    // 선택 없음 — 연속 몇 틱 비어야 닫기 (모바일 깜빡임 방지)
+    if (!lastKeyRef.current) return;
+    emptyTicksRef.current += 1;
+    if (emptyTicksRef.current >= EMPTY_TICKS_BEFORE_CLOSE) {
+      closeMenu();
+    }
+  }, [closeMenu, enabled, placeMenu, textareaRef]);
 
-  // 실제 메뉴 크기 보정
-  useLayoutEffect(() => {
-    if (!menu || menu.measured || !menuRef.current) return;
-    const rect = menuRef.current.getBoundingClientRect();
-    if (rect.width < 8 || rect.height < 8) return;
-    placeMenu(menu.selection, { width: rect.width, height: rect.height });
-  }, [menu, placeMenu]);
-
+  // 핵심: focus 중 폴링 (모바일 선택 핸들·지연 selection 대응)
   useEffect(() => {
     if (!enabled) {
       closeMenu();
       return;
     }
 
-    let cancelled = false;
-    let detach: (() => void) | null = null;
-    let retryTimer: number | null = null;
-
-    const attach = (el: HTMLTextAreaElement) => {
-      const onMouseUp = () => {
-        requestAnimationFrame(() => syncFromSelection());
-      };
-
-      // 선택 핸들은 textarea 밖에서 끝나므로 document 캡처로 본다
-      const onDocTouchEnd = (event: TouchEvent) => {
-        const target = event.target as Node | null;
-        if (menuRef.current?.contains(target)) return;
-        if (document.activeElement !== el && target !== el) {
-          // 에디터 밖 터치 — 선택이 남아 있으면 유지, 없으면 지연 후 닫기
-          syncAfterTouch();
-          return;
-        }
-        syncAfterTouch();
-      };
-
-      const onDocPointerUp = (event: PointerEvent) => {
-        if (event.pointerType === "touch") return;
-        const target = event.target as Node | null;
-        if (menuRef.current?.contains(target)) return;
-        if (document.activeElement !== el && target !== el) return;
-        requestAnimationFrame(() => syncFromSelection());
-      };
-
-      const onKeyUp = (event: KeyboardEvent) => {
-        if (event.key === "Escape") {
-          closeMenu();
-          return;
-        }
-        requestAnimationFrame(() => syncFromSelection());
-      };
-
-      const onSelect = () => {
-        requestAnimationFrame(() => syncFromSelection({ allowClear: false }));
-      };
-
-      // 스크롤해도 닫지 않음 — 모바일 선택 시 OS 스크롤이 잦음
-      const onScroll = () => {
-        const selection = readSelection(el);
-        if (!selection) return;
-        placeMenu(
-          selection,
-          menuRef.current
-            ? {
-                width: menuRef.current.getBoundingClientRect().width,
-                height: menuRef.current.getBoundingClientRect().height,
-              }
-            : undefined,
-        );
-      };
-
-      const onSelectionChange = () => {
-        if (document.activeElement !== el) return;
-        requestAnimationFrame(() => syncFromSelection({ allowClear: false }));
-      };
-
-      const onVisualViewportChange = () => {
-        const selection = readSelection(el) ?? menuSelectionRef.current;
-        if (!selection) return;
-        if (!readSelection(el)) return;
-        placeMenu(
-          selection,
-          menuRef.current
-            ? {
-                width: menuRef.current.getBoundingClientRect().width,
-                height: menuRef.current.getBoundingClientRect().height,
-              }
-            : undefined,
-        );
-      };
-
-      const onFocusOut = () => {
-        // 메뉴 버튼 탭 시 포커스가 잠깐 빠질 수 있음
-        window.setTimeout(() => {
-          if (menuRef.current?.contains(document.activeElement)) return;
-          if (document.activeElement === el) return;
-          const selection = readSelection(el);
-          if (!selection) closeMenu();
-        }, 0);
-      };
-
-      el.addEventListener("mouseup", onMouseUp);
-      el.addEventListener("keyup", onKeyUp);
-      el.addEventListener("select", onSelect);
-      el.addEventListener("scroll", onScroll, { passive: true });
-      el.addEventListener("focusout", onFocusOut);
-      document.addEventListener("touchend", onDocTouchEnd, {
-        capture: true,
-        passive: true,
-      });
-      document.addEventListener("pointerup", onDocPointerUp, true);
-      document.addEventListener("selectionchange", onSelectionChange);
-      window.visualViewport?.addEventListener("resize", onVisualViewportChange);
-      window.visualViewport?.addEventListener("scroll", onVisualViewportChange);
-      window.addEventListener("resize", onVisualViewportChange);
-
-      return () => {
-        el.removeEventListener("mouseup", onMouseUp);
-        el.removeEventListener("keyup", onKeyUp);
-        el.removeEventListener("select", onSelect);
-        el.removeEventListener("scroll", onScroll);
-        el.removeEventListener("focusout", onFocusOut);
-        document.removeEventListener("touchend", onDocTouchEnd, true);
-        document.removeEventListener("pointerup", onDocPointerUp, true);
-        document.removeEventListener("selectionchange", onSelectionChange);
-        window.visualViewport?.removeEventListener(
-          "resize",
-          onVisualViewportChange,
-        );
-        window.visualViewport?.removeEventListener(
-          "scroll",
-          onVisualViewportChange,
-        );
-        window.removeEventListener("resize", onVisualViewportChange);
-      };
+    const onFocusIn = () => {
+      refreshFromTextarea();
     };
-
-    const tryAttach = () => {
-      const next = textareaRef.current;
-      if (!next || cancelled) return false;
-      detach = attach(next);
-      return true;
-    };
-
-    if (!tryAttach()) {
-      retryTimer = window.setInterval(() => {
-        if (tryAttach() && retryTimer != null) {
-          window.clearInterval(retryTimer);
-          retryTimer = null;
-        }
+    const onFocusOut = () => {
+      window.setTimeout(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        if (menuRef.current?.contains(document.activeElement)) return;
+        if (document.activeElement === el) return;
+        // 포커스가 완전히 떠났고 선택도 없으면 닫기
+        if (!readSelection(el)) closeMenu();
       }, 50);
-    }
+    };
+
+    const onDocTouchEnd = () => {
+      // 선택 핸들 조작 직후
+      window.setTimeout(refreshFromTextarea, 0);
+      window.setTimeout(refreshFromTextarea, 100);
+      window.setTimeout(refreshFromTextarea, 300);
+    };
+
+    const onMouseUp = () => {
+      window.requestAnimationFrame(refreshFromTextarea);
+    };
+
+    const onSelect = () => {
+      window.requestAnimationFrame(refreshFromTextarea);
+    };
+
+    const onSelectionChange = () => {
+      const el = textareaRef.current;
+      if (!el) return;
+      if (document.activeElement !== el && !lastKeyRef.current) return;
+      window.requestAnimationFrame(refreshFromTextarea);
+    };
+
+    const onViewport = () => {
+      const selection = selectionRef.current ?? readSelection(textareaRef.current);
+      if (!selection || !readSelection(textareaRef.current)) return;
+      placeMenu(
+        selection,
+        menuRef.current
+          ? {
+              width: menuRef.current.getBoundingClientRect().width,
+              height: menuRef.current.getBoundingClientRect().height,
+            }
+          : undefined,
+      );
+    };
+
+    let pollTimer: number | null = null;
+    const startPoll = () => {
+      if (pollTimer != null) return;
+      pollTimer = window.setInterval(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        if (
+          document.activeElement === el ||
+          lastKeyRef.current ||
+          readSelection(el)
+        ) {
+          refreshFromTextarea();
+        }
+      }, POLL_MS);
+    };
+    const stopPoll = () => {
+      if (pollTimer != null) {
+        window.clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    };
+
+    startPoll();
+
+    const bind = (el: HTMLTextAreaElement) => {
+      el.addEventListener("focus", onFocusIn);
+      el.addEventListener("blur", onFocusOut);
+      el.addEventListener("mouseup", onMouseUp);
+      el.addEventListener("select", onSelect);
+      el.addEventListener("keyup", onMouseUp);
+      el.addEventListener("touchend", onDocTouchEnd, { passive: true });
+    };
+
+    const unbind = (el: HTMLTextAreaElement) => {
+      el.removeEventListener("focus", onFocusIn);
+      el.removeEventListener("blur", onFocusOut);
+      el.removeEventListener("mouseup", onMouseUp);
+      el.removeEventListener("select", onSelect);
+      el.removeEventListener("keyup", onMouseUp);
+      el.removeEventListener("touchend", onDocTouchEnd);
+    };
+
+    let attached: HTMLTextAreaElement | null = null;
+    const ensureAttached = () => {
+      const el = textareaRef.current;
+      if (!el || el === attached) return;
+      if (attached) unbind(attached);
+      attached = el;
+      bind(el);
+    };
+    ensureAttached();
+    const attachTimer = window.setInterval(ensureAttached, 500);
+
+    document.addEventListener("touchend", onDocTouchEnd, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("selectionchange", onSelectionChange);
+    window.visualViewport?.addEventListener("resize", onViewport);
+    window.visualViewport?.addEventListener("scroll", onViewport);
+    window.addEventListener("resize", onViewport);
 
     return () => {
-      cancelled = true;
-      if (retryTimer != null) window.clearInterval(retryTimer);
-      clearTouchSyncTimers();
-      clearClearTimer();
-      detach?.();
+      stopPoll();
+      window.clearInterval(attachTimer);
+      if (attached) unbind(attached);
+      document.removeEventListener("touchend", onDocTouchEnd, true);
+      document.removeEventListener("selectionchange", onSelectionChange);
+      window.visualViewport?.removeEventListener("resize", onViewport);
+      window.visualViewport?.removeEventListener("scroll", onViewport);
+      window.removeEventListener("resize", onViewport);
     };
-  }, [
-    clearClearTimer,
-    clearTouchSyncTimers,
-    closeMenu,
-    enabled,
-    placeMenu,
-    syncAfterTouch,
-    syncFromSelection,
-    textareaRef,
-  ]);
+  }, [closeMenu, enabled, placeMenu, refreshFromTextarea, textareaRef]);
+
+  useLayoutEffect(() => {
+    if (!menu || menu.measured || !menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8) return;
+    placeMenu(menu.selection, { width: rect.width, height: rect.height });
+  }, [menu, placeMenu]);
 
   const runAction = useCallback(
     (actionId: string, ctx: QuickActionContext) => {
@@ -417,13 +373,21 @@ export function QuickActions({
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-[9999] flex max-w-[calc(100vw-16px)] flex-nowrap items-center gap-1 overflow-x-auto",
+        "fixed flex max-w-[calc(100vw-16px)] flex-nowrap items-center gap-1 overflow-x-auto",
         "rounded-full border border-ns-border bg-ns-surface",
-        "px-1 py-1 shadow-ns-md",
+        "px-1 py-1 shadow-lg",
         "[-webkit-overflow-scrolling:touch]",
-        menu.docked && "shadow-lg",
       )}
-      style={{ top: menu.top, left: menu.left }}
+      style={{
+        zIndex: 2147483000,
+        left: menu.left,
+        ...(menu.docked && menu.bottom != null
+          ? { top: "auto", bottom: menu.bottom }
+          : { top: menu.top, bottom: "auto" }),
+        paddingBottom: menu.docked
+          ? "max(0px, env(safe-area-inset-bottom))"
+          : undefined,
+      }}
       role="toolbar"
       aria-label="Quick Actions"
       data-quick-actions-menu=""
@@ -439,9 +403,9 @@ export function QuickActions({
             className={cn(
               "inline-flex min-h-11 shrink-0 items-center justify-center gap-2",
               "rounded-full px-3 text-sm font-medium text-ns-ink",
-              "hover:bg-ns-muted",
+              "hover:bg-ns-muted active:bg-ns-muted",
               "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
-              isHighlight && "bg-[#BFE8FF] hover:bg-[#A8DEFF]",
+              isHighlight && "bg-[#BFE8FF] hover:bg-[#A8DEFF] active:bg-[#A8DEFF]",
             )}
             onPointerDown={(event) => {
               event.preventDefault();
