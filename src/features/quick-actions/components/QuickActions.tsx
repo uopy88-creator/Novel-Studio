@@ -230,8 +230,8 @@ export function QuickActions({
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-[9999] flex max-w-[min(100vw-16px,28rem)] flex-wrap items-center gap-1",
-        "rounded-lg border border-ns-border bg-ns-surface",
+        "fixed z-[9999] flex flex-nowrap items-center gap-1",
+        "rounded-full border border-ns-border bg-ns-surface",
         "px-1 py-1 shadow-ns-md",
       )}
       style={{ top: menu.top, left: menu.left }}
@@ -247,8 +247,8 @@ export function QuickActions({
             type="button"
             data-quick-action={action.id}
             className={cn(
-              "inline-flex min-h-11 items-center justify-center gap-2",
-              "rounded-md px-3 text-sm font-medium text-ns-ink",
+              "inline-flex min-h-11 shrink-0 items-center justify-center gap-2",
+              "rounded-full px-3 text-sm font-medium text-ns-ink",
               "hover:bg-ns-muted",
               "focus-visible:outline-none focus-visible:shadow-[var(--ns-ring-accent)]",
               isHighlight && "bg-[#BFE8FF] hover:bg-[#A8DEFF]",

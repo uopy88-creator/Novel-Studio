@@ -19,7 +19,7 @@ export function createSentenceAssistantAction(options: {
   return {
     id: "sentence-assistant",
     label: "Sentence Assistant",
-    icon: "🪄",
+    icon: "✍️",
     priority: 10,
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
     execute: (ctx) => {
@@ -70,7 +70,7 @@ export function createHighlightAction(options: {
   return {
     id: "highlight",
     label: "하이라이트",
-    icon: "H",
+    icon: "🖍",
     // 맨 앞 — Selection Action Menu 에서 바로 보이게
     priority: 1,
     isAvailable: (ctx) => Boolean(ctx.selection.text.trim()),
