@@ -308,8 +308,15 @@ export function rowToInspiration(row: DbInspirationRow): Inspiration {
   };
 }
 
+/**
+ * Memo → memos 행.
+ *
+ * section_stable_id / source_text 는 후속 마이그레이션 컬럼이다.
+ * 값이 없을 때 키를 넣으면(미적용 DB에서) PostgREST 가 upsert 를 거부한다.
+ * → 값이 있을 때만 포함한다. (SELECT * 는 컬럼 없이도 동작함)
+ */
 export function memoToRow(memo: Memo, userId: string): DbMemoRow {
-  return {
+  const row: DbMemoRow = {
     id: memo.id,
     project_id: memo.projectId,
     user_id: userId,
@@ -320,12 +327,19 @@ export function memoToRow(memo: Memo, userId: string): DbMemoRow {
     document_id: memo.chapterId ?? null,
     character_id: memo.characterId ?? null,
     foreshadowing_id: memo.foreshadowingId ?? null,
-    section_stable_id: memo.sectionStableId ?? null,
-    source_text: memo.sourceText ?? null,
     tags: memo.tags ?? [],
     created_at: memo.createdAt,
     updated_at: memo.updatedAt,
   };
+
+  if (memo.sectionStableId) {
+    row.section_stable_id = memo.sectionStableId;
+  }
+  if (memo.sourceText) {
+    row.source_text = memo.sourceText;
+  }
+
+  return row;
 }
 
 export function rowToMemo(row: DbMemoRow): Memo {
