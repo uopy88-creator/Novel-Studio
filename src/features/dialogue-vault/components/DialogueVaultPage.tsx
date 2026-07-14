@@ -4,15 +4,16 @@
  * =============================================================================
  * DialogueVaultPage → Writing Vault
  * -----------------------------------------------------------------------------
- * 문장 · 단어 · 아이디어 통합 금고
- * - 추가 / 수정 / 삭제
- * - 검색 · 태그 검색 · 종류 필터
- * - 즐겨찾기 · Reference
+ * Sentence · Word · Memo · Foreshadowing · Inspiration 통합 금고
  * =============================================================================
  */
 
 import { useEffect, useMemo, useState } from "react";
 import type { WritingVaultEntry } from "@/features/dialogue-vault/types/dialogue";
+import {
+  WRITING_VAULT_TYPES,
+  type WritingVaultType,
+} from "@/features/dialogue-vault/types/dialogue";
 import type { ProjectId } from "@/types/ids";
 import { useDialogues } from "@/features/dialogue-vault/hooks/useDialogues";
 import { DialogueList } from "@/features/dialogue-vault/components/DialogueList";
@@ -73,14 +74,20 @@ export function DialogueVaultPage({
     dialogues.length > 0;
 
   const typeCounts = useMemo(() => {
-    const counts = {
+    const counts: Record<"all" | WritingVaultType, number> = {
       all: dialogues.length,
       sentence: 0,
       word: 0,
-      idea: 0,
+      memo: 0,
+      foreshadowing: 0,
+      inspiration: 0,
     };
     for (const entry of dialogues) {
       counts[entry.type] += 1;
+    }
+    // 타입 목록이 늘어나도 counts 키가 빠지지 않도록 보장
+    for (const type of WRITING_VAULT_TYPES) {
+      if (typeof counts[type] !== "number") counts[type] = 0;
     }
     return counts;
   }, [dialogues]);
@@ -92,8 +99,8 @@ export function DialogueVaultPage({
           <p className="ns-caption mb-ns-2">보관함</p>
           <h2 className="ns-heading">Writing Vault</h2>
           <p className="mt-ns-2 text-ns-sm text-ns-ink-secondary">
-            문장·단어·아이디어를 한곳에서 모읍니다. 원고와는 독립적으로
-            관리됩니다.
+            Sentence · Word · Memo · Foreshadowing · Inspiration 을 한곳에서
+            모읍니다. 원고와는 독립적으로 관리됩니다.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-ns-2">
@@ -162,23 +169,22 @@ export function DialogueVaultPage({
         dialogue={modal.type === "edit" ? modal.dialogue : null}
         defaultType={typeFilter === "all" ? "sentence" : typeFilter}
         onClose={closeModal}
-        onSubmit={(input) => {
-          void (async () => {
-            try {
-              setActionError(null);
-              if (modal.type === "edit") {
-                await update(modal.dialogue.id, input);
-              } else {
-                await create(input);
-              }
-            } catch (error) {
-              setActionError(
-                error instanceof Error
-                  ? error.message
-                  : "클라우드 저장에 실패했습니다.",
-              );
+        onSubmit={async (input) => {
+          setActionError(null);
+          try {
+            if (modal.type === "edit") {
+              await update(modal.dialogue.id, input);
+            } else {
+              await create(input);
             }
-          })();
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "클라우드 저장에 실패했습니다.";
+            setActionError(message);
+            throw error;
+          }
         }}
       />
 

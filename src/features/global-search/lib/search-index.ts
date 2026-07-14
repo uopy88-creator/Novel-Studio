@@ -175,7 +175,10 @@ export async function buildSearchIndex(
     });
   }
 
+  // Memo / Foreshadowing / Inspiration 은 도메인 인덱스로 검색한다.
+  // Writing Vault 검색은 Sentence · Word 만 넣어 중복을 막는다.
   for (const entry of vault) {
+    if (entry.type !== "sentence" && entry.type !== "word") continue;
     docs.push({
       id: `wv-${entry.id}`,
       kind: "writing-vault",

@@ -28,7 +28,11 @@ export type ManuscriptId = EntityId;
 export type CharacterId = EntityId;
 
 /** 대사(Dialogue) ID */
-export type DialogueId = EntityId;
+/** Writing Vault 항목 ID */
+export type WritingVaultEntryId = EntityId;
+
+/** @deprecated WritingVaultEntryId 사용 */
+export type DialogueId = WritingVaultEntryId;
 
 /** 복선(Foreshadowing) ID */
 export type ForeshadowingId = EntityId;

@@ -34,7 +34,7 @@ export interface DialogueModalProps {
   dialogue?: WritingVaultEntry | null;
   /** 생성 시 기본 종류 */
   defaultType?: WritingVaultType;
-  onSubmit: (input: WritingVaultInput) => void;
+  onSubmit: (input: WritingVaultInput) => void | Promise<void>;
 }
 
 export function DialogueModal({
@@ -53,6 +53,7 @@ export function DialogueModal({
   const [author, setAuthor] = useState("");
   const [refMemo, setRefMemo] = useState("");
   const [contentError, setContentError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +76,7 @@ export function DialogueModal({
       setRefMemo("");
     }
     setContentError(null);
+    setSaving(false);
   }, [open, mode, dialogue, defaultType]);
 
   const handleSubmit = (event: FormEvent) => {
@@ -86,18 +88,32 @@ export function DialogueModal({
       return;
     }
 
-    onSubmit({
-      type,
-      title,
-      content: trimmed,
-      tags: parseTagsInput(tagsRaw),
-      reference: {
-        workTitle,
-        author,
-        memo: refMemo,
-      },
-    });
-    onClose();
+    void (async () => {
+      setSaving(true);
+      setContentError(null);
+      try {
+        await onSubmit({
+          type,
+          title,
+          content: trimmed,
+          tags: parseTagsInput(tagsRaw),
+          reference: {
+            workTitle,
+            author,
+            memo: refMemo,
+          },
+        });
+        onClose();
+      } catch (error) {
+        setContentError(
+          error instanceof Error
+            ? error.message
+            : "저장에 실패했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -110,7 +126,7 @@ export function DialogueModal({
       description={
         isEdit
           ? "종류·내용·Reference를 수정합니다."
-          : "문장·단어·아이디어를 Writing Vault에 보관합니다."
+          : "Writing Vault에 항목을 보관합니다."
       }
       size="md"
       footer={
@@ -118,8 +134,8 @@ export function DialogueModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             취소
           </Button>
-          <Button type="submit" form="writing-vault-form">
-            {isEdit ? "저장" : "추가"}
+          <Button type="submit" form="writing-vault-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "추가"}
           </Button>
         </>
       }
@@ -186,9 +202,13 @@ export function DialogueModal({
             placeholder={
               type === "word"
                 ? "예: 여명"
-                : type === "idea"
-                  ? "예: 주인공이 이름을 잃는 설정"
-                  : "예: 그래도, 나는 여기 남을게."
+                : type === "memo"
+                  ? "예: 이 장에서 감정의 온도를 낮출 것"
+                  : type === "foreshadowing"
+                    ? "예: 첫 장에서 본 열쇠가 나중에 쓰인다"
+                    : type === "inspiration"
+                      ? "예: 인상 깊었던 문장이나 장면"
+                      : "예: 그래도, 나는 여기 남을게."
             }
             rows={5}
             autoFocus

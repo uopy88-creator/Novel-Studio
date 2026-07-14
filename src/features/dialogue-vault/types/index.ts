@@ -12,4 +12,5 @@ export {
   WRITING_VAULT_TYPE_LABELS,
   emptyWritingVaultReference,
   isWritingVaultType,
+  normalizeWritingVaultType,
 } from "./dialogue";

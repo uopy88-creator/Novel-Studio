@@ -19,7 +19,8 @@ import type {
 } from "@/features/manuscript/types/chapter";
 import type { Manuscript } from "@/features/manuscript/types/manuscript";
 import type { ManuscriptVersion } from "@/features/manuscript/types/manuscript-version";
-import type { Dialogue } from "@/features/dialogue-vault/types/dialogue";
+import type { WritingVaultEntry } from "@/features/writing-vault/types/writing-vault-entry";
+import { normalizeWritingVaultType } from "@/features/writing-vault/types/writing-vault-entry";
 import type { Character } from "@/features/characters/types/character";
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { Memo, MemoKind } from "@/features/memo/types/memo";
@@ -29,7 +30,7 @@ import type { WordTreasuryEntry } from "@/features/word-treasury/types/word-trea
 import type { TimelineEvent } from "@/features/timeline/types/timeline-event";
 import type {
   DbCharacterRow,
-  DbDialogueRow,
+  DbWritingVaultRow,
   DbDocumentRow,
   DbForeshadowingRow,
   DbInspirationRow,
@@ -171,45 +172,70 @@ export function rowToManuscriptVersion(
   };
 }
 
-export function dialogueToRow(dialogue: Dialogue, userId: string): DbDialogueRow {
+export function writingVaultEntryToRow(
+  entry: WritingVaultEntry,
+  userId: string,
+): DbWritingVaultRow {
   return {
-    id: dialogue.id,
-    project_id: dialogue.projectId,
+    id: entry.id,
+    project_id: entry.projectId,
     user_id: userId,
-    entry_type: dialogue.type,
-    title: dialogue.title ?? "",
-    content: dialogue.content,
-    tags: dialogue.tags,
-    reference_work_title: dialogue.reference?.workTitle ?? "",
-    reference_author: dialogue.reference?.author ?? "",
-    reference_memo: dialogue.reference?.memo ?? "",
-    is_favorite: dialogue.isFavorite,
-    created_at: dialogue.createdAt,
-    updated_at: dialogue.updatedAt,
+    entry_type: entry.type,
+    title: entry.title ?? "",
+    content: entry.content,
+    tags: entry.tags ?? [],
+    reference_work_title: entry.reference?.workTitle ?? "",
+    reference_author: entry.reference?.author ?? "",
+    reference_memo: entry.reference?.memo ?? "",
+    is_favorite: entry.isFavorite,
+    is_pinned: entry.isPinned,
+    section_stable_id: entry.sectionStableId ?? null,
+    document_id: entry.documentId ?? null,
+    meta: entry.meta ?? {},
+    created_at: entry.createdAt,
+    updated_at: entry.updatedAt,
   };
 }
 
-export function rowToDialogue(row: DbDialogueRow): Dialogue {
-  const rawType = (row as DbDialogueRow & { entry_type?: string }).entry_type;
-  const entryType =
-    rawType === "word" || rawType === "idea" ? rawType : "sentence";
+export function rowToWritingVaultEntry(row: DbWritingVaultRow): WritingVaultEntry {
+  const meta =
+    row.meta && typeof row.meta === "object" && !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {};
 
   return {
     id: row.id,
     projectId: row.project_id,
-    type: entryType,
+    type: normalizeWritingVaultType(row.entry_type),
     title: row.title ?? "",
-    content: row.content,
+    content: row.content ?? "",
     tags: row.tags ?? [],
     reference: {
       workTitle: row.reference_work_title ?? "",
       author: row.reference_author ?? "",
       memo: row.reference_memo ?? "",
     },
-    isFavorite: row.is_favorite,
+    isFavorite: Boolean(row.is_favorite),
+    isPinned: Boolean(row.is_pinned),
+    sectionStableId: row.section_stable_id ?? undefined,
+    documentId: row.document_id ?? undefined,
+    meta,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** @deprecated writingVaultEntryToRow */
+export function dialogueToRow(
+  entry: WritingVaultEntry,
+  userId: string,
+): DbWritingVaultRow {
+  return writingVaultEntryToRow(entry, userId);
+}
+
+/** @deprecated rowToWritingVaultEntry */
+export function rowToDialogue(row: DbWritingVaultRow): WritingVaultEntry {
+  return rowToWritingVaultEntry(row);
 }
 
 export function characterToRow(

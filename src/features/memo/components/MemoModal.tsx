@@ -22,7 +22,7 @@ export interface MemoModalProps {
   initialBody?: string;
   /** Pin 초기값 */
   initialPinned?: boolean;
-  onSubmit: (input: MemoInput) => void;
+  onSubmit: (input: MemoInput) => void | Promise<void>;
   onDelete?: () => void;
 }
 
@@ -39,6 +39,7 @@ export function MemoModal({
   const [body, setBody] = useState("");
   const [isPinned, setIsPinned] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +51,7 @@ export function MemoModal({
       setIsPinned(initialPinned);
     }
     setError(null);
+    setSaving(false);
   }, [open, mode, memo, initialBody, initialPinned]);
 
   const handleSubmit = (event: FormEvent) => {
@@ -59,12 +61,25 @@ export function MemoModal({
       setError("내용을 입력해 주세요.");
       return;
     }
-    onSubmit({
-      body: trimmed,
-      isPinned,
-      kind: memo?.kind ?? "note",
-    });
-    onClose();
+
+    void (async () => {
+      setSaving(true);
+      setError(null);
+      try {
+        await onSubmit({
+          body: trimmed,
+          isPinned,
+          kind: memo?.kind ?? "note",
+        });
+        onClose();
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Memo 저장에 실패했습니다.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const isEdit = mode === "edit";
@@ -98,8 +113,8 @@ export function MemoModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             취소
           </Button>
-          <Button type="submit" form="memo-form">
-            {isEdit ? "저장" : "만들기"}
+          <Button type="submit" form="memo-form" disabled={saving}>
+            {saving ? "저장 중…" : isEdit ? "저장" : "만들기"}
           </Button>
         </>
       }

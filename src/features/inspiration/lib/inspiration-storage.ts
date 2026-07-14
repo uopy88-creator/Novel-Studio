@@ -1,27 +1,23 @@
 /**
  * =============================================================================
- * Inspiration Storage — Supabase Database 단일 소스
- * -----------------------------------------------------------------------------
- * Supabase 설정 시: CRUD 는 클라우드만. LocalStorage 는 성공 후 백업 쓰기만.
- * Supabase 미설정(로컬 개발) 시에만 LocalStorage 를 데이터 소스로 사용.
+ * Inspiration Storage — Writing Vault facade (type = inspiration)
  * =============================================================================
  */
 
 import type { Inspiration } from "@/features/inspiration/types/inspiration";
 import type { DocumentId, InspirationId, ProjectId } from "@/types/ids";
 import {
-  isSupabaseDataMode,
-  requireCloudDb,
-} from "@/database/supabase/cloud-mode";
+  createWritingVaultEntry,
+  deleteWritingVaultEntry,
+  readAllWritingVaultEntries,
+  readWritingVaultByProject,
+  updateWritingVaultEntry,
+} from "@/features/writing-vault/lib/writing-vault-storage";
 import {
-  cloudDeleteInspiration,
-  cloudListInspirations,
-  cloudListInspirationsByProject,
-  cloudUpsertInspiration,
-} from "@/database/supabase/inspirations-repo";
+  inspirationFromVaultEntry,
+  inspirationToVaultInput,
+} from "@/features/writing-vault/lib/adapters";
 import { INSPIRATIONS_STORAGE_KEY } from "@/lib/storage/keys";
-import { writeWorkDataBackup } from "@/lib/storage/backup";
-import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
 
 export { INSPIRATIONS_STORAGE_KEY };
 
@@ -42,57 +38,13 @@ export interface InspirationCreateParams extends InspirationInput {
   sectionStableId?: string;
 }
 
-function normalizeInspiration(raw: unknown): Inspiration | null {
-  if (!raw || typeof raw !== "object") return null;
-  const item = raw as Partial<Inspiration>;
-
-  if (typeof item.id !== "string" || typeof item.projectId !== "string") {
-    return null;
-  }
-  if (typeof item.documentId !== "string") return null;
-  if (typeof item.selectedText !== "string") return null;
-  if (typeof item.workTitle !== "string") return null;
-
-  const createdAt =
-    typeof item.createdAt === "string" ? item.createdAt : nowIso();
-
-  return {
-    id: item.id,
-    projectId: item.projectId,
-    documentId: item.documentId,
-    selectedText: item.selectedText,
-    workTitle: item.workTitle.trim(),
-    author: typeof item.author === "string" ? item.author : "",
-    memo: typeof item.memo === "string" ? item.memo : "",
-    startOffset: typeof item.startOffset === "number" ? item.startOffset : 0,
-    endOffset: typeof item.endOffset === "number" ? item.endOffset : 0,
-    sectionStableId:
-      typeof item.sectionStableId === "string" && item.sectionStableId
-        ? item.sectionStableId
-        : undefined,
-    createdAt,
-    updatedAt:
-      typeof item.updatedAt === "string" ? item.updatedAt : createdAt,
-  };
-}
-
-/** 로컬 전용 모드(Supabase 미설정)에서만 사용 */
-function readLocalInspirations(): Inspiration[] {
-  return readJsonArray<unknown>(INSPIRATIONS_STORAGE_KEY)
-    .map(normalizeInspiration)
+function toInspirationList(
+  entries: Awaited<ReturnType<typeof readAllWritingVaultEntries>>,
+): Inspiration[] {
+  return entries
+    .filter((e) => e.type === "inspiration")
+    .map(inspirationFromVaultEntry)
     .filter((item): item is Inspiration => item !== null);
-}
-
-function writeLocalInspirations(items: Inspiration[]): void {
-  writeJsonArray(INSPIRATIONS_STORAGE_KEY, items);
-}
-
-function backupInspirations(items: Inspiration[]): void {
-  writeWorkDataBackup(INSPIRATIONS_STORAGE_KEY, items);
-}
-
-function createInspirationId(): InspirationId {
-  return crypto.randomUUID();
 }
 
 export function sortInspirations(
@@ -134,31 +86,17 @@ export function filterInspirations(
 }
 
 export async function readAllInspirations(): Promise<Inspiration[]> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const items = await cloudListInspirations();
-    backupInspirations(items);
-    return items;
-  }
-  return readLocalInspirations();
+  return toInspirationList(await readAllWritingVaultEntries());
 }
 
 export async function readInspirationsByProject(
   projectId: ProjectId,
 ): Promise<Inspiration[]> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const list = await cloudListInspirationsByProject(projectId);
-    try {
-      backupInspirations(await cloudListInspirations());
-    } catch {
-      // 백업 실패 무시
-    }
-    return sortInspirations(list, "recent");
-  }
-
+  const list = await readWritingVaultByProject(projectId, "inspiration");
   return sortInspirations(
-    readLocalInspirations().filter((item) => item.projectId === projectId),
+    list
+      .map(inspirationFromVaultEntry)
+      .filter((item): item is Inspiration => item !== null),
     "recent",
   );
 }
@@ -177,101 +115,60 @@ export async function createInspiration(
   projectId: ProjectId,
   params: InspirationCreateParams,
 ): Promise<Inspiration> {
-  const timestamp = nowIso();
-  const selectedText = params.selectedText.trim();
-  const workTitle = params.workTitle.trim();
-
-  const inspiration: Inspiration = {
-    id: createInspirationId(),
+  const entry = await createWritingVaultEntry(
     projectId,
-    documentId: params.documentId,
-    selectedText,
-    workTitle,
-    author: params.author.trim(),
-    memo: params.memo.trim(),
-    startOffset: params.startOffset,
-    endOffset: params.endOffset,
-    sectionStableId: params.sectionStableId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    await cloudUpsertInspiration(inspiration);
-    try {
-      backupInspirations(await cloudListInspirations());
-    } catch {
-      // 백업 실패 무시
-    }
-    return inspiration;
+    inspirationToVaultInput({
+      documentId: params.documentId,
+      selectedText: params.selectedText,
+      workTitle: params.workTitle,
+      author: params.author,
+      memo: params.memo,
+      startOffset: params.startOffset,
+      endOffset: params.endOffset,
+      sectionStableId: params.sectionStableId,
+    }),
+  );
+  const item = inspirationFromVaultEntry(entry);
+  if (!item) {
+    throw new Error("Inspiration 저장에 실패했습니다.");
   }
-
-  writeLocalInspirations([...readLocalInspirations(), inspiration]);
-  return inspiration;
+  return item;
 }
 
 export async function updateInspiration(
   id: InspirationId,
   input: InspirationInput,
 ): Promise<Inspiration | null> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const all = await cloudListInspirations();
-    const index = all.findIndex((item) => item.id === id);
-    if (index < 0) return null;
+  const all = await readAllWritingVaultEntries();
+  const current = all.find((e) => e.id === id && e.type === "inspiration");
+  if (!current) return null;
 
-    const updated: Inspiration = {
-      ...all[index],
+  const existing = inspirationFromVaultEntry(current);
+  if (!existing) return null;
+
+  const updated = await updateWritingVaultEntry(id, {
+    type: "inspiration",
+    title: "",
+    content: existing.selectedText,
+    tags: [],
+    reference: {
       workTitle: input.workTitle.trim(),
       author: input.author.trim(),
       memo: input.memo.trim(),
-      updatedAt: nowIso(),
-    };
-    await cloudUpsertInspiration(updated);
-    try {
-      backupInspirations(await cloudListInspirations());
-    } catch {
-      // 백업 실패 무시
-    }
-    return updated;
-  }
+    },
+    sectionStableId: existing.sectionStableId,
+    documentId: existing.documentId,
+    meta: {
+      startOffset: existing.startOffset,
+      endOffset: existing.endOffset,
+    },
+  });
 
-  const all = readLocalInspirations();
-  const index = all.findIndex((item) => item.id === id);
-  if (index < 0) return null;
-
-  const updated: Inspiration = {
-    ...all[index],
-    workTitle: input.workTitle.trim(),
-    author: input.author.trim(),
-    memo: input.memo.trim(),
-    updatedAt: nowIso(),
-  };
-  const next = [...all];
-  next[index] = updated;
-  writeLocalInspirations(next);
-  return updated;
+  return updated ? inspirationFromVaultEntry(updated) : null;
 }
 
 export async function deleteInspiration(id: InspirationId): Promise<boolean> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const all = await cloudListInspirations();
-    if (!all.some((item) => item.id === id)) return false;
-    await cloudDeleteInspiration(id);
-    try {
-      backupInspirations(await cloudListInspirations());
-    } catch {
-      // 백업 실패 무시
-    }
-    return true;
-  }
-
-  const all = readLocalInspirations();
-  if (!all.some((item) => item.id === id)) return false;
-  writeLocalInspirations(all.filter((item) => item.id !== id));
-  return true;
+  return deleteWritingVaultEntry(id);
 }
 
 /** Dashboard — 최근 3개 */

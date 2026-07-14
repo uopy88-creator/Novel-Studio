@@ -599,22 +599,20 @@ export function ManuscriptWorkspace({
         mode="create"
         initialBody={pendingMemoSelection?.text ?? ""}
         onClose={() => setPendingMemoSelection(null)}
-        onSubmit={(input) => {
+        onSubmit={async (input) => {
           if (!pendingMemoSelection) return;
-          void (async () => {
-            await createMemo(projectId, {
-              body: input.body,
-              isPinned: input.isPinned,
-              kind: "note",
-              sourceText: pendingMemoSelection.text,
-              sectionStableId:
-                findSectionStableIdAtOffset(
-                  content,
-                  pendingMemoSelection.start,
-                ) ?? undefined,
-            });
-            setPendingMemoSelection(null);
-          })();
+          await createMemo(projectId, {
+            body: input.body,
+            isPinned: input.isPinned,
+            kind: "note",
+            sourceText: pendingMemoSelection.text,
+            sectionStableId:
+              findSectionStableIdAtOffset(
+                content,
+                pendingMemoSelection.start,
+              ) ?? undefined,
+          });
+          setPendingMemoSelection(null);
         }}
       />
 

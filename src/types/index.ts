@@ -13,6 +13,7 @@ export type {
   ChapterId,
   CharacterId,
   DialogueId,
+  WritingVaultEntryId,
   DocumentId,
   EntityId,
   ForeshadowingId,

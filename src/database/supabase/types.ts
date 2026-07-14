@@ -49,12 +49,14 @@ export interface DbManuscriptRow {
   updated_at: string;
 }
 
-/** writing_vault (Writing Vault / 구 dialogues) */
-export interface DbDialogueRow {
+/**
+ * writing_vault — Writing Vault 통합 행
+ * entry_type: sentence | word | memo | foreshadowing | inspiration
+ */
+export interface DbWritingVaultRow {
   id: string;
   project_id: string;
   user_id: string;
-  /** sentence | word | idea */
   entry_type: string;
   title: string;
   content: string;
@@ -63,9 +65,16 @@ export interface DbDialogueRow {
   reference_author: string;
   reference_memo: string;
   is_favorite: boolean;
+  is_pinned?: boolean;
+  section_stable_id?: string | null;
+  document_id?: string | null;
+  meta?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
+
+/** @deprecated DbWritingVaultRow 사용 */
+export type DbDialogueRow = DbWritingVaultRow;
 
 /** characters */
 export interface DbCharacterRow {
@@ -230,7 +239,9 @@ export const DB_TABLES = {
   documents: "documents",
   manuscripts: "manuscripts",
   manuscript_versions: "manuscript_versions",
-  /** Writing Vault (구 dialogues) */
+  /** Writing Vault 통합 테이블 */
+  writing_vault: "writing_vault",
+  /** @deprecated writing_vault 사용 */
   dialogues: "writing_vault",
   characters: "characters",
   inspirations: "inspirations",

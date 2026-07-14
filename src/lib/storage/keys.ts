@@ -23,7 +23,10 @@ export const MANUSCRIPTS_STORAGE_KEY = "novel-studio:manuscripts";
 export const MANUSCRIPT_VERSIONS_STORAGE_KEY =
   "novel-studio:manuscript-versions";
 
-/** 대사 금고 */
+/** Writing Vault 통합 저장 (LocalStorage 백업) */
+export const WRITING_VAULT_STORAGE_KEY = "novel-studio:writing-vault";
+
+/** @deprecated WRITING_VAULT_STORAGE_KEY — 로컬 마이그레이션 소스 */
 export const DIALOGUES_STORAGE_KEY = "novel-studio:dialogues";
 
 /** 메모 (Dashboard 읽기 · CRUD 준비 — LocalStorage 백업 전용 키) */

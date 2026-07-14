@@ -1,31 +1,25 @@
 /**
  * =============================================================================
- * Memo Storage — Supabase Database 단일 소스
+ * Memo Storage — Writing Vault facade (type = memo)
  * -----------------------------------------------------------------------------
- * Supabase 설정 시: CRUD 는 클라우드만. LocalStorage 는 성공 후 백업 쓰기만.
- * Supabase 미설정(로컬 개발) 시에만 LocalStorage 를 데이터 소스로 사용.
+ * CRUD 는 writing-vault-storage 만 사용한다.
  * =============================================================================
  */
 
 import type { Memo } from "@/features/memo/types/memo";
 import type { MemoId, ProjectId } from "@/types/ids";
 import {
-  isSupabaseDataMode,
-  requireCloudDb,
-} from "@/database/supabase/cloud-mode";
+  createWritingVaultEntry,
+  deleteWritingVaultEntry,
+  readAllWritingVaultEntries,
+  readWritingVaultByProject,
+  updateWritingVaultEntry,
+} from "@/features/writing-vault/lib/writing-vault-storage";
 import {
-  cloudDeleteMemo,
-  cloudListMemos,
-  cloudListMemosByProject,
-  cloudUpsertMemo,
-} from "@/database/supabase/memos-repo";
+  memoFromVaultEntry,
+  memoToVaultInput,
+} from "@/features/writing-vault/lib/adapters";
 import { MEMOS_STORAGE_KEY } from "@/lib/storage/keys";
-import { writeWorkDataBackup } from "@/lib/storage/backup";
-import {
-  nowIso,
-  readJsonArray,
-  writeJsonArray,
-} from "@/lib/storage/browser";
 
 export { MEMOS_STORAGE_KEY };
 
@@ -42,190 +36,72 @@ export interface MemoInput {
   tags?: string[];
 }
 
-/** 로컬 전용 모드(Supabase 미설정)에서만 사용 */
-function readLocalMemos(): Memo[] {
-  return readJsonArray<Memo>(MEMOS_STORAGE_KEY);
-}
-
-function writeLocalMemos(memos: Memo[]): void {
-  writeJsonArray(MEMOS_STORAGE_KEY, memos);
-}
-
-function backupMemos(memos: Memo[]): void {
-  writeWorkDataBackup(MEMOS_STORAGE_KEY, memos);
-}
-
 export function createMemoId(): MemoId {
   return crypto.randomUUID();
 }
 
 export async function readAllMemos(): Promise<Memo[]> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const list = await cloudListMemos();
-    backupMemos(list);
-    return list;
-  }
-  return readLocalMemos();
+  const all = await readAllWritingVaultEntries();
+  return all.filter((e) => e.type === "memo").map(memoFromVaultEntry);
 }
 
 export async function readMemosByProject(
   projectId: ProjectId,
 ): Promise<Memo[]> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const list = await cloudListMemosByProject(projectId);
-    try {
-      backupMemos(await cloudListMemos());
-    } catch {
-      // 백업 실패는 본 읽기에 영향 없음
-    }
-    return list;
-  }
-  return readLocalMemos().filter((m) => m.projectId === projectId);
+  const list = await readWritingVaultByProject(projectId, "memo");
+  return list.map(memoFromVaultEntry);
 }
 
 export async function createMemo(
   projectId: ProjectId,
   input: MemoInput,
 ): Promise<Memo> {
-  const timestamp = nowIso();
-  const memo: Memo = {
-    id: createMemoId(),
+  const entry = await createWritingVaultEntry(
     projectId,
-    body: input.body.trim(),
-    kind: input.kind ?? "note",
-    isPinned: Boolean(input.isPinned),
-    isResolved: Boolean(input.isResolved),
-    sectionStableId: input.sectionStableId,
-    sourceText: input.sourceText?.trim() || undefined,
-    chapterId: input.chapterId,
-    characterId: input.characterId,
-    foreshadowingId: input.foreshadowingId,
-    tags: input.tags ?? [],
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    await cloudUpsertMemo(memo);
-    try {
-      backupMemos(await cloudListMemos());
-    } catch {
-      // 백업 실패 무시
-    }
-    return memo;
-  }
-
-  writeLocalMemos([memo, ...readLocalMemos()]);
-  return memo;
+    memoToVaultInput(input),
+  );
+  return memoFromVaultEntry(entry);
 }
 
 export async function updateMemo(
   id: MemoId,
   patch: Partial<MemoInput>,
 ): Promise<Memo | null> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const all = await cloudListMemos();
-    const index = all.findIndex((m) => m.id === id);
-    if (index < 0) return null;
+  const all = await readAllWritingVaultEntries();
+  const current = all.find((e) => e.id === id && e.type === "memo");
+  if (!current) return null;
 
-    const updated: Memo = {
-      ...all[index],
-      body: patch.body !== undefined ? patch.body.trim() : all[index].body,
-      kind: patch.kind ?? all[index].kind,
-      isPinned: patch.isPinned ?? all[index].isPinned,
-      isResolved: patch.isResolved ?? all[index].isResolved,
-      sectionStableId:
-        patch.sectionStableId !== undefined
-          ? patch.sectionStableId
-          : all[index].sectionStableId,
-      sourceText:
-        patch.sourceText !== undefined
-          ? patch.sourceText.trim() || undefined
-          : all[index].sourceText,
-      chapterId:
-        patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
-      characterId:
-        patch.characterId !== undefined
-          ? patch.characterId
-          : all[index].characterId,
-      foreshadowingId:
-        patch.foreshadowingId !== undefined
-          ? patch.foreshadowingId
-          : all[index].foreshadowingId,
-      tags: patch.tags ?? all[index].tags,
-      updatedAt: nowIso(),
-    };
-    await cloudUpsertMemo(updated);
-    try {
-      backupMemos(await cloudListMemos());
-    } catch {
-      // 백업 실패 무시
-    }
-    return updated;
-  }
-
-  const all = readLocalMemos();
-  const index = all.findIndex((m) => m.id === id);
-  if (index < 0) return null;
-
-  const updated: Memo = {
-    ...all[index],
-    body: patch.body !== undefined ? patch.body.trim() : all[index].body,
-    kind: patch.kind ?? all[index].kind,
-    isPinned: patch.isPinned ?? all[index].isPinned,
-    isResolved: patch.isResolved ?? all[index].isResolved,
+  const memo = memoFromVaultEntry(current);
+  const nextInput = memoToVaultInput({
+    body: patch.body !== undefined ? patch.body : memo.body,
+    kind: patch.kind ?? memo.kind,
+    isPinned: patch.isPinned ?? memo.isPinned,
+    isResolved: patch.isResolved ?? memo.isResolved,
     sectionStableId:
       patch.sectionStableId !== undefined
         ? patch.sectionStableId
-        : all[index].sectionStableId,
+        : memo.sectionStableId,
     sourceText:
-      patch.sourceText !== undefined
-        ? patch.sourceText.trim() || undefined
-        : all[index].sourceText,
+      patch.sourceText !== undefined ? patch.sourceText : memo.sourceText,
     chapterId:
-      patch.chapterId !== undefined ? patch.chapterId : all[index].chapterId,
+      patch.chapterId !== undefined ? patch.chapterId : memo.chapterId,
     characterId:
-      patch.characterId !== undefined
-        ? patch.characterId
-        : all[index].characterId,
+      patch.characterId !== undefined ? patch.characterId : memo.characterId,
     foreshadowingId:
       patch.foreshadowingId !== undefined
         ? patch.foreshadowingId
-        : all[index].foreshadowingId,
-    tags: patch.tags ?? all[index].tags,
-    updatedAt: nowIso(),
-  };
-  const next = [...all];
-  next[index] = updated;
-  writeLocalMemos(next);
-  return updated;
+        : memo.foreshadowingId,
+    tags: patch.tags ?? memo.tags,
+  });
+
+  const updated = await updateWritingVaultEntry(id, nextInput);
+  return updated ? memoFromVaultEntry(updated) : null;
 }
 
 export async function deleteMemo(id: MemoId): Promise<boolean> {
-  if (isSupabaseDataMode()) {
-    await requireCloudDb();
-    const all = await cloudListMemos();
-    if (!all.some((m) => m.id === id)) return false;
-    await cloudDeleteMemo(id);
-    try {
-      backupMemos(await cloudListMemos());
-    } catch {
-      // 백업 실패 무시
-    }
-    return true;
-  }
-
-  const before = readLocalMemos();
-  const after = before.filter((m) => m.id !== id);
-  writeLocalMemos(after);
-  return after.length < before.length;
+  return deleteWritingVaultEntry(id);
 }
 
-/** pinned 우선, 그다음 최근 수정순 */
 export function sortMemos(memos: Memo[]): Memo[] {
   return [...memos].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;

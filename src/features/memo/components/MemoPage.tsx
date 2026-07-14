@@ -49,6 +49,7 @@ export function MemoPage({ projectId, initialMemoId }: MemoPageProps) {
 
   const [modal, setModal] = useState<ModalState>({ type: "closed" });
   const [deleting, setDeleting] = useState<Memo | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isReady || !initialMemoId) return;
@@ -86,6 +87,12 @@ export function MemoPage({ projectId, initialMemoId }: MemoPageProps) {
           aria-label="Memo 검색"
         />
 
+        {actionError ? (
+          <p className="text-ns-sm text-ns-danger" role="alert">
+            {actionError}
+          </p>
+        ) : null}
+
         {!isReady ? (
           <p className="text-ns-sm text-ns-ink-tertiary">불러오는 중…</p>
         ) : filtered.length === 0 ? (
@@ -118,8 +125,18 @@ export function MemoPage({ projectId, initialMemoId }: MemoPageProps) {
         open={modal.type === "create"}
         mode="create"
         onClose={() => setModal({ type: "closed" })}
-        onSubmit={(input) => {
-          void create(input);
+        onSubmit={async (input) => {
+          setActionError(null);
+          try {
+            await create(input);
+          } catch (error) {
+            setActionError(
+              error instanceof Error
+                ? error.message
+                : "Memo 저장에 실패했습니다.",
+            );
+            throw error;
+          }
         }}
       />
 
@@ -128,9 +145,19 @@ export function MemoPage({ projectId, initialMemoId }: MemoPageProps) {
         mode="edit"
         memo={editing}
         onClose={() => setModal({ type: "closed" })}
-        onSubmit={(input) => {
+        onSubmit={async (input) => {
           if (!editing) return;
-          void update(editing.id, input);
+          setActionError(null);
+          try {
+            await update(editing.id, input);
+          } catch (error) {
+            setActionError(
+              error instanceof Error
+                ? error.message
+                : "Memo 저장에 실패했습니다.",
+            );
+            throw error;
+          }
         }}
         onDelete={() => {
           if (!editing) return;
