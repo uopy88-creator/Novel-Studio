@@ -96,7 +96,7 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
 
   return (
     <SectionRegistryProvider projectId={projectId as ProjectId}>
-      <div className="flex min-h-dvh min-h-screen bg-ns-canvas text-ns-ink">
+      <div className="flex h-dvh min-h-0 overflow-hidden bg-ns-canvas text-ns-ink">
         <Sidebar
           projectId={projectId}
           collapsed={collapsed}
@@ -105,7 +105,7 @@ export function AppLayout({ projectId, children }: AppLayoutProps) {
           onToggleCollapsed={toggleCollapsed}
         />
 
-        <div className={cn("flex min-w-0 flex-1 flex-col")}>
+        <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col")}>
           <Header
             projectTitle={projectTitle}
             titleLoading={titleLoading}

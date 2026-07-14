@@ -6,5 +6,10 @@ export { Sidebar } from "./Sidebar";
 export { Header } from "./Header";
 export { ContentContainer } from "./ContentContainer";
 export { ComingSoon } from "./ComingSoon";
-export { STUDIO_NAV_ITEMS, studioPath } from "./nav-items";
+export {
+  STUDIO_NAV_ITEMS,
+  STUDIO_MAIN_NAV_ITEMS,
+  STUDIO_UTILITY_NAV_ITEMS,
+  studioPath,
+} from "./nav-items";
 export type { StudioNavItem } from "./nav-items";

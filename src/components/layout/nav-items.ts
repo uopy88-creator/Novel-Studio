@@ -16,10 +16,10 @@ export interface StudioNavItem {
 }
 
 /**
- * 사이드바 메뉴 순서.
+ * 사이드바 주요 메뉴.
  * Dashboard 기능을 구현하는 것이 아니라, 진입 경로만 마련한다.
  */
-export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
+export const STUDIO_MAIN_NAV_ITEMS: StudioNavItem[] = [
   { segment: "dashboard", label: "Dashboard", icon: "🏠" },
   { segment: "manuscript", label: "Manuscript", icon: "✍" },
   { segment: "sections", label: "Section", icon: "📑" },
@@ -29,8 +29,21 @@ export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
   { segment: "inspiration", label: "Inspiration", icon: "💡" },
   { segment: "foreshadowing", label: "Foreshadowing", icon: "🎯" },
   { segment: "memo", label: "Memo", icon: "📝" },
-  { segment: "trash", label: "Trash", icon: "🗑" },
+];
+
+/**
+ * 하단 유틸 메뉴 — PC에서도 스크롤 없이 항상 보이게 Sidebar footer 에 둔다.
+ * Trash 는 Soft Delete 휴지통 (독립 메뉴).
+ */
+export const STUDIO_UTILITY_NAV_ITEMS: StudioNavItem[] = [
+  { segment: "trash", label: "휴지통", icon: "🗑" },
   { segment: "settings", label: "Settings", icon: "⚙" },
+];
+
+/** 전체 메뉴 (검색·테스트 등에서 순서 포함 목록이 필요할 때) */
+export const STUDIO_NAV_ITEMS: StudioNavItem[] = [
+  ...STUDIO_MAIN_NAV_ITEMS,
+  ...STUDIO_UTILITY_NAV_ITEMS,
 ];
 
 /** 작품 작업실 경로 생성 */

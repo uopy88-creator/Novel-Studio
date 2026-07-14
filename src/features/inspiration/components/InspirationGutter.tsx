@@ -23,7 +23,11 @@ export interface InspirationGutterProps {
 
 function lineIndexAtOffset(content: string, offset: number): number {
   const safe = Math.max(0, Math.min(offset, content.length));
-  return content.slice(0, safe).split("\n").length - 1;
+  let lines = 0;
+  for (let i = 0; i < safe; i += 1) {
+    if (content.charCodeAt(i) === 10) lines += 1;
+  }
+  return lines;
 }
 
 export function InspirationGutter({
@@ -34,6 +38,8 @@ export function InspirationGutter({
   className,
 }: InspirationGutterProps) {
   const markers = useMemo(() => {
+    if (inspirations.length === 0) return [];
+
     // 같은 줄에 여러 개면 겹치지 않게 살짝 오프셋
     const byLine = new Map<number, Inspiration[]>();
 

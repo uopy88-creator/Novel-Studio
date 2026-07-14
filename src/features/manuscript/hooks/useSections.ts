@@ -177,15 +177,19 @@ export function useSections(
   );
 
   // Section Registry (SSOT) — Manuscript 가 관리, Timeline 등은 구독만
+  // 키 입력마다 동기 publish 하면 구독 UI 가 매 타자마다 리렌더되므로 debounce
   useEffect(() => {
-    const refs = isEmptyManuscriptContent(content)
-      ? []
-      : sectionRefsFromSections(sections);
-    publishSections(projectId, {
-      sections: refs,
-      primaryDocumentId: documentId,
-      source: "live",
-    });
+    const timer = window.setTimeout(() => {
+      const refs = isEmptyManuscriptContent(content)
+        ? []
+        : sectionRefsFromSections(sections);
+      publishSections(projectId, {
+        sections: refs,
+        primaryDocumentId: documentId,
+        source: "live",
+      });
+    }, 200);
+    return () => window.clearTimeout(timer);
   }, [projectId, documentId, content, sections]);
 
   useEffect(() => {

@@ -12,14 +12,19 @@
  * - 접으면 아이콘(이모지)만 보여 PC·iPad 공간을 확보
  *
  * 반응형
- * - md 이상: 고정 사이드바 (접기/펼치기)
+ * - md 이상: 고정 사이드바 (접기/펼치기), 뷰포트 높이로 잠가 하단 메뉴가 잘리지 않게 함
  * - md 미만: 오버레이 드로어 (열림 시 배경 딤)
  * =============================================================================
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { STUDIO_NAV_ITEMS, studioPath } from "@/components/layout/nav-items";
+import {
+  STUDIO_MAIN_NAV_ITEMS,
+  STUDIO_UTILITY_NAV_ITEMS,
+  studioPath,
+  type StudioNavItem,
+} from "@/components/layout/nav-items";
 import { cn } from "@/lib/utils/cn";
 
 export interface SidebarProps {
@@ -30,6 +35,50 @@ export interface SidebarProps {
   mobileOpen: boolean;
   onCloseMobile: () => void;
   onToggleCollapsed: () => void;
+}
+
+function NavLink({
+  item,
+  projectId,
+  pathname,
+  collapsed,
+  onCloseMobile,
+}: {
+  item: StudioNavItem;
+  projectId: string;
+  pathname: string;
+  collapsed: boolean;
+  onCloseMobile: () => void;
+}) {
+  const href = studioPath(projectId, item.segment);
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+
+  return (
+    <li>
+      <Link
+        href={href}
+        title={item.label}
+        onClick={onCloseMobile}
+        className={cn(
+          "flex min-h-11 items-center rounded-ns-md text-ns-sm font-medium transition-colors",
+          collapsed ? "justify-center px-ns-2" : "gap-ns-3 px-ns-3",
+          active
+            ? "bg-ns-accent-soft text-ns-accent"
+            : "text-ns-ink-secondary hover:bg-ns-surface hover:text-ns-ink",
+        )}
+        aria-current={active ? "page" : undefined}
+      >
+        <span className="text-base leading-none" aria-hidden="true">
+          {item.icon}
+        </span>
+        {!collapsed ? (
+          <span className="truncate">{item.label}</span>
+        ) : (
+          <span className="sr-only">{item.label}</span>
+        )}
+      </Link>
+    </li>
+  );
 }
 
 export function Sidebar({
@@ -56,14 +105,14 @@ export function Sidebar({
 
       <aside
         className={cn(
-          // 공통
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-ns-border bg-ns-muted",
+          // 공통 — 뷰포트 높이로 잠가 nav 가 내부 스크롤되게 한다 (PC에서 휴지통이 잘리던 원인)
+          "fixed inset-y-0 left-0 z-50 flex h-dvh max-h-dvh flex-col border-r border-ns-border bg-ns-muted",
           "transition-[width,transform] duration-200 ease-out",
           "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
           // 모바일: 슬라이드 인/아웃
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          // md+: 항상 보이고, 너비만 접기
-          "md:static md:z-0 md:translate-x-0",
+          // md+: 레이아웃 흐름에 두고 항상 보이게
+          "md:sticky md:top-0 md:z-0 md:translate-x-0",
           collapsed ? "w-[4.5rem] md:w-[4.5rem]" : "w-64 md:w-60",
         )}
         aria-label="작업실 메뉴"
@@ -112,61 +161,49 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* 메뉴 목록 */}
-        <nav className="flex-1 overflow-y-auto px-ns-2 py-ns-3">
+        {/* 주요 메뉴 — 넘치면 이 영역만 스크롤 */}
+        <nav className="min-h-0 flex-1 overflow-y-auto px-ns-2 py-ns-3">
           <ul className="flex flex-col gap-ns-1">
-            {STUDIO_NAV_ITEMS.map((item) => {
-              const href = studioPath(projectId, item.segment);
-              const active =
-                pathname === href || pathname.startsWith(`${href}/`);
-
-              return (
-                <li key={item.segment}>
-                  <Link
-                    href={href}
-                    title={item.label}
-                    onClick={onCloseMobile}
-                    className={cn(
-                      "flex min-h-11 items-center rounded-ns-md text-ns-sm font-medium transition-colors",
-                      collapsed ? "justify-center px-ns-2" : "gap-ns-3 px-ns-3",
-                      active
-                        ? "bg-ns-accent-soft text-ns-accent"
-                        : "text-ns-ink-secondary hover:bg-ns-surface hover:text-ns-ink",
-                    )}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    <span className="text-base leading-none" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                    {!collapsed ? (
-                      <span className="truncate">{item.label}</span>
-                    ) : (
-                      <span className="sr-only">{item.label}</span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
+            {STUDIO_MAIN_NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.segment}
+                item={item}
+                projectId={projectId}
+                pathname={pathname}
+                collapsed={collapsed}
+                onCloseMobile={onCloseMobile}
+              />
+            ))}
           </ul>
         </nav>
 
-        {/* 하단: Help + 작품 목록 */}
+        {/* 하단 유틸: 휴지통 · Settings · Help · 작품 목록 — 항상 노출 */}
         <div className="shrink-0 border-t border-ns-border p-ns-2">
+          <ul className="flex flex-col gap-ns-1">
+            {STUDIO_UTILITY_NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.segment}
+                item={item}
+                projectId={projectId}
+                pathname={pathname}
+                collapsed={collapsed}
+                onCloseMobile={onCloseMobile}
+              />
+            ))}
+          </ul>
           <Link
             href={studioPath(projectId, "help")}
             onClick={onCloseMobile}
             title="Help"
             className={cn(
-              "flex min-h-11 items-center rounded-ns-md text-ns-sm font-medium transition-colors",
+              "mt-ns-1 flex min-h-11 items-center rounded-ns-md text-ns-sm font-medium transition-colors",
               collapsed ? "justify-center px-ns-2" : "gap-ns-3 px-ns-3",
               pathname === studioPath(projectId, "help") ||
                 pathname.startsWith(`${studioPath(projectId, "help")}/`)
                 ? "bg-ns-accent-soft text-ns-accent"
                 : "text-ns-ink-secondary hover:bg-ns-surface hover:text-ns-ink",
             )}
-            aria-current={
-              pathname.includes("/help") ? "page" : undefined
-            }
+            aria-current={pathname.includes("/help") ? "page" : undefined}
           >
             <span aria-hidden="true">❓</span>
             {!collapsed ? (
