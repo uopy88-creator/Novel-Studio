@@ -261,7 +261,23 @@ export async function updateDialogue(
   return updated;
 }
 
+export async function getDialogueById(
+  id: WritingVaultEntryId,
+): Promise<WritingVaultEntry | null> {
+  const all = await readAllDialogues();
+  return all.find((e) => e.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteDialogue(
+  id: WritingVaultEntryId,
+): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("writing-vault", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeDialogue(
   id: WritingVaultEntryId,
 ): Promise<boolean> {
   if (isSupabaseDataMode()) {
@@ -280,6 +296,28 @@ export async function deleteDialogue(
   const all = readLocalEntries();
   if (!all.some((e) => e.id === id)) return false;
   writeLocalEntries(all.filter((e) => e.id !== id));
+  return true;
+}
+
+export async function restoreDialogueFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const entry = normalizeWritingVaultEntry(payload);
+  if (!entry) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertDialogue(entry);
+    try {
+      backupEntries(await cloudListDialogues());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocalEntries().filter((e) => e.id !== entry.id);
+  writeLocalEntries([...others, entry]);
   return true;
 }
 

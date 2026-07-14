@@ -165,7 +165,46 @@ export async function updateWordTreasuryEntry(
   return updated;
 }
 
+function normalizeWordTreasuryEntry(raw: unknown): WordTreasuryEntry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as Partial<WordTreasuryEntry>;
+  if (typeof item.id !== "string" || typeof item.projectId !== "string") {
+    return null;
+  }
+  if (typeof item.word !== "string") return null;
+  return {
+    id: item.id,
+    projectId: item.projectId,
+    word: item.word,
+    meaning: typeof item.meaning === "string" ? item.meaning : "",
+    example: typeof item.example === "string" ? item.example : "",
+    note: typeof item.note === "string" ? item.note : "",
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    isFavorite: Boolean(item.isFavorite),
+    createdAt:
+      typeof item.createdAt === "string" ? item.createdAt : nowIso(),
+    updatedAt:
+      typeof item.updatedAt === "string" ? item.updatedAt : nowIso(),
+  };
+}
+
+export async function getWordTreasuryEntryById(
+  id: WordTreasuryId,
+): Promise<WordTreasuryEntry | null> {
+  const all = await readAllWordTreasury();
+  return all.find((e) => e.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteWordTreasuryEntry(
+  id: WordTreasuryId,
+): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("word-treasury", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeWordTreasuryEntry(
   id: WordTreasuryId,
 ): Promise<boolean> {
   if (isSupabaseDataMode()) {
@@ -185,4 +224,26 @@ export async function deleteWordTreasuryEntry(
   const after = before.filter((e) => e.id !== id);
   writeLocal(after);
   return after.length < before.length;
+}
+
+export async function restoreWordTreasuryFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const entry = normalizeWordTreasuryEntry(payload);
+  if (!entry) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertWordTreasury(entry);
+    try {
+      backupWordTreasury(await cloudListWordTreasury());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocal().filter((e) => e.id !== entry.id);
+  writeLocal([entry, ...others]);
+  return true;
 }

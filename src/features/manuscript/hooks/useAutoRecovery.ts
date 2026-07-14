@@ -4,9 +4,10 @@
  * =============================================================================
  * useAutoRecovery
  * -----------------------------------------------------------------------------
- * - 30초마다 LocalStorage 에 임시 초안 저장 (Supabase 미사용)
- * - Document 로드 시 저장본과 다르면 복원 제안
- * - 팝업이 떠 있는 동안은 임시 저장을 잠시 멈춤
+ * - 내용 변경 후 debounce(10초) 로 LocalStorage Recovery Draft 저장
+ * - Autosave(Supabase) 와 완전히 분리
+ * - Document 로드 시 Recovery 가 저장본보다 최신이면 복구 다이얼로그
+ * - 정상 저장 성공 시 Recovery 자동 삭제
  * =============================================================================
  */
 
@@ -17,12 +18,13 @@ import type { SaveStatus } from "@/features/manuscript/hooks/useManuscript";
 import {
   clearRecoveryDraft,
   getRecoveryDraft,
+  isRecoveryNewerThanSaved,
   recoveryDiffersFromSaved,
   writeRecoveryDraft,
 } from "@/features/manuscript/lib/manuscript-recovery-storage";
 
-/** 임시 저장 주기 (요구사항: 30초) */
-const RECOVERY_INTERVAL_MS = 30_000;
+/** 내용 변경 후 Recovery 기록 debounce (입력 성능 유지) */
+const RECOVERY_DEBOUNCE_MS = 10_000;
 
 export interface UseAutoRecoveryParams {
   projectId: ProjectId;
@@ -30,18 +32,19 @@ export interface UseAutoRecoveryParams {
   content: string;
   setContent: (value: string) => void;
   saveStatus: SaveStatus;
+  /** 마지막 정상 저장 시각 — Recovery 최신 여부 판단 */
+  lastSavedAt?: string | null;
 }
 
 export interface UseAutoRecoveryResult {
-  /** 복원 제안이 있으면 팝업 표시 */
   offer: RecoveryOffer | null;
-  /** 차이점 미리보기 펼침 */
   showDiff: boolean;
   setShowDiff: (open: boolean) => void;
-  /** 복구 초안으로 에디터 교체 → 이후 기존 자동 저장이 클라우드에 반영 */
   acceptRecovery: () => void;
-  /** 복구 초안 삭제 */
+  /** Recovery Storage 삭제 후 저장본 유지 */
   discardRecovery: () => void;
+  /** 다이얼로그만 닫기 — Recovery 는 유지 */
+  dismissRecovery: () => void;
 }
 
 export function useAutoRecovery({
@@ -50,6 +53,7 @@ export function useAutoRecovery({
   content,
   setContent,
   saveStatus,
+  lastSavedAt = null,
 }: UseAutoRecoveryParams): UseAutoRecoveryResult {
   const [offer, setOffer] = useState<RecoveryOffer | null>(null);
   const [showDiff, setShowDiff] = useState(false);
@@ -60,12 +64,13 @@ export function useAutoRecovery({
   const checkedChapterRef = useRef<ChapterId | null>(null);
   /** 마지막 클라우드/로드 저장본 — 이와 같을 때는 임시 초안을 쓰지 않음 */
   const savedBaselineRef = useRef<string>("");
+  const debounceTimerRef = useRef<number | null>(null);
 
   contentRef.current = content;
   chapterRef.current = chapterId;
   offerRef.current = offer;
 
-  // —— Document 로드 후: 복구 초안 vs 마지막 저장본 비교 ——
+  // —— Document 로드 후: Recovery 가 저장본보다 최신·다르면 제안 ——
   useEffect(() => {
     if (!chapterId) {
       checkedChapterRef.current = null;
@@ -74,7 +79,6 @@ export function useAutoRecovery({
       return;
     }
 
-    // loadDocument 가 chapterId·content·idle 을 한 번에 세팅할 때까지 대기
     if (saveStatus === "dirty" || saveStatus === "saving") return;
     if (checkedChapterRef.current === chapterId) return;
     checkedChapterRef.current = chapterId;
@@ -86,36 +90,36 @@ export function useAutoRecovery({
       return;
     }
 
-    if (!recoveryDiffersFromSaved(draft.content, content)) {
-      // 저장본과 동일 → 불필요한 초안 정리
-      clearRecoveryDraft(projectId, chapterId);
+    const differs = recoveryDiffersFromSaved(draft.content, content);
+    const newer = isRecoveryNewerThanSaved(draft.updatedAt, lastSavedAt);
+
+    if (!differs || !newer) {
+      // 저장본과 같거나 더 오래된 초안 → 정리
+      if (!differs) {
+        clearRecoveryDraft(projectId, chapterId);
+      }
       setOffer(null);
       return;
     }
 
     setShowDiff(false);
     setOffer({ draft, savedContent: content });
-  }, [projectId, chapterId, content, saveStatus]);
+  }, [projectId, chapterId, content, saveStatus, lastSavedAt]);
 
-  // —— 클라우드 저장 성공 후: baseline 갱신 · 동일 초안 삭제 ——
+  // —— 정상 저장 성공 → Recovery 자동 삭제 ——
   useEffect(() => {
     if (!chapterId) return;
     if (saveStatus !== "saved") return;
-    if (offerRef.current) return; // 복원 결정 전에는 건드리지 않음
+    if (offerRef.current) return;
 
     savedBaselineRef.current = content;
-    const draft = getRecoveryDraft(projectId, chapterId);
-    if (draft && !recoveryDiffersFromSaved(draft.content, content)) {
-      clearRecoveryDraft(projectId, chapterId);
-    }
+    clearRecoveryDraft(projectId, chapterId);
   }, [saveStatus, projectId, chapterId, content]);
 
   const flushRecovery = useCallback(() => {
     const id = chapterRef.current;
     if (!id) return;
-    // 복원 팝업이 열려 있으면 덮어쓰지 않음 (저장본 기준 비교 유지)
     if (offerRef.current) return;
-    // 마지막 저장본과 같으면 임시 초안 불필요
     if (contentRef.current === savedBaselineRef.current) return;
 
     writeRecoveryDraft({
@@ -125,20 +129,27 @@ export function useAutoRecovery({
     });
   }, [projectId]);
 
-  // —— 30초 주기 임시 저장 ——
+  // —— 내용 변경 debounce(10초) — Editor 렌더와 분리 (ref + timer) ——
   useEffect(() => {
     if (!chapterId) return;
+    if (offer) return;
 
-    const timer = window.setInterval(() => {
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
       flushRecovery();
-    }, RECOVERY_INTERVAL_MS);
+    }, RECOVERY_DEBOUNCE_MS);
 
     return () => {
-      window.clearInterval(timer);
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
     };
-  }, [chapterId, flushRecovery]);
+  }, [chapterId, content, flushRecovery, offer]);
 
-  // —— 탭 숨김·종료 직전에도 한 번 기록 (브라우저 종료 대비) ——
+  // —— 탭 숨김·종료 직전 즉시 기록 ——
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === "hidden") {
@@ -165,9 +176,7 @@ export function useAutoRecovery({
     clearRecoveryDraft(projectId, chapterId);
     setOffer(null);
     setShowDiff(false);
-    // 에디터 반영 → useManuscript 800ms 자동 저장이 Supabase 에 올림
     setContent(recovered);
-    // 같은 문서에서 재제안되지 않도록 체크 유지
     checkedChapterRef.current = chapterId;
   }, [chapterId, projectId, setContent]);
 
@@ -179,11 +188,21 @@ export function useAutoRecovery({
     checkedChapterRef.current = chapterId;
   }, [chapterId, projectId]);
 
+  const dismissRecovery = useCallback(() => {
+    // 취소 — Recovery 유지, 다이얼로그만 닫음
+    setOffer(null);
+    setShowDiff(false);
+    if (chapterId) {
+      checkedChapterRef.current = chapterId;
+    }
+  }, [chapterId]);
+
   return {
     offer,
     showDiff,
     setShowDiff,
     acceptRecovery,
     discardRecovery,
+    dismissRecovery,
   };
 }

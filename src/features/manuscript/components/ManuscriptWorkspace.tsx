@@ -137,12 +137,14 @@ export function ManuscriptWorkspace({
     setShowDiff: setRecoveryShowDiff,
     acceptRecovery,
     discardRecovery,
+    dismissRecovery,
   } = useAutoRecovery({
     projectId,
     chapterId: selectedChapterId,
     content,
     setContent: replaceContent,
     saveStatus,
+    lastSavedAt,
   });
 
   const {
@@ -678,6 +680,7 @@ export function ManuscriptWorkspace({
         onToggleDiff={() => setRecoveryShowDiff(!recoveryShowDiff)}
         onAccept={acceptRecovery}
         onDiscard={discardRecovery}
+        onCancel={dismissRecovery}
       />
     </ContentContainer>
   );

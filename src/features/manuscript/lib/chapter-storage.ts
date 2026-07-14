@@ -27,6 +27,8 @@ import {
 import { CHAPTERS_STORAGE_KEY } from "@/lib/storage/keys";
 import { writeWorkDataBackup } from "@/lib/storage/backup";
 import { nowIso, readJsonArray, writeJsonArray } from "@/lib/storage/browser";
+import { clearRecoveryDraft } from "@/features/manuscript/lib/manuscript-recovery-storage";
+
 
 export { CHAPTERS_STORAGE_KEY };
 
@@ -212,7 +214,19 @@ export async function updateChapter(
   return updated;
 }
 
+export async function getChapterById(id: ChapterId): Promise<Chapter | null> {
+  const all = await readAllChapters();
+  return all.find((chapter) => chapter.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteChapter(id: ChapterId): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("document", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeChapter(id: ChapterId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
     const all = await cloudListDocuments();
@@ -220,6 +234,7 @@ export async function deleteChapter(id: ChapterId): Promise<boolean> {
     if (!target) return false;
 
     await cloudDeleteDocument(id);
+    clearRecoveryDraft(target.projectId, id);
     const remaining = all.filter((chapter) => chapter.id !== id);
     const renumbered = renumberProjectChapters(remaining, target.projectId);
     await cloudUpsertDocuments(
@@ -234,6 +249,39 @@ export async function deleteChapter(id: ChapterId): Promise<boolean> {
   if (!target) return false;
   const remaining = all.filter((chapter) => chapter.id !== id);
   writeLocalAllChapters(renumberProjectChapters(remaining, target.projectId));
+  clearRecoveryDraft(target.projectId, id);
+  return true;
+}
+
+export async function restoreChapterFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  if (!payload || typeof payload !== "object") return false;
+  const data = payload as { chapter?: unknown; manuscript?: unknown };
+  const chapter = normalizeChapter(data.chapter);
+  if (!chapter) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertDocument(chapter);
+    if (data.manuscript) {
+      const { upsertManuscriptSnapshot } = await import(
+        "@/features/manuscript/lib/manuscript-storage"
+      );
+      await upsertManuscriptSnapshot(data.manuscript);
+    }
+    void backupAllChaptersFromCloud();
+    return true;
+  }
+
+  const others = readLocalAllChapters().filter((c) => c.id !== chapter.id);
+  writeLocalAllChapters([...others, chapter]);
+  if (data.manuscript) {
+    const { upsertManuscriptSnapshot } = await import(
+      "@/features/manuscript/lib/manuscript-storage"
+    );
+    await upsertManuscriptSnapshot(data.manuscript);
+  }
   return true;
 }
 
