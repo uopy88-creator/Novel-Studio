@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   applyPlainEditToHighlightedContent,
   extractHighlights,
+  normalizeHighlightContent,
   serializeHighlights,
   SKY_HIGHLIGHT_COLOR,
   SKY_HIGHLIGHT_OPEN,
@@ -47,6 +48,17 @@ function main() {
     11,
   );
   assert.deepEqual(extractHighlights(merged).ranges, [{ start: 0, end: 11 }]);
+
+  // 깨진 mark 잔여물이 plain 에 새면 태그 제거 (에디터 구멍/밑줄 원인)
+  const broken = '안녕 <mark data-ns-hl="sky">세계</mark> <mark>잔여';
+  const brokenExtract = extractHighlights(broken);
+  assert.equal(brokenExtract.plain.includes("<mark"), false);
+  assert.equal(brokenExtract.plain.includes("잔여"), true);
+  assert.deepEqual(brokenExtract.ranges, []);
+
+  const normalized = normalizeHighlightContent(withMark);
+  assert.equal(stripHighlights(normalized), plain);
+  assert.deepEqual(extractHighlights(normalized).ranges, [{ start: 6, end: 11 }]);
 
   console.log("highlight-marks-selftest: ok");
 }
