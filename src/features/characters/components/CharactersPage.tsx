@@ -166,20 +166,18 @@ export function CharactersPage({
         mode={modal.type === "edit" ? "edit" : "create"}
         character={editingCharacter}
         onClose={closeModal}
-        onSubmit={(input) => {
-          void (async () => {
-            if (modal.type === "edit" && editingCharacter) {
-              const oldName = editingCharacter.name;
-              await update(editingCharacter.id, input);
-              await syncMentionNamesInManuscript(
-                projectId,
-                oldName,
-                input.name,
-              );
-            } else {
-              await create(input);
-            }
-          })();
+        onSubmit={async (input) => {
+          if (modal.type === "edit" && editingCharacter) {
+            const oldName = editingCharacter.name;
+            await update(editingCharacter.id, input);
+            await syncMentionNamesInManuscript(
+              projectId,
+              oldName,
+              input.name,
+            );
+            return;
+          }
+          await create(input);
         }}
       />
 

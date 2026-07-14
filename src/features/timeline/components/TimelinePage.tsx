@@ -221,15 +221,12 @@ export function TimelinePage({
         defaultDocumentId={resolvedDocumentId}
         defaultSectionStableId={initialSectionId}
         onClose={() => setModal({ type: "closed" })}
-        onSubmit={(input) => {
-          void (async () => {
-            if (modal.type === "edit") {
-              await update(modal.event.id, input);
-            } else {
-              await create(input);
-            }
-            setModal({ type: "closed" });
-          })();
+        onSubmit={async (input) => {
+          if (modal.type === "edit") {
+            await update(modal.event.id, input);
+            return;
+          }
+          await create(input);
         }}
       />
 
