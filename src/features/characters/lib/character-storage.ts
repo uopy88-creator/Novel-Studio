@@ -304,7 +304,21 @@ export async function updateCharacter(
   return updated;
 }
 
+export async function getCharacterById(
+  id: CharacterId,
+): Promise<Character | null> {
+  const all = await readAllCharacters();
+  return all.find((character) => character.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteCharacter(id: CharacterId): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("character", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeCharacter(id: CharacterId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
     const all = await cloudListCharacters();
@@ -321,6 +335,28 @@ export async function deleteCharacter(id: CharacterId): Promise<boolean> {
   const all = readLocalCharacters();
   if (!all.some((character) => character.id === id)) return false;
   writeLocalCharacters(all.filter((character) => character.id !== id));
+  return true;
+}
+
+export async function restoreCharacterFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const character = normalizeCharacter(payload);
+  if (!character) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertCharacter(character);
+    try {
+      backupCharacters(await cloudListCharacters());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocalCharacters().filter((c) => c.id !== character.id);
+  writeLocalCharacters([...others, character]);
   return true;
 }
 

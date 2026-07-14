@@ -18,6 +18,8 @@ export interface DbProjectRow {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  /** Soft-hide (휴지통) — null 이면 활성 목록에 표시 */
+  deleted_at?: string | null;
 }
 
 /** documents (앱의 Chapter / Document) */
@@ -248,4 +250,5 @@ export const DB_TABLES = {
   scene_metas: "scenes",
   section_metas: "scenes",
   timeline_events: "timeline_events",
+  trash_items: "trash_items",
 } as const;

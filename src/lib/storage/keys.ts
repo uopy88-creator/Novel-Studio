@@ -78,6 +78,9 @@ export const SECTIONS_MIGRATION_FLAG_KEY =
 export const MANUSCRIPT_RECOVERY_STORAGE_KEY =
   "novel-studio:manuscript-recovery";
 
+/** Soft Delete 휴지통 (엔티티 스냅샷) */
+export const TRASH_STORAGE_KEY = "novel-studio:trash-items";
+
 /** 사이드바 접힘 상태 */
 export const SIDEBAR_COLLAPSED_KEY = "novel-studio:sidebar-collapsed";
 

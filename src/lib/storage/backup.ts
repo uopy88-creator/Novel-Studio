@@ -27,6 +27,7 @@ import {
   TIMELINE_EVENTS_STORAGE_KEY,
   WORD_TREASURY_STORAGE_KEY,
   WRITING_VAULT_STORAGE_KEY,
+  TRASH_STORAGE_KEY,
 } from "@/lib/storage/keys";
 import {
   readStorageString,
@@ -51,6 +52,7 @@ export const WORK_DATA_BACKUP_KEYS = [
   SECTION_METAS_STORAGE_KEY,
   SCENE_METAS_STORAGE_KEY,
   TIMELINE_EVENTS_STORAGE_KEY,
+  TRASH_STORAGE_KEY,
 ] as const;
 
 export type WorkDataBackupSnapshot = Record<string, string | null>;

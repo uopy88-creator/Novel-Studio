@@ -19,7 +19,10 @@ import {
 } from "@/database/supabase/cloud-mode";
 import {
   cloudDeleteProject,
+  cloudGetProjectById,
+  cloudHideProject,
   cloudListProjects,
+  cloudUnhideProject,
   cloudUpsertProject,
 } from "@/database/supabase/projects-repo";
 import { purgeLocalProjectData } from "@/features/projects/lib/purge-project-data";
@@ -184,19 +187,31 @@ export async function updateProject(
   return updated;
 }
 
+export async function getProjectById(id: ProjectId): Promise<Project | null> {
+  const projects = await readProjects();
+  return projects.find((project) => project.id === id) ?? null;
+}
+
 /**
- * 작품을 삭제한다.
- * - Supabase: projects 행 삭제 → FK CASCADE 로 Chapters/Manuscript/Characters
- *   /Writing Vault/Memo/Foreshadowing 등 클라우드 데이터가 함께 삭제됨
- * - LocalStorage: 동일 작품에 속한 백업·복구 초안도 purge
+ * Soft Delete — 휴지통 이동.
+ * removeLive 는 hideProject (자식 CASCADE 없음).
  */
 export async function deleteProject(id: ProjectId): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("project", id);
+}
+
+/**
+ * Soft-hide — 활성 목록에서만 제거. 자식 데이터는 유지.
+ * - Cloud: deleted_at 설정 (DELETE CASCADE 회피)
+ * - Local: projects 배열에서만 제거
+ */
+export async function hideProject(id: ProjectId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
-    const projects = await cloudListProjects();
-    if (!projects.some((project) => project.id === id)) return false;
-    await cloudDeleteProject(id);
-    purgeLocalProjectData(id);
+    const existing = await cloudGetProjectById(id);
+    if (!existing) return false;
+    await cloudHideProject(id);
     backupProjects(await cloudListProjects());
     return true;
   }
@@ -204,11 +219,70 @@ export async function deleteProject(id: ProjectId): Promise<boolean> {
   const projects = readLocalProjects();
   if (!projects.some((project) => project.id === id)) return false;
   writeLocalProjects(projects.filter((project) => project.id !== id));
-  purgeLocalProjectData(id);
   return true;
 }
 
-export async function getProjectById(id: ProjectId): Promise<Project | null> {
-  const projects = await readProjects();
-  return projects.find((project) => project.id === id) ?? null;
+/**
+ * 영구삭제 — projects 행 DELETE + 로컬 cascade purge.
+ * Soft Delete 경로에서는 호출하지 않는다 (permanentDelete 전용).
+ */
+export async function purgeProject(id: ProjectId): Promise<boolean> {
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    const existing = await cloudGetProjectById(id);
+    if (!existing) {
+      // 이미 없더라도 로컬 잔여 정리
+      purgeLocalProjectData(id);
+      const { clearTrashForProject } = await import(
+        "@/features/trash/lib/trash-storage"
+      );
+      await clearTrashForProject(id);
+      return false;
+    }
+    await cloudDeleteProject(id);
+    purgeLocalProjectData(id);
+    const { clearTrashForProject } = await import(
+      "@/features/trash/lib/trash-storage"
+    );
+    await clearTrashForProject(id);
+    backupProjects(await cloudListProjects());
+    return true;
+  }
+
+  const projects = readLocalProjects();
+  const existed = projects.some((project) => project.id === id);
+  if (existed) {
+    writeLocalProjects(projects.filter((project) => project.id !== id));
+  }
+  purgeLocalProjectData(id);
+  const { clearTrashForProject } = await import(
+    "@/features/trash/lib/trash-storage"
+  );
+  await clearTrashForProject(id);
+  return existed;
+}
+
+export async function restoreProjectFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const project = normalizeProject(payload);
+  if (!project) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    // 행이 soft-hide 상태면 unhide, 없으면 upsert
+    const existing = await cloudGetProjectById(project.id);
+    if (existing) {
+      await cloudUnhideProject(project.id);
+      await cloudUpsertProject(project);
+    } else {
+      await cloudUpsertProject(project);
+    }
+    backupProjects(await cloudListProjects());
+    return true;
+  }
+
+  const others = readLocalProjects().filter((p) => p.id !== project.id);
+  writeLocalProjects([...others, project]);
+  return true;
 }

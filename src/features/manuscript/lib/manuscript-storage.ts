@@ -314,6 +314,70 @@ export async function saveManuscriptContent(
   return verified;
 }
 
+/**
+ * 휴지통 복원 등 — 검증 없이 Manuscript 스냅샷을 upsert 한다.
+ * (circular import 방지를 위해 chapter-storage 에서 dynamic import)
+ */
+export async function upsertManuscriptSnapshot(
+  payload: unknown,
+): Promise<boolean> {
+  if (!payload || typeof payload !== "object") return false;
+  const item = payload as Partial<Manuscript>;
+  if (
+    typeof item.id !== "string" ||
+    typeof item.projectId !== "string" ||
+    typeof item.chapterId !== "string" ||
+    typeof item.content !== "string"
+  ) {
+    return false;
+  }
+
+  const manuscript: Manuscript = {
+    id: item.id,
+    projectId: item.projectId,
+    chapterId: item.chapterId,
+    content: item.content,
+    plainText:
+      typeof item.plainText === "string" ? item.plainText : item.content,
+    wordCount:
+      typeof item.wordCount === "number"
+        ? item.wordCount
+        : countCharsWithoutSpaces(item.content),
+    createdAt:
+      typeof item.createdAt === "string" ? item.createdAt : nowIso(),
+    updatedAt:
+      typeof item.updatedAt === "string" ? item.updatedAt : nowIso(),
+    lastOpenedAt:
+      typeof item.lastOpenedAt === "string" ? item.lastOpenedAt : undefined,
+  };
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertManuscript(manuscript);
+    try {
+      backupManuscripts(await cloudListManuscripts());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const local = readLocalManuscripts();
+  const index = local.findIndex(
+    (m) =>
+      m.projectId === manuscript.projectId &&
+      m.chapterId === manuscript.chapterId,
+  );
+  if (index >= 0) {
+    const next = [...local];
+    next[index] = manuscript;
+    writeLocalManuscripts(next);
+  } else {
+    writeLocalManuscripts([...local, manuscript]);
+  }
+  return true;
+}
+
 export async function touchManuscriptOpened(
   projectId: ProjectId,
   chapterId: ChapterId,

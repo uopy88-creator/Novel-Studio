@@ -24,6 +24,7 @@ import {
   TIMELINE_EVENTS_STORAGE_KEY,
   WORD_TREASURY_STORAGE_KEY,
   WRITING_VAULT_STORAGE_KEY,
+  TRASH_STORAGE_KEY,
 } from "@/lib/storage/keys";
 import {
   canUseStorage,
@@ -49,6 +50,7 @@ const PROJECT_SCOPED_ARRAY_KEYS = [
   SECTION_METAS_STORAGE_KEY,
   SCENE_METAS_STORAGE_KEY,
   TIMELINE_EVENTS_STORAGE_KEY,
+  TRASH_STORAGE_KEY,
 ] as const;
 
 function removeFromProjectScopedArray(key: string, projectId: ProjectId): void {

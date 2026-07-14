@@ -230,7 +230,33 @@ export async function updateForeshadowing(
   return updated;
 }
 
+function isForeshadowingPayload(raw: unknown): raw is Foreshadowing {
+  if (!raw || typeof raw !== "object") return false;
+  const item = raw as Partial<Foreshadowing>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.projectId === "string" &&
+    typeof item.title === "string"
+  );
+}
+
+export async function getForeshadowingById(
+  id: ForeshadowingId,
+): Promise<Foreshadowing | null> {
+  const all = await readAllForeshadowings();
+  return all.find((f) => f.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteForeshadowing(
+  id: ForeshadowingId,
+): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("foreshadowing", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeForeshadowing(
   id: ForeshadowingId,
 ): Promise<boolean> {
   if (isSupabaseDataMode()) {
@@ -250,4 +276,26 @@ export async function deleteForeshadowing(
   const after = before.filter((f) => f.id !== id);
   writeLocal(after);
   return after.length < before.length;
+}
+
+export async function restoreForeshadowingFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  if (!isForeshadowingPayload(payload)) return false;
+  const item = normalizeLocalItem(payload);
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertForeshadowing(item);
+    try {
+      backupForeshadowings(await cloudListForeshadowings());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocal().filter((f) => f.id !== item.id);
+  writeLocal([item, ...others]);
+  return true;
 }

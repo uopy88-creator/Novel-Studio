@@ -205,7 +205,46 @@ export async function updateMemo(
   return updated;
 }
 
+function normalizeMemo(raw: unknown): Memo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as Partial<Memo>;
+  if (typeof item.id !== "string" || typeof item.projectId !== "string") {
+    return null;
+  }
+  if (typeof item.body !== "string") return null;
+  return {
+    id: item.id,
+    projectId: item.projectId,
+    body: item.body,
+    kind: item.kind ?? "note",
+    isPinned: Boolean(item.isPinned),
+    isResolved: Boolean(item.isResolved),
+    sectionStableId: item.sectionStableId,
+    sourceText: item.sourceText,
+    chapterId: item.chapterId,
+    characterId: item.characterId,
+    foreshadowingId: item.foreshadowingId,
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    createdAt:
+      typeof item.createdAt === "string" ? item.createdAt : nowIso(),
+    updatedAt:
+      typeof item.updatedAt === "string" ? item.updatedAt : nowIso(),
+  };
+}
+
+export async function getMemoById(id: MemoId): Promise<Memo | null> {
+  const all = await readAllMemos();
+  return all.find((m) => m.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteMemo(id: MemoId): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("memo", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeMemo(id: MemoId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
     const all = await cloudListMemos();
@@ -223,6 +262,28 @@ export async function deleteMemo(id: MemoId): Promise<boolean> {
   const after = before.filter((m) => m.id !== id);
   writeLocalMemos(after);
   return after.length < before.length;
+}
+
+export async function restoreMemoFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const memo = normalizeMemo(payload);
+  if (!memo) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertMemo(memo);
+    try {
+      backupMemos(await cloudListMemos());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocalMemos().filter((m) => m.id !== memo.id);
+  writeLocalMemos([memo, ...others]);
+  return true;
 }
 
 /** pinned 우선, 그다음 최근 수정순 */

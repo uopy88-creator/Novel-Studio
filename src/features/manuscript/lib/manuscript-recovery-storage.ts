@@ -113,3 +113,19 @@ export function recoveryDiffersFromSaved(
 ): boolean {
   return draftContent !== savedContent;
 }
+
+/**
+ * Recovery 시각이 마지막 정상 저장보다 최신인지.
+ * lastSavedAt 이 없으면(미저장 로드) 내용이 다르면 최신으로 본다.
+ */
+export function isRecoveryNewerThanSaved(
+  recoveryUpdatedAt: string,
+  lastSavedAt: string | null | undefined,
+): boolean {
+  if (!lastSavedAt) return true;
+  const recoveryMs = Date.parse(recoveryUpdatedAt);
+  const savedMs = Date.parse(lastSavedAt);
+  if (!Number.isFinite(recoveryMs)) return true;
+  if (!Number.isFinite(savedMs)) return true;
+  return recoveryMs > savedMs;
+}

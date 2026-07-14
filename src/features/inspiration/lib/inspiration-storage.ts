@@ -254,7 +254,21 @@ export async function updateInspiration(
   return updated;
 }
 
+export async function getInspirationById(
+  id: InspirationId,
+): Promise<Inspiration | null> {
+  const all = await readAllInspirations();
+  return all.find((item) => item.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteInspiration(id: InspirationId): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("inspiration", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeInspiration(id: InspirationId): Promise<boolean> {
   if (isSupabaseDataMode()) {
     await requireCloudDb();
     const all = await cloudListInspirations();
@@ -271,6 +285,28 @@ export async function deleteInspiration(id: InspirationId): Promise<boolean> {
   const all = readLocalInspirations();
   if (!all.some((item) => item.id === id)) return false;
   writeLocalInspirations(all.filter((item) => item.id !== id));
+  return true;
+}
+
+export async function restoreInspirationFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  const inspiration = normalizeInspiration(payload);
+  if (!inspiration) return false;
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertInspiration(inspiration);
+    try {
+      backupInspirations(await cloudListInspirations());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocalInspirations().filter((i) => i.id !== inspiration.id);
+  writeLocalInspirations([...others, inspiration]);
   return true;
 }
 

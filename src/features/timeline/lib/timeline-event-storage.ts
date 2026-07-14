@@ -214,7 +214,23 @@ export async function updateTimelineEvent(
   return updated;
 }
 
+export async function getTimelineEventById(
+  id: TimelineEventId,
+): Promise<TimelineEvent | null> {
+  const all = await readAllTimelineEvents();
+  return all.find((e) => e.id === id) ?? null;
+}
+
+/** Soft Delete — 휴지통 이동 */
 export async function deleteTimelineEvent(
+  id: TimelineEventId,
+): Promise<boolean> {
+  const { softDelete } = await import("@/features/trash/lib/trash-manager");
+  return softDelete("timeline", id);
+}
+
+/** 영구삭제 / softDelete removeLive */
+export async function purgeTimelineEvent(
   id: TimelineEventId,
 ): Promise<boolean> {
   if (isSupabaseDataMode()) {
@@ -230,6 +246,32 @@ export async function deleteTimelineEvent(
 
   const next = readLocal().filter((e) => e.id !== id);
   writeLocal(next);
+  return true;
+}
+
+export async function restoreTimelineEventFromTrash(
+  payload: unknown,
+): Promise<boolean> {
+  if (!payload || typeof payload !== "object") return false;
+  const raw = payload as RawTimelineEvent;
+  if (typeof raw.id !== "string" || typeof raw.projectId !== "string") {
+    return false;
+  }
+  const event = normalizeEvent(raw);
+
+  if (isSupabaseDataMode()) {
+    await requireCloudDb();
+    await cloudUpsertTimelineEvent(event);
+    try {
+      backup(await cloudListTimelineEvents());
+    } catch {
+      // 백업 실패 무시
+    }
+    return true;
+  }
+
+  const others = readLocal().filter((e) => e.id !== event.id);
+  writeLocal([event, ...others]);
   return true;
 }
 
