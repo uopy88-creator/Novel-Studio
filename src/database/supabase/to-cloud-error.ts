@@ -50,7 +50,7 @@ function friendlyMissingTableMessage(parts: {
   if (/timeline_events/i.test(blob)) {
     return (
       "Timeline 테이블(public.timeline_events)이 Supabase에 없습니다. " +
-      "Supabase → SQL Editor에서 supabase/migrations/20260711000005_timeline_events.sql " +
+      "Supabase → SQL Editor에서 supabase/HOTFIX_timeline_events.sql " +
       "내용을 실행한 뒤 페이지를 새로고침하세요."
     );
   }
@@ -69,13 +69,59 @@ function friendlyMissingTableMessage(parts: {
   );
 }
 
+/** 미적용 마이그레이션(컬럼 없음) → 한글 안내 */
+function friendlyMissingColumnMessage(parts: {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+}): string | null {
+  const blob = `${parts.message} ${parts.details} ${parts.hint} ${parts.code}`;
+  const isMissingColumn =
+    parts.code === "PGRST204" ||
+    /Could not find the ['"][^'"]+['"] column/i.test(blob);
+
+  if (!isMissingColumn) return null;
+
+  if (/['"]type['"]/.test(blob) && /projects/i.test(blob)) {
+    return (
+      "projects.type 컬럼이 Supabase에 없습니다. " +
+      "Supabase → SQL Editor에서 supabase/HOTFIX_projects_type.sql " +
+      "내용을 실행한 뒤 다시 작품을 추가하세요."
+    );
+  }
+
+  if (/['"]nickname['"]|['"]status['"]|['"]intro['"]/.test(blob) && /characters/i.test(blob)) {
+    return (
+      "characters 프로필 컬럼이 Supabase에 없습니다. " +
+      "Supabase → SQL Editor에서 supabase/migrations/20260712000003_characters_profile_fields.sql " +
+      "을 실행해 주세요."
+    );
+  }
+
+  const columnMatch = blob.match(/['"]([a-z0-9_]+)['"] column/i);
+  if (columnMatch) {
+    return (
+      `필요한 DB 컬럼(${columnMatch[1]})이 Supabase에 없습니다. ` +
+      "Supabase → SQL Editor에서 해당 migration SQL을 실행해 주세요."
+    );
+  }
+
+  return (
+    "필요한 DB 컬럼이 Supabase에 없습니다. " +
+    "Supabase → SQL Editor에서 supabase/migrations/ 안의 미적용 SQL을 실행해 주세요."
+  );
+}
+
 export function toCloudError(
   error: unknown,
   fallback = "클라우드 저장에 실패했습니다.",
 ): Error {
   const parts = readErrorParts(error);
-  const friendly = friendlyMissingTableMessage(parts);
-  if (friendly) return new Error(friendly);
+  const friendlyTable = friendlyMissingTableMessage(parts);
+  if (friendlyTable) return new Error(friendlyTable);
+  const friendlyColumn = friendlyMissingColumnMessage(parts);
+  if (friendlyColumn) return new Error(friendlyColumn);
 
   if (error instanceof Error) return error;
 
