@@ -8,8 +8,8 @@
  * - 검색 점프를 위해 ref + setSelectionRange 지원
  * - @멘션 자동완성을 위해 키보드/클릭/선택/IME 핸들러 전달 가능
  * - 하늘색 Highlight 는 Selection Menu 토글; grid 오버레이로 표시
- *   (position:relative 래퍼를 쓰면 textarea.offsetParent 가 바뀌어
- *    Quick Actions 위치가 어긋나므로 grid 스택만 사용)
+ *   - isolate 로 z-index 를 에디터 안에 가둬 Inspiration 💡 gutter 를 가리지 않음
+ *   - position:relative 래퍼는 쓰지 않음 (textarea.offsetParent / Quick Actions 위치 유지)
  * =============================================================================
  */
 

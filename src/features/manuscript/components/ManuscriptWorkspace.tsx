@@ -528,7 +528,7 @@ export function ManuscriptWorkspace({
                 content={plainContent}
                 inspirations={gutterInspirations}
                 onOpen={(item) => setViewingInspiration(item)}
-                className="z-10 pt-ns-5"
+                className="z-20 pt-ns-5"
               />
               <CharacterMentionField
                 value={plainContent}
